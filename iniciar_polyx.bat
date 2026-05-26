@@ -1,0 +1,17 @@
+@echo off
+title Poly-X
+cd /d "%~dp0"
+
+if not exist .venv\Scripts\python.exe (
+    echo [ERROR] No se encuentra el entorno virtual.
+    echo Ejecuta primero SETUP.bat
+    pause
+    exit /b 1
+)
+
+.venv\Scripts\python.exe -m polyx.launcher
+if errorlevel 1 (
+    echo.
+    echo Poly-X termino con errores. Revisa el mensaje de arriba.
+    pause
+)
