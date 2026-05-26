@@ -1,0 +1,375 @@
+"""Generador de reporte HTML paper-quality (autocontenido, imágenes en base64).
+
+Contenido:
+  1. Abstract (resumen ejecutivo)
+  2. Métodos (modelo, params, calibración, dispositivo, fecha)
+  3. Resultados generales (clase, conf, tamaño, P/R/F1)
+  4. Resumen por modelo
+  5. Análisis de errores (matriz de confusión + galería)
+  6. Comparación entre modelos
+  7. Galería completa por imagen anotada
+  8. Referencias bibliográficas
+"""
+from __future__ import annotations
+import base64
+import io
+from collections import Counter
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import numpy as np
+
+# matplotlib en modo no-interactivo
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+from . import theme as T
+from .metrics import aggregate_per_class, confusion_matrix
+from .yolo_wrap import Detection
+
+
+# ────────────────────────────────────────────────────────────────────
+# Estilos del reporte (idénticos al manual)
+# ────────────────────────────────────────────────────────────────────
+REPORT_CSS = """
+:root{--ink:#1f2328;--ink2:#424a53;--ink3:#656d76;--muted:#8c959f;
+--rule:#d0d7de;--rule_soft:#eaeef2;--bg:#ffffff;--bg_soft:#f6f8fa;
+--accent:#0969da;--accent_d:#0550ae;
+--ok:#1f6b5e;--warn:#9a6700;--err:#cf222e;--vio:#6639ba;}
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:var(--ink);
+background:var(--bg);margin:0;padding:0;line-height:1.55;}
+.container{max-width:1100px;margin:0 auto;padding:40px 48px 80px;}
+header.cover{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:28px;}
+.kicker{font-size:10pt;letter-spacing:.14em;text-transform:uppercase;
+color:var(--accent_d);font-weight:600;margin-bottom:8px;}
+h1{font-size:28pt;margin:4px 0 8px;line-height:1.18;}
+h2{font-size:18pt;margin-top:38px;padding-bottom:8px;border-bottom:1px solid var(--rule);}
+h3{font-size:13pt;margin-top:22px;color:var(--ink2);}
+h4{font-size:11pt;margin-top:14px;color:var(--ink2);}
+.meta{font-size:10pt;color:var(--ink3);}
+.toc{background:var(--bg_soft);border-left:3px solid var(--accent);
+padding:14px 20px;margin:18px 0 28px;}
+.toc h3{margin:0 0 8px;color:var(--ink);}
+.toc ol{margin:0;padding-left:22px;font-size:10.5pt;}
+.toc a{color:var(--ink2);text-decoration:none;}
+.toc a:hover{color:var(--accent);}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0;}
+.kpi{background:var(--bg);border:1px solid var(--rule);border-radius:8px;
+padding:14px 16px;}
+.kpi .v{font-size:22pt;font-weight:700;color:var(--ink);margin:4px 0 6px;}
+.kpi .l{font-size:9pt;font-weight:600;color:var(--ink3);letter-spacing:1.4px;
+text-transform:uppercase;}
+.kpi .b{height:3px;background:var(--accent);border-radius:2px;}
+table.data{width:100%;border-collapse:collapse;font-size:10pt;margin:12px 0;}
+table.data th{background:var(--bg_soft);text-align:left;padding:8px 10px;
+border-bottom:1px solid var(--rule);font-weight:600;}
+table.data td{padding:7px 10px;border-bottom:1px solid var(--rule_soft);}
+table.data tr:last-child td{border-bottom:none;}
+table.data td.r{text-align:right;font-variant-numeric:tabular-nums;}
+.fig{margin:18px 0;}
+.fig img{width:100%;border:1px solid var(--rule);border-radius:6px;display:block;}
+.caption{font-size:9pt;color:var(--ink3);margin-top:6px;text-align:center;}
+.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0;}
+.gallery .item{border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--bg_soft);}
+.gallery .item img{width:100%;display:block;}
+.gallery .item .cap{font-size:8.5pt;color:var(--ink3);padding:5px 8px;}
+.badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:8.5pt;
+font-weight:600;letter-spacing:.04em;}
+.b-blue{background:#ddf4ff;color:var(--accent_d);}
+.b-green{background:#d8f5ea;color:var(--ok);}
+.b-amber{background:#fff8c5;color:var(--warn);}
+.b-red{background:#ffebe9;color:var(--err);}
+.b-violet{background:#ece0fd;color:var(--vio);}
+footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:18px;
+font-size:9.5pt;color:var(--ink3);}
+@media print{.container{max-width:none;padding:24px;}
+h2{page-break-after:avoid;}.fig,.gallery .item{page-break-inside:avoid;}}
+"""
+
+
+def _fig_to_b64(fig) -> str:
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+    plt.close(fig)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _img_b64(data: bytes) -> str:
+    return base64.b64encode(data).decode("ascii")
+
+
+def _fig_class_distribution(per_class_counts: Dict[str, int]) -> str:
+    if not per_class_counts:
+        return ""
+    fig, ax = plt.subplots(figsize=(7, 3.2))
+    names = list(per_class_counts.keys())
+    vals = list(per_class_counts.values())
+    colors = [T.CLASS_COLOR_HEX.get(n, "#888") for n in names]
+    ax.bar(names, vals, color=colors, edgecolor="black", linewidth=0.5)
+    ax.set_ylabel("Detecciones")
+    ax.set_title("Distribución por clase")
+    ax.grid(axis="y", alpha=0.25)
+    return _fig_to_b64(fig)
+
+
+def _fig_confidence_hist(confs: List[float]) -> str:
+    if not confs:
+        return ""
+    fig, ax = plt.subplots(figsize=(7, 3.2))
+    ax.hist(confs, bins=20, color=T.ACCENT, edgecolor="black", linewidth=0.5)
+    ax.set_xlabel("Confianza")
+    ax.set_ylabel("Frecuencia")
+    ax.set_title("Histograma de confianza")
+    ax.grid(axis="y", alpha=0.25)
+    return _fig_to_b64(fig)
+
+
+def _fig_size_hist(sizes_um: List[float]) -> str:
+    if not sizes_um:
+        return ""
+    fig, ax = plt.subplots(figsize=(7, 3.2))
+    ax.hist(sizes_um, bins=25, color=T.WARN, edgecolor="black", linewidth=0.5)
+    ax.set_xlabel("Diámetro equivalente (μm)")
+    ax.set_ylabel("Frecuencia")
+    ax.set_title("Distribución de tamaños")
+    ax.grid(axis="y", alpha=0.25)
+    return _fig_to_b64(fig)
+
+
+def _fig_confusion_matrix(cm: np.ndarray, class_names: List[str]) -> str:
+    labels = list(class_names) + ["background"]
+    fig, ax = plt.subplots(figsize=(5.5, 4.8))
+    im = ax.imshow(cm, cmap="Blues")
+    ax.set_xticks(range(len(labels))); ax.set_yticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=45, ha="right")
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Predicción"); ax.set_ylabel("Ground Truth")
+    ax.set_title("Matriz de confusión")
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            val = cm[i, j]
+            color = "white" if val > cm.max() * 0.5 else "black"
+            ax.text(j, i, str(int(val)), ha="center", va="center",
+                    fontsize=9, color=color)
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    return _fig_to_b64(fig)
+
+
+# ────────────────────────────────────────────────────────────────────
+def generate_report(state, output_path: Path,
+                    include_refs: bool = True,
+                    include_gallery: bool = True) -> Path:
+    """Genera el reporte HTML. `state` es un DetectorState con resultados."""
+    out_path = Path(output_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    active = state.active_models()
+    all_results = [r for rs in state.results.values() for r in rs]
+    total_imgs = len({r.image_path for r in all_results})
+    total_dets = sum(len(r.predictions) for r in all_results)
+    confs = [p.conf for r in all_results for p in r.predictions]
+    sizes = [p.diam_um for r in all_results for p in r.predictions if p.diam_um]
+    avg_conf = sum(confs)/len(confs) if confs else 0
+    avg_size = sum(sizes)/len(sizes) if sizes else 0
+    any_gt = any(r.has_gt for r in all_results)
+
+    # ── Distribución por clase ──
+    per_class = Counter()
+    for r in all_results:
+        for p in r.predictions:
+            per_class[p.class_name] += 1
+
+    # ── Análisis de errores: matriz + métricas por clase (modelo principal) ──
+    err_section = ""
+    if any_gt and active:
+        main_mi = state.model_slots.index(active[0])
+        rs = state.results.get(main_mi, [])
+        gts_only = [r.gt for r in rs if r.has_gt]
+        preds_only = [r.predictions for r in rs if r.has_gt]
+        cls_ids = sorted({d.class_id for lst in gts_only + preds_only for d in lst})
+        cls_names = []
+        for cid in cls_ids:
+            name = next((d.class_name for lst in gts_only + preds_only for d in lst if d.class_id == cid), str(cid))
+            cls_names.append(name)
+        cm = confusion_matrix(preds_only, gts_only, cls_ids, iou_thr=state.params.iou_tp)
+        per_class_metrics = aggregate_per_class(preds_only, gts_only, cls_ids, iou_thr=state.params.iou_tp)
+
+        cm_img = _fig_confusion_matrix(cm, cls_names)
+        rows = ""
+        for cid, name in zip(cls_ids, cls_names):
+            cm_ = per_class_metrics[cid]
+            rows += (
+                f"<tr><td>{name}</td>"
+                f"<td class='r'>{cm_.tp}</td><td class='r'>{cm_.fp}</td><td class='r'>{cm_.fn}</td>"
+                f"<td class='r'>{cm_.precision:.3f}</td><td class='r'>{cm_.recall:.3f}</td>"
+                f"<td class='r'>{cm_.f1:.3f}</td></tr>"
+            )
+        err_section = f"""
+        <h2 id='errors'>5. Análisis de errores</h2>
+        <h3>5.1 Matriz de confusión</h3>
+        <div class='fig'><img src='data:image/png;base64,{cm_img}' />
+            <div class='caption'>Figura. Matriz de confusión (modelo principal: {active[0].alias}, IoU = {state.params.iou_tp}).</div></div>
+        <h3>5.2 P / R / F1 por clase</h3>
+        <table class='data'><tr><th>Clase</th><th>TP</th><th>FP</th><th>FN</th>
+        <th>Precision</th><th>Recall</th><th>F1</th></tr>{rows}</table>
+        """
+
+    # ── Resumen por modelo (tabla comparativa) ──
+    rows_models = ""
+    for mi, slot in enumerate(state.model_slots):
+        if slot.path is None: continue
+        rs = state.results.get(mi, [])
+        n_img = len({r.image_path for r in rs})
+        n_det = sum(len(r.predictions) for r in rs)
+        cf = [p.conf for r in rs for p in r.predictions]
+        tp = sum(r.tp for r in rs); fp = sum(r.fp for r in rs); fn = sum(r.fn for r in rs)
+        prec = tp/(tp+fp) if (tp+fp) else 0; rec = tp/(tp+fn) if (tp+fn) else 0
+        f1 = 2*prec*rec/(prec+rec) if (prec+rec) else 0
+        avg_cf = (sum(cf)/len(cf)) if cf else 0
+        f1_cell = f"{f1:.3f}" if any(r.has_gt for r in rs) else "—"
+        rows_models += (
+            f"<tr><td>{slot.alias}</td><td class='r'>{n_img}</td><td class='r'>{n_det}</td>"
+            f"<td class='r'>{avg_cf:.3f}</td>"
+            f"<td class='r'>{tp}</td><td class='r'>{fp}</td><td class='r'>{fn}</td>"
+            f"<td class='r'>{f1_cell}</td></tr>"
+        )
+
+    # ── Galería ──
+    gallery_html = ""
+    if include_gallery and state.run_dir:
+        items = []
+        for mi, rs in state.results.items():
+            slot = state.model_slots[mi]
+            for r in rs:
+                if r.annotated_png:
+                    b64 = _img_b64(r.annotated_png)
+                    items.append(
+                        f"<div class='item'><img src='data:image/png;base64,{b64}' />"
+                        f"<div class='cap'>{slot.alias} · {r.image_path.name} · "
+                        f"pred {len(r.predictions)} · GT {len(r.gt)}</div></div>"
+                    )
+        if items:
+            gallery_html = f"<h2 id='gallery'>7. Galería por imagen</h2><div class='gallery'>{''.join(items)}</div>"
+
+    # ── Figuras agregadas ──
+    fig_classes = _fig_class_distribution(dict(per_class))
+    fig_conf = _fig_confidence_hist(confs)
+    fig_size = _fig_size_hist(sizes) if sizes else ""
+
+    figures_html = ""
+    if fig_classes:
+        figures_html += f"<div class='fig'><img src='data:image/png;base64,{fig_classes}' /><div class='caption'>Figura. Distribución de detecciones por clase.</div></div>"
+    if fig_conf:
+        figures_html += f"<div class='fig'><img src='data:image/png;base64,{fig_conf}' /><div class='caption'>Figura. Histograma de confianza.</div></div>"
+    if fig_size:
+        figures_html += f"<div class='fig'><img src='data:image/png;base64,{fig_size}' /><div class='caption'>Figura. Distribución de tamaños (diámetro equivalente en μm).</div></div>"
+
+    # ── Métodos ──
+    p = state.params
+    methods_rows = [
+        ("Modelos cargados", ", ".join(s.alias for s in active) or "—"),
+        ("Confianza mínima", f"{p.conf}"),
+        ("IoU NMS", f"{p.iou_nms}"),
+        ("IoU emparejar TP", f"{p.iou_tp}"),
+        ("Tamaño de imagen (imgsz)", f"{p.imgsz}"),
+        ("Dispositivo", p.device),
+        ("μm por píxel", f"{p.um_per_px}" if p.um_per_px > 0 else "—"),
+        ("Filtro tamaño (μm)", f"{p.size_min_um} – {p.size_max_um}" if (p.size_min_um or p.size_max_um) else "sin filtro"),
+        ("Imágenes procesadas", str(total_imgs)),
+        ("Total de detecciones", str(total_dets)),
+        ("Fecha de generación", now),
+    ]
+    methods_html = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in methods_rows)
+
+    refs_html = ""
+    if include_refs:
+        refs_html = """
+        <h2 id='refs'>8. Referencias bibliográficas</h2>
+        <ol>
+          <li>Pérez M, Parra S, Ferrada C, Bravo M, Pérez PA, Quiroz W (2024).
+              Development of a new methodology for the determination of PET microplastics in sediment,
+              based on microwave-assisted acid digestion.
+              <em>PLoS ONE</em> 19(12): e0314520.
+              <a href='https://doi.org/10.1371/journal.pone.0314520'>https://doi.org/10.1371/journal.pone.0314520</a></li>
+          <li>Ferrada C, Pérez M, Parra S, Salas E, Sepúlveda F, Bravo MA, Quiroz W (2024).
+              Evaluation of microwave-assisted acid/oxidant digestion method for the detection of
+              polyethylene microplastics in <em>Merluccius gayi</em> fish by Nile Red fluorescent
+              staining and image analysis. <em>J. Chil. Chem. Soc.</em> 69(1): 6082.</li>
+        </ol>
+        """
+
+    # ── Ensamblar HTML ──
+    html = f"""<!doctype html>
+<html lang='es'><head><meta charset='utf-8'>
+<title>Reporte Poly-X · {now}</title>
+<style>{REPORT_CSS}</style></head><body>
+<div class='container'>
+
+<header class='cover'>
+  <div class='kicker'>Poly-X · Reporte paper-quality</div>
+  <h1>Análisis automatizado de microplásticos<br>por fluorescencia Nile Red e IA</h1>
+  <p class='meta'><strong>Autor:</strong> Cristofher Ferrada &middot;
+    <strong>Generado:</strong> {now} &middot;
+    <strong>Modelos:</strong> {', '.join(s.alias for s in active) or '—'}</p>
+</header>
+
+<div class='toc'>
+  <h3>📑 Índice</h3>
+  <ol>
+    <li><a href='#abstract'>Resumen</a></li>
+    <li><a href='#methods'>Métodos</a></li>
+    <li><a href='#results'>Resultados generales</a></li>
+    <li><a href='#models'>Resumen por modelo</a></li>
+    {"<li><a href='#errors'>Análisis de errores</a></li>" if any_gt else ""}
+    <li><a href='#compare'>Comparación entre modelos</a></li>
+    {"<li><a href='#gallery'>Galería por imagen</a></li>" if gallery_html else ""}
+    {"<li><a href='#refs'>Referencias</a></li>" if include_refs else ""}
+  </ol>
+</div>
+
+<h2 id='abstract'>1. Resumen</h2>
+<div class='kpis'>
+  <div class='kpi'><div class='l'>Imágenes</div><div class='v'>{total_imgs}</div><div class='b' style='background:var(--accent)'></div></div>
+  <div class='kpi'><div class='l'>Detecciones</div><div class='v'>{total_dets}</div><div class='b' style='background:var(--accent)'></div></div>
+  <div class='kpi'><div class='l'>Conf. media</div><div class='v'>{avg_conf:.3f}</div><div class='b' style='background:var(--vio)'></div></div>
+  <div class='kpi'><div class='l'>Tamaño medio (μm)</div><div class='v'>{(f"{avg_size:.1f}" if avg_size else "—")}</div><div class='b' style='background:var(--warn)'></div></div>
+</div>
+<p>Se analizaron <strong>{total_imgs} imágenes</strong> con
+<strong>{len(active)} modelo{'s' if len(active)!=1 else ''}</strong> YOLO entrenado para detectar
+microplásticos de PET, PP y LDPE bajo fluorescencia Nile Red (254 nm). El total de detecciones
+fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.3f}</strong>.
+{"Se incluyó análisis de errores con Ground Truth (TP/FP/FN/MISCLS)." if any_gt else "No se aportó Ground Truth, por lo que no se reportan métricas de error."}
+</p>
+
+<h2 id='methods'>2. Métodos</h2>
+<table class='data'><tr><th>Parámetro</th><th>Valor</th></tr>{methods_html}</table>
+
+<h2 id='results'>3. Resultados generales</h2>
+{figures_html}
+
+<h2 id='models'>4. Resumen por modelo</h2>
+<table class='data'><tr><th>Modelo</th><th>Imágenes</th><th>Detecciones</th>
+<th>Conf. media</th><th>TP</th><th>FP</th><th>FN</th><th>F1</th></tr>{rows_models}</table>
+
+{err_section}
+
+<h2 id='compare'>6. Comparación entre modelos</h2>
+<p>Esta sección consolida las métricas globales de cada modelo (tabla anterior) y permite
+identificar cuál ofrece el mejor balance de precisión y cobertura sobre este conjunto de imágenes.</p>
+
+{gallery_html}
+
+{refs_html}
+
+<footer>
+  © Cristofher Ferrada · Generado por Poly-X · {now}<br>
+  Suite de detección de microplásticos por fluorescencia Nile Red (254 nm) e IA (YOLO v8/v11).
+</footer>
+</div></body></html>
+"""
+    out_path.write_text(html, encoding="utf-8")
+    return out_path

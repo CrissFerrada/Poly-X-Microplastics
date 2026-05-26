@@ -1,0 +1,138 @@
+"""Página 2 — Imágenes. Selección de archivos/carpeta + carpeta GT opcional."""
+from __future__ import annotations
+from pathlib import Path
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog,
+    QTableWidget, QTableWidgetItem, QHeaderView,
+)
+
+from ._base import DetectorPage
+from ...core import theme as T
+from ...core.paths import IMAGE_EXTS
+from ...core.yolo_wrap import find_gt_for_image
+
+
+class ImagenesPage(DetectorPage):
+    STEP_N = 2
+    STEP_TITLE = "Imágenes"
+    STEP_DESCRIPTION = (
+        "Selecciona imágenes individuales o una carpeta. Si tienes etiquetas verdaderas en "
+        "formato YOLO (.txt) en la misma carpeta o en una hermana 'labels/', se cargarán y "
+        "activarán el análisis de errores."
+    )
+
+    def __init__(self, state, parent=None):
+        super().__init__(state, parent)
+
+        # ── Tarjeta Origen ──
+        c1, l1 = self.card("Origen", "📁")
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        btn_files = QPushButton("📷  Seleccionar imágenes…")
+        btn_files.clicked.connect(self._pick_files)
+        btn_folder = QPushButton("📁  Seleccionar carpeta…")
+        btn_folder.clicked.connect(self._pick_folder)
+        btn_clear = QPushButton("✕  Limpiar")
+        btn_clear.clicked.connect(self._clear)
+        row.addWidget(btn_files)
+        row.addWidget(btn_folder)
+        row.addWidget(btn_clear)
+        row.addStretch(1)
+        l1.addLayout(row)
+
+        # Carpeta GT opcional
+        gt_row = QHBoxLayout()
+        gt_row.setSpacing(8)
+        lbl_gt = QLabel("Carpeta GT (opcional):")
+        lbl_gt.setStyleSheet(f"color: {T.INK2}; border: none;")
+        self.ed_gt = QLineEdit()
+        self.ed_gt.setPlaceholderText("Ruta a la carpeta con .txt YOLO (si no, busca junto a la imagen)")
+        self.ed_gt.editingFinished.connect(self._gt_text_changed)
+        btn_gt = QPushButton("…")
+        btn_gt.setFixedWidth(36)
+        btn_gt.clicked.connect(self._pick_gt_folder)
+        gt_row.addWidget(lbl_gt)
+        gt_row.addWidget(self.ed_gt, 1)
+        gt_row.addWidget(btn_gt)
+        l1.addLayout(gt_row)
+
+        hint = QLabel(
+            "Si dejas vacío, busca .txt junto a cada imagen y en /labels/ hermana. "
+            "Si una imagen tiene GT, se incluirá en el análisis de errores (TP/FP/FN). "
+            "Si no, solo se reportan las detecciones del modelo."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
+        l1.addWidget(hint)
+        self.body.addWidget(c1)
+
+        # ── Tarjeta Imágenes cargadas ──
+        c2, l2 = self.card("Imágenes cargadas", "🖼")
+        self.lbl_count = QLabel("0 imágenes")
+        self.lbl_count.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l2.addWidget(self.lbl_count)
+
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Imagen", "Carpeta", "GT"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setAlternatingRowColors(True)
+        self.table.setMinimumHeight(280)
+        l2.addWidget(self.table)
+        self.body.addWidget(c2)
+
+    # ──────────────────────────────────────────
+    def _pick_files(self):
+        ext_filter = "Imágenes (" + " ".join(f"*{e}" for e in IMAGE_EXTS) + ")"
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "Seleccionar imágenes", "", ext_filter
+        )
+        if files:
+            self.state.images = [Path(f) for f in files]
+            self._refresh_table()
+
+    def _pick_folder(self):
+        d = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta con imágenes")
+        if d:
+            root = Path(d)
+            imgs: list[Path] = []
+            for ext in IMAGE_EXTS:
+                imgs.extend(root.rglob(f"*{ext}"))
+            imgs = sorted(set(imgs))
+            self.state.images = imgs
+            self._refresh_table()
+
+    def _clear(self):
+        self.state.images = []
+        self._refresh_table()
+
+    def _pick_gt_folder(self):
+        d = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta GT")
+        if d:
+            self.ed_gt.setText(d)
+            self._gt_text_changed()
+
+    def _gt_text_changed(self):
+        txt = self.ed_gt.text().strip()
+        self.state.gt_folder = Path(txt) if txt else None
+        self._refresh_table()
+
+    def _refresh_table(self):
+        imgs = self.state.images
+        self.lbl_count.setText(f"{len(imgs)} imágene{'s' if len(imgs)!=1 else ''}")
+        self.table.setRowCount(len(imgs))
+        for r, p in enumerate(imgs):
+            self.table.setItem(r, 0, QTableWidgetItem(p.name))
+            self.table.setItem(r, 1, QTableWidgetItem(str(p.parent)))
+            gt = find_gt_for_image(p, self.state.gt_folder)
+            item = QTableWidgetItem("✓" if gt else "—")
+            item.setTextAlignment(Qt.AlignCenter)
+            if gt:
+                item.setForeground(Qt.darkGreen)
+            self.table.setItem(r, 2, item)
+        self.state.images_changed.emit()

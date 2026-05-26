@@ -34,14 +34,16 @@ from PySide6.QtWidgets import QApplication
 # ────────────────────────────────────────────────────────────────────
 FIGURE_MAP = {
     # fig_01 — Launcher principal
-    1: dict(
-        module="polyx.launcher", cls="LauncherWindow",
-        size=(1180, 820), wait_ms=900,
-    ),
-    # cuando existan los siguientes módulos, se irán activando:
-    # 2: dict(module="polyx.detector",   cls="DetectorWindow", size=(1280, 820), tab="modelos"),
-    # 3: dict(module="polyx.detector",   cls="DetectorWindow", size=(1280, 820), tab="imagenes"),
-    # ...
+    1: dict(module="polyx.launcher", cls="LauncherWindow", size=(1180, 820), wait_ms=900),
+    # fig_02..09 — Detector, una por pestaña del sidebar
+    2: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=0),
+    3: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=1),
+    4: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=3),  # Parametros
+    5: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=4),  # Ejecutar
+    6: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=5),  # Resultados
+    7: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=6),  # Errores
+    8: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=7),  # Comparar
+    9: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=8),  # Reporte
 }
 
 
@@ -54,11 +56,10 @@ def pixmap_to_png_base64(pix: QPixmap) -> str:
     return base64.b64encode(bytes(ba)).decode("ascii")
 
 
-def capture_window(module_dotted: str, cls_name: str, size, wait_ms: int = 600) -> str | None:
-    """Importa el módulo, instancia la ventana, la renderiza y devuelve base64 PNG.
-
-    Devuelve None si el módulo no existe (todavía no implementado).
-    """
+def capture_window(module_dotted: str, cls_name: str, size, wait_ms: int = 600,
+                   tab: int | None = None) -> str | None:
+    """Importa el módulo, instancia la ventana (cambia de pestaña si aplica)
+    y devuelve base64 PNG. Devuelve None si el módulo no existe."""
     import importlib
     try:
         spec = importlib.util.find_spec(module_dotted)
@@ -77,11 +78,20 @@ def capture_window(module_dotted: str, cls_name: str, size, wait_ms: int = 600) 
     w = klass()
     if size:
         w.resize(*size)
-    # Posicionar fuera de pantalla para no molestar visualmente
     w.move(-3000, -3000)
     w.show()
 
-    # Permitir que se procesen eventos, layouts y animaciones (microscopio)
+    # Si pidieron una pestaña concreta (Detector u otros con sidebar)
+    if tab is not None:
+        try:
+            btns = getattr(w, "sidebar_buttons", None)
+            stack = getattr(w, "stack", None)
+            if btns and stack and 0 <= tab < len(btns):
+                btns[tab].setChecked(True)
+                stack.setCurrentIndex(tab)
+        except Exception as e:
+            print(f"  [WARN] no se pudo cambiar a pestaña {tab}: {e}")
+
     deadline = time.time() + wait_ms / 1000.0
     while time.time() < deadline:
         QApplication.processEvents()
@@ -169,6 +179,7 @@ def main():
             cfg["module"], cfg["cls"],
             size=cfg.get("size"),
             wait_ms=cfg.get("wait_ms", 600),
+            tab=cfg.get("tab"),
         )
         if b64:
             replacements[fig_n] = b64
