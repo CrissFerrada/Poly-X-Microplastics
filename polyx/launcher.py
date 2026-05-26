@@ -355,6 +355,9 @@ class LauncherWindow(QMainWindow):
         st.setStyleSheet(f"color: {T.OK}; font-size: 9.5pt; font-weight: 600;")
         foot.addWidget(st)
         foot.addStretch(1)
+        leeme_btn = QPushButton("📄 LÉAME")
+        leeme_btn.clicked.connect(self.open_leeme)
+        foot.addWidget(leeme_btn)
         manual_btn = QPushButton("📖 Manual de usuario")
         manual_btn.clicked.connect(self.open_manual)
         foot.addWidget(manual_btn)
@@ -389,6 +392,14 @@ class LauncherWindow(QMainWindow):
             webbrowser.open(manual.as_uri())
         else:
             self._toast("Manual_PolyX.html no encontrado")
+
+    def open_leeme(self):
+        leeme = Path(__file__).resolve().parents[1] / "LEEME.txt"
+        if leeme.exists():
+            import os
+            os.startfile(str(leeme))
+        else:
+            self._toast("LEEME.txt no encontrado")
 
     def _toast(self, msg: str):
         from PySide6.QtWidgets import QMessageBox

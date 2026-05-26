@@ -1,0 +1,85 @@
+================================================================
+  POLY-X — Suite de detección de microplásticos
+  Autor: Cristofher Ferrada · Año: 2026 · Versión: 2.0
+================================================================
+
+¿QUÉ ES?
+--------
+Plataforma de detección y clasificación de microplásticos
+(PET, PP y LDPE) por fluorescencia Nile Red bajo luz UV (254 nm)
+e inteligencia artificial (YOLO v8 / v11).
+
+INSTALACIÓN (PRIMERA VEZ)
+-------------------------
+1. Instala Python 3.11.x (NO 3.12+) desde
+   https://www.python.org/downloads/release/python-3119/
+   Marca "Add Python to PATH" y "tcl/tk and IDLE".
+
+2. (Opcional, si tienes GPU NVIDIA) instala los drivers actualizados.
+
+3. Doble clic en  SETUP.bat
+   - Crea el entorno virtual .venv
+   - Detecta GPU automáticamente
+   - Instala PyTorch + ultralytics + PySide6 (5-15 min la 1ª vez)
+
+USO DIARIO
+----------
+Doble clic en  iniciar_polyx.bat
+Se abre el menú principal con 4 módulos:
+
+   🔬 Detector     · Analiza imágenes con un modelo .pt entrenado
+                     y genera reporte HTML tipo paper.
+   🎯 Entrenador   · Entrena modelos YOLO v8/v11 con curvas en vivo.
+   🏷  Etiquetador · Anota imágenes en formato YOLO con
+                     pre-anotación automática.
+   📐 Visor        · Inspección + calibración interactiva μm/píxel.
+
+FLUJO RÁPIDO (usar modelo ya entrenado)
+---------------------------------------
+1. Abre el Detector desde el launcher.
+2. Pestaña "Modelos" → "Usar bestdetectormedium.pt" (carga rápida).
+3. Pestaña "Imágenes" → selecciona tu carpeta.
+4. Pestaña "Parámetros" → ajusta μm/píxel del microscopio.
+5. Pestaña "Ejecutar" → ▶ Iniciar detección.
+6. Pestaña "Reporte" → 📄 Generar reporte HTML.
+
+ESTRUCTURA DE CARPETAS
+----------------------
+  polyx/              Código fuente (launcher, detector, ...)
+  models/             Pesos .pt entrenados
+  runs/               Resultados de cada corrida (timestamp)
+  data/               Datasets YOLO (images/ + labels/)
+  legacy/             Versiones anteriores del código (referencia)
+  manual_screenshots/ Capturas usadas por el manual
+  Manual_PolyX.html   Manual de usuario completo (abrir en navegador)
+  SETUP.bat           Instalación
+  iniciar_polyx.bat   Lanzador
+
+REGENERAR EL MANUAL CON LA UI ACTUAL
+------------------------------------
+.venv\Scripts\python.exe generar_manual.py --solo launcher
+.venv\Scripts\python.exe generar_manual.py --solo detector
+.venv\Scripts\python.exe generar_manual.py            (todos)
+
+PROBLEMAS COMUNES
+-----------------
+• "No module named tkinter"  →  reinstala Python marcando tcl/tk.
+• "CUDA not available"       →  no es error, solo CPU es más lento.
+• Detector no detecta nada   →  baja confianza a 0.10 en Parámetros.
+• OOM en entrenamiento       →  baja batch a 4 o 2, e imgsz a 640.
+
+CONTACTO
+--------
+Cristofher Ferrada
+Doctorado en Ciencias mención Química — 2026
+Repo: https://github.com/CrissFerrada/Poly-X-Microplastics
+
+REFERENCIAS
+-----------
+Pérez M, Parra S, Ferrada C, et al. (2024).
+   PLoS ONE 19(12): e0314520.
+   https://doi.org/10.1371/journal.pone.0314520
+
+Ferrada C, Pérez M, Parra S, et al. (2024).
+   J. Chil. Chem. Soc. 69(1): 6082.
+================================================================
