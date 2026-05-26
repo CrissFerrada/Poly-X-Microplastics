@@ -1,0 +1,66 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Modelos YOLO (pesos grandes — el usuario los tiene local)
+*.pt
+*.onnx
+*.engine
+*.tflite
+
+# Datasets y runs
+runs/
+runs_*/
+data_microplastico/
+Imagenes Microplasticos.rar
+Fotos de peces y camarones/
+imagenes max/
+Microscopio/
+data/
+datasets/
+
+# Avance / docs personales
+Avance MP/
+Papers Analítica/
+Proyecto de Titulo/
+YOLO/
+YOLO Python/
+*.docx
+*.pptm
+*.pptx
+~$*
+PROCEDIMIENTO*.docx
+
+# Reportes generados
+reporte_paper*.html
+reporte_*.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Logs y temporales
+*.log
+*.tmp
+venv.txt
