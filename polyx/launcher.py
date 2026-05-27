@@ -300,6 +300,15 @@ class LauncherWindow(QMainWindow):
         descr.setWordWrap(True)
         descr.setStyleSheet(f"color: {T.INK3}; font-size: 10.5pt; border: none;")
         left.addWidget(descr)
+
+        # Crédito de autoría (justo bajo el descriptor)
+        author = QLabel("✍  Diseñado y desarrollado por <b>Cristofher Ferrada</b> · Doctorado en Química, 2026")
+        author.setTextFormat(Qt.RichText)
+        author.setStyleSheet(
+            f"color: {T.ACCENT_D}; font-size: 9.5pt; border: none; "
+            f"background: {T.BG_SOFT}; padding: 6px 10px; border-radius: 4px;"
+        )
+        left.addWidget(author)
         left.addSpacing(4)
 
         # 4 chips
@@ -354,6 +363,10 @@ class LauncherWindow(QMainWindow):
         st = QLabel("● Listo")
         st.setStyleSheet(f"color: {T.OK}; font-size: 9.5pt; font-weight: 600;")
         foot.addWidget(st)
+        foot.addSpacing(20)
+        copyr = QLabel("© Cristofher Ferrada · Poly-X v" + __version__)
+        copyr.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
+        foot.addWidget(copyr)
         foot.addStretch(1)
         leeme_btn = QPushButton("📄 LÉAME")
         leeme_btn.clicked.connect(self.open_leeme)

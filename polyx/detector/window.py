@@ -113,6 +113,15 @@ class DetectorWindow(QMainWindow):
         self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt; padding: 4px 8px;")
         sb.addWidget(self.lbl_status)
 
+        # Crédito de autoría
+        author = QLabel("Diseñado por\nCristofher Ferrada\n2026")
+        author.setAlignment(Qt.AlignCenter)
+        author.setStyleSheet(
+            f"color: {T.INK3}; font-size: 8.5pt; padding: 8px; "
+            f"border-top: 1px solid {T.RULE_SOFT}; margin-top: 6px;"
+        )
+        sb.addWidget(author)
+
         root.addWidget(sidebar)
 
         # ── Área de contenido ──

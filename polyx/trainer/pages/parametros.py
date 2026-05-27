@@ -6,7 +6,7 @@ entrenar siempre al máximo posible).
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QSpinBox, QDoubleSpinBox,
     QCheckBox, QComboBox, QPushButton, QLineEdit, QFrame, QMessageBox,
@@ -15,6 +15,15 @@ from PySide6.QtWidgets import (
 from ._base import TrainerPage
 from ...core import theme as T
 from ..hw import detect_gpu, recommend_max_imgsz, recommend_batch, estimate_vram_gb, humanize_gb
+
+
+# Detección de GPU en background para no congelar la GUI al arrancar
+# (torch.cuda.is_available() puede tardar 10–30 s la primera vez).
+class _GpuDetectWorker(QThread):
+    detected = Signal(object)   # GPUInfo
+    def run(self):
+        info = detect_gpu()
+        self.detected.emit(info)
 
 
 IMGSZ_CHOICES = [320, 416, 512, 640, 800, 960, 1024, 1280, 1600, 1920, 2560, 3840]
@@ -184,8 +193,12 @@ class ParametrosPage(TrainerPage):
         # Suscribirse a cambios de preset
         self.state.params_changed.connect(self._reload_from_state)
         self.state.model_changed.connect(self._update_estimate)
-        # Detectar GPU al inicio
-        self._detect_gpu()
+
+        # Detección de GPU diferida (en background) para no bloquear el arranque
+        self._gpu_worker: _GpuDetectWorker | None = None
+        self.lbl_gpu.setText("⌛  Detectando GPU en background (puede tardar 10–30 s la primera vez)…")
+        self.lbl_gpu.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        QTimer.singleShot(100, self._detect_gpu)
         self._update_estimate()
 
     # ──────────────────────────────────────────────────────────────
@@ -230,9 +243,23 @@ class ParametrosPage(TrainerPage):
             self.state.model_changed.emit()
         self._update_estimate()
 
-    # ── GPU detection ──────────────────────────────────────────
+    # ── GPU detection (en background) ───────────────────────────
     def _detect_gpu(self):
-        info = detect_gpu()
+        # Si ya hay un worker corriendo, no spawnees otro
+        if self._gpu_worker is not None and self._gpu_worker.isRunning():
+            return
+        self.btn_detect.setEnabled(False)
+        self.btn_maximize.setEnabled(False)
+        self.btn_suggest_batch.setEnabled(False)
+        self._gpu_worker = _GpuDetectWorker()
+        self._gpu_worker.detected.connect(self._on_gpu_detected)
+        self._gpu_worker.start()
+
+    def _on_gpu_detected(self, info):
+        self._last_gpu_info = info   # cache para los otros botones
+        self.btn_detect.setEnabled(True)
+        self.btn_maximize.setEnabled(True)
+        self.btn_suggest_batch.setEnabled(True)
         if info.available:
             self.lbl_gpu.setText(
                 f"<b>GPU detectada:</b> {info.name} · "
@@ -250,7 +277,7 @@ class ParametrosPage(TrainerPage):
         self._update_estimate()
 
     def _maximize_imgsz(self):
-        info = detect_gpu()
+        info = getattr(self, "_last_gpu_info", None) or detect_gpu()
         if not info.available:
             QMessageBox.information(
                 self, "Sin GPU",
@@ -269,7 +296,7 @@ class ParametrosPage(TrainerPage):
         )
 
     def _suggest_batch(self):
-        info = detect_gpu()
+        info = getattr(self, "_last_gpu_info", None) or detect_gpu()
         if not info.available:
             QMessageBox.information(self, "Sin GPU", "Sin GPU no aplica esta sugerencia.")
             return

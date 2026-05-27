@@ -16,12 +16,30 @@ from ..runner import TrainerRunner
 
 
 class _LiveCurves(QFrame):
-    """Lienzo matplotlib 2x2 con curvas Box loss / mAP / Precision / Recall."""
+    """Lienzo matplotlib 2x2 con curvas Box loss / mAP / Precision / Recall.
+
+    matplotlib se importa de forma perezosa la primera vez que llega data.
+    Esto evita una espera de ~5 s al abrir el Entrenador.
+    """
 
     def __init__(self):
         super().__init__()
         self.setStyleSheet(f"QFrame {{ background: {T.BG}; border: 1px solid {T.RULE}; border-radius: 8px; }}")
-        lay = QVBoxLayout(self); lay.setContentsMargins(8, 8, 8, 8)
+        self._lay = QVBoxLayout(self); self._lay.setContentsMargins(8, 8, 8, 8)
+        self._placeholder = QLabel(
+            "Las curvas aparecerán aquí en cuanto el entrenamiento avance la primera época."
+        )
+        self._placeholder.setAlignment(Qt.AlignCenter)
+        self._placeholder.setStyleSheet(
+            f"color: {T.INK3}; font-size: 10pt; border: none; padding: 60px;"
+        )
+        self._lay.addWidget(self._placeholder)
+        self._ok = False
+        self.fig = None; self.axes = None; self.canvas = None
+
+    def _lazy_init(self) -> bool:
+        if self._ok or self.canvas is not None:
+            return self._ok
         try:
             import matplotlib
             matplotlib.use("QtAgg")
@@ -32,17 +50,18 @@ class _LiveCurves(QFrame):
             for ax in self.axes.flat:
                 ax.grid(alpha=0.25)
             self.canvas = FigureCanvasQTAgg(self.fig)
-            lay.addWidget(self.canvas)
+            # Reemplazar placeholder por canvas
+            self._lay.removeWidget(self._placeholder)
+            self._placeholder.deleteLater()
+            self._lay.addWidget(self.canvas)
             self._ok = True
         except Exception as e:
-            lbl = QLabel(f"matplotlib no disponible: {e}")
-            lbl.setStyleSheet(f"color: {T.WARN}; border: none; padding: 20px;")
-            lay.addWidget(lbl)
-            self._ok = False
+            self._placeholder.setText(f"matplotlib no disponible: {e}")
+        return self._ok
 
     def update_curves(self, history):
-        if not self._ok or not history:
-            return
+        if not history: return
+        if not self._lazy_init(): return
         epochs = [m.epoch for m in history]
         box   = [m.box_loss for m in history]
         map50 = [m.map50 for m in history]
