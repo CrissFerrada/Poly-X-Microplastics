@@ -1,0 +1,301 @@
+"""Página 3 — Parámetros de entrenamiento.
+
+Incluye la utilidad clave 'Maximizar imgsz para mi GPU' que detecta VRAM
+disponible y propone el imgsz más alto que cabe sin OOM (objetivo del usuario:
+entrenar siempre al máximo posible).
+"""
+from __future__ import annotations
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QSpinBox, QDoubleSpinBox,
+    QCheckBox, QComboBox, QPushButton, QLineEdit, QFrame, QMessageBox,
+)
+
+from ._base import TrainerPage
+from ...core import theme as T
+from ..hw import detect_gpu, recommend_max_imgsz, recommend_batch, estimate_vram_gb, humanize_gb
+
+
+IMGSZ_CHOICES = [320, 416, 512, 640, 800, 960, 1024, 1280, 1600, 1920, 2560, 3840]
+
+
+def _hint(text: str) -> QLabel:
+    l = QLabel(text)
+    l.setStyleSheet(f"color: {T.INK3}; font-size: 9pt; border: none;")
+    l.setWordWrap(True)
+    return l
+
+
+class ParametrosPage(TrainerPage):
+    PAGE_ICON = "⚙️"
+    PAGE_TITLE = "Parámetros de entrenamiento"
+    PAGE_DESCRIPTION = (
+        "Cada parámetro tiene un hint con su explicación. Los valores por defecto son "
+        "sensatos para microplásticos. Si tocas algo, el preset cambia a 'Personalizado'."
+    )
+
+    def __init__(self, state, parent=None):
+        super().__init__(state, parent)
+
+        # ── Configuración básica (incluye Maximizar imgsz) ──
+        c1, l1 = self.card("Configuración básica", "🧱")
+        g = QGridLayout(); g.setHorizontalSpacing(20); g.setVerticalSpacing(10)
+
+        # Imgsz: combobox con tamaños altos como valores principales
+        g.addWidget(QLabel("Tamaño imagen (imgsz):"), 0, 0)
+        self.combo_imgsz = QComboBox(); self.combo_imgsz.setEditable(True)
+        for v in IMGSZ_CHOICES: self.combo_imgsz.addItem(str(v))
+        self.combo_imgsz.setCurrentText(str(state.params.imgsz))
+        self.combo_imgsz.currentTextChanged.connect(self._on_change)
+        g.addWidget(self.combo_imgsz, 0, 1)
+        g.addWidget(_hint("MÁS ALTO = mejor para partículas pequeñas. Recomendado: 1280+."), 0, 2)
+
+        # Épocas
+        g.addWidget(QLabel("Épocas:"), 1, 0)
+        self.sb_epochs = QSpinBox(); self.sb_epochs.setRange(1, 2000); self.sb_epochs.setValue(state.params.epochs)
+        self.sb_epochs.valueChanged.connect(self._on_change); g.addWidget(self.sb_epochs, 1, 1)
+        g.addWidget(_hint("150–300 típico. Early stopping detiene si no mejora (ver Patience)."), 1, 2)
+
+        # Batch
+        g.addWidget(QLabel("Batch size:"), 2, 0)
+        self.sb_batch = QSpinBox(); self.sb_batch.setRange(1, 256); self.sb_batch.setValue(state.params.batch)
+        self.sb_batch.valueChanged.connect(self._on_change); g.addWidget(self.sb_batch, 2, 1)
+        g.addWidget(_hint("Bajar si hay OOM. Subir si la GPU tiene RAM de sobra."), 2, 2)
+
+        # Cache
+        g.addWidget(QLabel("Cache:"), 3, 0)
+        self.combo_cache = QComboBox(); self.combo_cache.addItems(["disk", "ram", "False"])
+        self.combo_cache.setCurrentText(state.params.cache)
+        self.combo_cache.currentTextChanged.connect(self._on_change)
+        g.addWidget(self.combo_cache, 3, 1)
+        g.addWidget(_hint("'ram' es lo más rápido si cabe; 'disk' es seguro; 'False' para datasets gigantes."), 3, 2)
+
+        l1.addLayout(g)
+
+        # ── Sub-panel: detección de GPU + maximizar imgsz ──
+        gpu_frame = QFrame()
+        gpu_frame.setStyleSheet(
+            f"QFrame {{ background: {T.BG_SOFT}; border: 1px solid {T.RULE}; border-radius: 6px; }}"
+        )
+        gf = QVBoxLayout(gpu_frame); gf.setContentsMargins(14, 10, 14, 12); gf.setSpacing(8)
+
+        title = QLabel("🚀  Maximizar imgsz para mi GPU")
+        title.setStyleSheet(f"color: {T.INK}; font-size: 11pt; font-weight: 600; border: none;")
+        gf.addWidget(title)
+        self.lbl_gpu = QLabel("Detectando GPU…")
+        self.lbl_gpu.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none;")
+        gf.addWidget(self.lbl_gpu)
+
+        btn_row = QHBoxLayout(); btn_row.setSpacing(8)
+        self.btn_detect = QPushButton("🔄  Detectar GPU / VRAM")
+        self.btn_detect.clicked.connect(self._detect_gpu)
+        btn_row.addWidget(self.btn_detect)
+
+        self.btn_maximize = QPushButton("⚡  Sugerir imgsz MÁXIMO")
+        self.btn_maximize.setStyleSheet(
+            f"background: {T.ACCENT}; color: white; border: none; "
+            f"border-radius: 6px; padding: 7px 14px; font-weight: 600;"
+        )
+        self.btn_maximize.setCursor(Qt.PointingHandCursor)
+        self.btn_maximize.clicked.connect(self._maximize_imgsz)
+        btn_row.addWidget(self.btn_maximize)
+
+        self.btn_suggest_batch = QPushButton("Sugerir batch para mi GPU")
+        self.btn_suggest_batch.clicked.connect(self._suggest_batch)
+        btn_row.addWidget(self.btn_suggest_batch)
+        btn_row.addStretch(1)
+        gf.addLayout(btn_row)
+
+        self.lbl_est = QLabel("Estimación de VRAM: —")
+        self.lbl_est.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
+        gf.addWidget(self.lbl_est)
+
+        l1.addWidget(gpu_frame)
+        self.body.addWidget(c1)
+
+        # ── Optimizador y LR ──
+        c2, l2 = self.card("Optimizador y learning rate", "📈")
+        g2 = QGridLayout(); g2.setHorizontalSpacing(20); g2.setVerticalSpacing(10)
+        g2.addWidget(QLabel("Learning rate (lr0):"), 0, 0)
+        self.sb_lr0 = QDoubleSpinBox(); self.sb_lr0.setRange(0.0001, 0.1)
+        self.sb_lr0.setDecimals(4); self.sb_lr0.setSingleStep(0.001); self.sb_lr0.setValue(state.params.lr0)
+        self.sb_lr0.valueChanged.connect(self._on_change); g2.addWidget(self.sb_lr0, 0, 1)
+        g2.addWidget(QLabel("Weight decay:"), 0, 2)
+        self.sb_wd = QDoubleSpinBox(); self.sb_wd.setRange(0.0, 0.01); self.sb_wd.setDecimals(5)
+        self.sb_wd.setSingleStep(0.0001); self.sb_wd.setValue(state.params.weight_decay)
+        self.sb_wd.valueChanged.connect(self._on_change); g2.addWidget(self.sb_wd, 0, 3)
+
+        g2.addWidget(QLabel("Momentum:"), 1, 0)
+        self.sb_mom = QDoubleSpinBox(); self.sb_mom.setRange(0.5, 0.999); self.sb_mom.setDecimals(3)
+        self.sb_mom.setSingleStep(0.01); self.sb_mom.setValue(state.params.momentum)
+        self.sb_mom.valueChanged.connect(self._on_change); g2.addWidget(self.sb_mom, 1, 1)
+        g2.addWidget(QLabel("Warmup épocas:"), 1, 2)
+        self.sb_warm = QSpinBox(); self.sb_warm.setRange(0, 50); self.sb_warm.setValue(state.params.warmup_epochs)
+        self.sb_warm.valueChanged.connect(self._on_change); g2.addWidget(self.sb_warm, 1, 3)
+
+        g2.addWidget(QLabel("Close mosaic:"), 2, 0)
+        self.sb_close = QSpinBox(); self.sb_close.setRange(0, 100); self.sb_close.setValue(state.params.close_mosaic)
+        self.sb_close.valueChanged.connect(self._on_change); g2.addWidget(self.sb_close, 2, 1)
+        g2.addWidget(QLabel("Label smoothing:"), 2, 2)
+        self.sb_ls = QDoubleSpinBox(); self.sb_ls.setRange(0.0, 0.3); self.sb_ls.setDecimals(2)
+        self.sb_ls.setSingleStep(0.01); self.sb_ls.setValue(state.params.label_smoothing)
+        self.sb_ls.valueChanged.connect(self._on_change); g2.addWidget(self.sb_ls, 2, 3)
+
+        self.cb_cos = QCheckBox("Cosine LR (curva coseno)")
+        self.cb_cos.setChecked(state.params.cos_lr); self.cb_cos.stateChanged.connect(self._on_change)
+        g2.addWidget(self.cb_cos, 3, 0, 1, 2)
+        self.cb_amp = QCheckBox("AMP (Mixed Precision FP16)")
+        self.cb_amp.setChecked(state.params.amp); self.cb_amp.stateChanged.connect(self._on_change)
+        g2.addWidget(self.cb_amp, 3, 2, 1, 2)
+        l2.addLayout(g2)
+        self.body.addWidget(c2)
+
+        # ── Early stopping ──
+        c3, l3 = self.card("Early stopping y checkpoints", "💾")
+        g3 = QGridLayout(); g3.setHorizontalSpacing(20); g3.setVerticalSpacing(10)
+        g3.addWidget(QLabel("Patience:"), 0, 0)
+        self.sb_pat = QSpinBox(); self.sb_pat.setRange(0, 500); self.sb_pat.setValue(state.params.patience)
+        self.sb_pat.valueChanged.connect(self._on_change); g3.addWidget(self.sb_pat, 0, 1)
+        g3.addWidget(_hint("Épocas sin mejora antes de detener. 50 = sensato."), 0, 2)
+        g3.addWidget(QLabel("Save period:"), 1, 0)
+        self.sb_save = QSpinBox(); self.sb_save.setRange(1, 100); self.sb_save.setValue(state.params.save_period)
+        self.sb_save.valueChanged.connect(self._on_change); g3.addWidget(self.sb_save, 1, 1)
+        g3.addWidget(_hint("Guardar checkpoint cada N épocas."), 1, 2)
+        l3.addLayout(g3)
+        self.body.addWidget(c3)
+
+        # ── Hardware / IO ──
+        c4, l4 = self.card("Hardware e I/O", "🖥")
+        g4 = QGridLayout(); g4.setHorizontalSpacing(20); g4.setVerticalSpacing(10)
+        g4.addWidget(QLabel("Device:"), 0, 0)
+        self.ed_device = QLineEdit(state.params.device); self.ed_device.editingFinished.connect(self._on_change)
+        g4.addWidget(self.ed_device, 0, 1)
+        g4.addWidget(_hint("'0' = primera GPU. 'cpu' = CPU (muy lento)."), 0, 2)
+        g4.addWidget(QLabel("Workers:"), 1, 0)
+        self.sb_workers = QSpinBox(); self.sb_workers.setRange(0, 32); self.sb_workers.setValue(state.params.workers)
+        self.sb_workers.valueChanged.connect(self._on_change); g4.addWidget(self.sb_workers, 1, 1)
+        g4.addWidget(QLabel("Nombre del run:"), 2, 0)
+        self.ed_run = QLineEdit(state.params.run_name); self.ed_run.setPlaceholderText("vacío = auto-fecha")
+        self.ed_run.editingFinished.connect(self._on_change); g4.addWidget(self.ed_run, 2, 1, 1, 2)
+        l4.addLayout(g4)
+        self.body.addWidget(c4)
+
+        # Suscribirse a cambios de preset
+        self.state.params_changed.connect(self._reload_from_state)
+        self.state.model_changed.connect(self._update_estimate)
+        # Detectar GPU al inicio
+        self._detect_gpu()
+        self._update_estimate()
+
+    # ──────────────────────────────────────────────────────────────
+    def _reload_from_state(self):
+        p = self.state.params
+        self.combo_imgsz.setCurrentText(str(p.imgsz))
+        self.sb_epochs.setValue(p.epochs)
+        self.sb_batch.setValue(p.batch)
+        self.combo_cache.setCurrentText(p.cache)
+        self.sb_lr0.setValue(p.lr0); self.sb_wd.setValue(p.weight_decay)
+        self.sb_mom.setValue(p.momentum); self.sb_warm.setValue(p.warmup_epochs)
+        self.sb_close.setValue(p.close_mosaic); self.sb_ls.setValue(p.label_smoothing)
+        self.cb_cos.setChecked(p.cos_lr); self.cb_amp.setChecked(p.amp)
+        self.sb_pat.setValue(p.patience); self.sb_save.setValue(p.save_period)
+        self.ed_device.setText(p.device); self.sb_workers.setValue(p.workers)
+        self.ed_run.setText(p.run_name)
+        self._update_estimate()
+
+    def _on_change(self, *_):
+        p = self.state.params
+        try: p.imgsz = int(self.combo_imgsz.currentText())
+        except ValueError: pass
+        p.epochs = self.sb_epochs.value()
+        p.batch = self.sb_batch.value()
+        p.cache = self.combo_cache.currentText()
+        p.lr0 = self.sb_lr0.value()
+        p.weight_decay = self.sb_wd.value()
+        p.momentum = self.sb_mom.value()
+        p.warmup_epochs = self.sb_warm.value()
+        p.close_mosaic = self.sb_close.value()
+        p.label_smoothing = self.sb_ls.value()
+        p.cos_lr = self.cb_cos.isChecked()
+        p.amp = self.cb_amp.isChecked()
+        p.patience = self.sb_pat.value()
+        p.save_period = self.sb_save.value()
+        p.device = self.ed_device.text().strip() or "0"
+        p.workers = self.sb_workers.value()
+        p.run_name = self.ed_run.text().strip()
+        # Cambio manual → preset Personalizado
+        if self.state.model.preset_name != "Personalizado":
+            self.state.model.preset_name = "Personalizado"
+            self.state.model_changed.emit()
+        self._update_estimate()
+
+    # ── GPU detection ──────────────────────────────────────────
+    def _detect_gpu(self):
+        info = detect_gpu()
+        if info.available:
+            self.lbl_gpu.setText(
+                f"<b>GPU detectada:</b> {info.name} · "
+                f"VRAM total: <b>{humanize_gb(info.vram_total_gb)}</b> · "
+                f"libre: <b>{humanize_gb(info.vram_free_gb)}</b>"
+            )
+            self.lbl_gpu.setStyleSheet(f"color: {T.OK}; font-size: 10pt; border: none;")
+            self.lbl_gpu.setTextFormat(Qt.RichText)
+        else:
+            self.lbl_gpu.setText(
+                "✗ No se detectó GPU NVIDIA disponible. Entrenarás en CPU (será MUY lento). "
+                "Verifica que SETUP.bat instaló PyTorch con CUDA."
+            )
+            self.lbl_gpu.setStyleSheet(f"color: {T.WARN}; font-size: 10pt; border: none;")
+        self._update_estimate()
+
+    def _maximize_imgsz(self):
+        info = detect_gpu()
+        if not info.available:
+            QMessageBox.information(
+                self, "Sin GPU",
+                "No hay GPU NVIDIA disponible. En CPU recomendamos imgsz ≤ 640."
+            )
+            self.combo_imgsz.setCurrentText("640")
+            return
+        size = self.state.model.size
+        batch = self.state.params.batch
+        amp = self.state.params.amp
+        sz = recommend_max_imgsz(size, batch, info.vram_free_gb, amp=amp)
+        self.combo_imgsz.setCurrentText(str(sz))
+        self.lbl_est.setText(
+            f"✓ Recomendación: imgsz = {sz} (modelo {size}, batch {batch}, "
+            f"VRAM libre {humanize_gb(info.vram_free_gb)})"
+        )
+
+    def _suggest_batch(self):
+        info = detect_gpu()
+        if not info.available:
+            QMessageBox.information(self, "Sin GPU", "Sin GPU no aplica esta sugerencia.")
+            return
+        try:
+            imgsz = int(self.combo_imgsz.currentText())
+        except ValueError:
+            imgsz = 1280
+        b = recommend_batch(self.state.model.size, imgsz, info.vram_free_gb,
+                            amp=self.cb_amp.isChecked())
+        self.sb_batch.setValue(b)
+        self.lbl_est.setText(
+            f"✓ Recomendación: batch = {b} para imgsz {imgsz} ({humanize_gb(info.vram_free_gb)} libres)"
+        )
+
+    def _update_estimate(self):
+        try:
+            imgsz = int(self.combo_imgsz.currentText())
+        except ValueError:
+            imgsz = 640
+        try:
+            est = estimate_vram_gb(self.state.model.size, imgsz, self.state.params.batch,
+                                   amp=self.cb_amp.isChecked())
+            self.lbl_est.setText(
+                f"Estimación de VRAM: ~{humanize_gb(est)} "
+                f"(modelo {self.state.model.size}, imgsz {imgsz}, batch {self.state.params.batch}, "
+                f"AMP={'on' if self.cb_amp.isChecked() else 'off'})"
+            )
+        except Exception:
+            self.lbl_est.setText("Estimación de VRAM: —")

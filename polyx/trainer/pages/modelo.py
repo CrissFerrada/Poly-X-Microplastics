@@ -1,0 +1,144 @@
+"""Página 1 — Modelo. Preset rápido + familia (v8/v11) + tamaño + pesos custom."""
+from __future__ import annotations
+from pathlib import Path
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QHBoxLayout, QVBoxLayout, QLabel, QComboBox, QLineEdit, QPushButton,
+    QFileDialog,
+)
+
+from ._base import TrainerPage
+from ...core import theme as T
+from ..state import PRESETS
+
+
+SIZE_DESCRIPTIONS = [
+    ("n", "Nano",   "El más liviano y rápido. Útil para probar.", T.OK),
+    ("s", "Small",  "Buen balance velocidad/precisión.",          T.OK),
+    ("m", "Medium", "RECOMENDADO. Precisión sólida en GPU media.", T.ACCENT),
+    ("l", "Large",  "Más preciso, requiere GPU potente.",         T.WARN),
+    ("x", "Extra",  "El más preciso, muy lento sin GPU buena.",   T.ERR),
+]
+
+
+class ModeloPage(TrainerPage):
+    PAGE_ICON = "🎯"
+    PAGE_TITLE = "Seleccionar modelo"
+    PAGE_DESCRIPTION = (
+        "Elige el preset según el caso, o personaliza familia y tamaño. El preset "
+        "'Balanceado' es el recomendado para la mayoría de proyectos."
+    )
+
+    def __init__(self, state, parent=None):
+        super().__init__(state, parent)
+
+        # ── Preset rápido ──
+        c1, l1 = self.card("Preset rápido", "⚡")
+        info = QLabel(
+            "Aplica un conjunto de parámetros probados con un clic. Cambiarlo después "
+            "en 'Parámetros' marca como Personalizado."
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l1.addWidget(info)
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.addWidget(QLabel("Preset:"))
+        self.combo_preset = QComboBox()
+        self.combo_preset.addItems(list(PRESETS.keys()))
+        self.combo_preset.setCurrentText(self.state.model.preset_name)
+        self.combo_preset.currentTextChanged.connect(self._on_preset)
+        self.combo_preset.setMinimumWidth(280)
+        row.addWidget(self.combo_preset)
+        row.addStretch(1)
+        l1.addLayout(row)
+        self.body.addWidget(c1)
+
+        # ── Familia y tamaño ──
+        c2, l2 = self.card("Familia y tamaño", "🧠")
+        row2 = QHBoxLayout()
+        row2.setSpacing(20)
+        row2.addWidget(QLabel("Familia:"))
+        self.combo_family = QComboBox()
+        self.combo_family.addItems(["YOLOv8", "YOLOv11"])
+        self.combo_family.setCurrentText("YOLOv11" if self.state.model.family == "v11" else "YOLOv8")
+        self.combo_family.currentTextChanged.connect(self._on_family)
+        row2.addWidget(self.combo_family)
+
+        row2.addWidget(QLabel("Tamaño:"))
+        self.combo_size = QComboBox()
+        for code, _, _, _ in SIZE_DESCRIPTIONS:
+            self.combo_size.addItem(code)
+        self.combo_size.setCurrentText(self.state.model.size)
+        self.combo_size.currentTextChanged.connect(self._on_size)
+        row2.addWidget(self.combo_size)
+        row2.addStretch(1)
+        l2.addLayout(row2)
+
+        # Descripciones
+        for code, name, desc, color in SIZE_DESCRIPTIONS:
+            line = QHBoxLayout()
+            bullet = QLabel("•")
+            bullet.setStyleSheet(f"color: {color}; font-weight: 700; border: none;")
+            line.addWidget(bullet)
+            text = QLabel(f"<b>{code}</b> → <b>{name}</b> — {desc}")
+            text.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none;")
+            text.setTextFormat(Qt.RichText)
+            line.addWidget(text, 1)
+            l2.addLayout(line)
+
+        self.body.addWidget(c2)
+
+        # ── Pesos personalizados ──
+        c3, l3 = self.card("Pesos personalizados (opcional)", "📦")
+        info3 = QLabel(
+            "Si tienes un .pt ya entrenado y quieres seguir desde ahí, selecciónalo. "
+            "Deja vacío para usar el modelo base de la familia/tamaño elegidos."
+        )
+        info3.setWordWrap(True)
+        info3.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l3.addWidget(info3)
+
+        row3 = QHBoxLayout()
+        row3.setSpacing(8)
+        self.ed_custom = QLineEdit()
+        self.ed_custom.setPlaceholderText("Ruta a un .pt para continuar el entrenamiento…")
+        self.ed_custom.editingFinished.connect(self._on_custom)
+        row3.addWidget(self.ed_custom, 1)
+        btn = QPushButton("…")
+        btn.setFixedWidth(36)
+        btn.clicked.connect(self._browse_custom)
+        row3.addWidget(btn)
+        btn_clr = QPushButton("✕")
+        btn_clr.setFixedWidth(36)
+        btn_clr.clicked.connect(lambda: (self.ed_custom.clear(), self._on_custom()))
+        row3.addWidget(btn_clr)
+        l3.addLayout(row3)
+        self.body.addWidget(c3)
+
+    def _on_preset(self, name: str):
+        self.state.apply_preset(name)
+        self.state.model.preset_name = name
+
+    def _on_family(self, txt: str):
+        self.state.model.family = "v11" if "11" in txt else "v8"
+        self.state.model_changed.emit()
+
+    def _on_size(self, txt: str):
+        self.state.model.size = txt
+        self.state.model_changed.emit()
+
+    def _on_custom(self):
+        t = self.ed_custom.text().strip()
+        self.state.model.custom_weights = Path(t) if t else None
+        self.state.model_changed.emit()
+
+    def _browse_custom(self):
+        f, _ = QFileDialog.getOpenFileName(
+            self, "Seleccionar pesos .pt", "", "Pesos PyTorch (*.pt)"
+        )
+        if f:
+            self.ed_custom.setText(f)
+            self._on_custom()

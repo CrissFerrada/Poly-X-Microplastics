@@ -1,0 +1,352 @@
+"""Página 2 — Dataset. Carga data.yaml, valida estructura, vista previa, auto-split."""
+from __future__ import annotations
+from pathlib import Path
+import random
+import shutil
+
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QPixmap, QPainter, QPen, QColor, QImage, QFont
+from PySide6.QtWidgets import (
+    QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton,
+    QFileDialog, QMessageBox, QFrame, QSpinBox, QComboBox,
+)
+
+from ._base import TrainerPage
+from ...core import theme as T
+from ...core.paths import IMAGE_EXTS
+
+
+def _load_yaml(path: Path) -> dict:
+    import yaml
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+def _save_yaml(path: Path, d: dict):
+    import yaml
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(d, f, sort_keys=False, allow_unicode=True)
+
+
+def _count_split(yaml_dir: Path, split_path_value) -> int:
+    if not split_path_value:
+        return 0
+    p = (yaml_dir / split_path_value).resolve() if not Path(split_path_value).is_absolute() else Path(split_path_value)
+    if p.is_dir():
+        n = 0
+        for ext in IMAGE_EXTS:
+            n += sum(1 for _ in p.rglob(f"*{ext}"))
+        return n
+    if p.is_file():
+        # archivo de listado .txt
+        try:
+            return sum(1 for line in p.read_text(encoding="utf-8").splitlines() if line.strip())
+        except Exception:
+            return 0
+    return 0
+
+
+class _PreviewTile(QLabel):
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(220, 150)
+        self.setStyleSheet(
+            f"background: {T.BG_SOFT}; border: 1px solid {T.RULE}; border-radius: 6px;"
+        )
+        self.setAlignment(Qt.AlignCenter)
+        self.setText("(vacío)")
+
+
+class DatasetPage(TrainerPage):
+    PAGE_ICON = "📂"
+    PAGE_TITLE = "Dataset"
+    PAGE_DESCRIPTION = (
+        "Carga tu data.yaml. Validamos la estructura, contamos imágenes y mostramos una "
+        "vista previa con cajas. Si tu dataset no está dividido, usa Auto-split."
+    )
+
+    def __init__(self, state, parent=None):
+        super().__init__(state, parent)
+
+        # ── Origen ──
+        c1, l1 = self.card("data.yaml", "📑")
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        self.ed_yaml = QLineEdit()
+        self.ed_yaml.setPlaceholderText("Ruta a data.yaml…")
+        self.ed_yaml.editingFinished.connect(self._reload_yaml)
+        row.addWidget(self.ed_yaml, 1)
+        btn = QPushButton("…")
+        btn.setFixedWidth(36)
+        btn.clicked.connect(self._browse)
+        row.addWidget(btn)
+        l1.addLayout(row)
+
+        self.lbl_yaml_status = QLabel("Sin data.yaml cargado.")
+        self.lbl_yaml_status.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l1.addWidget(self.lbl_yaml_status)
+        self.body.addWidget(c1)
+
+        # ── Conteos ──
+        c2, l2 = self.card("Conteos por split", "📊")
+        grid = QGridLayout(); grid.setHorizontalSpacing(20); grid.setVerticalSpacing(8)
+        self.lbl_train = QLabel("Train: —"); grid.addWidget(self.lbl_train, 0, 0)
+        self.lbl_val   = QLabel("Val: —");   grid.addWidget(self.lbl_val,   0, 1)
+        self.lbl_test  = QLabel("Test: —");  grid.addWidget(self.lbl_test,  0, 2)
+        self.lbl_classes = QLabel("Clases: —"); grid.addWidget(self.lbl_classes, 1, 0, 1, 3)
+        for w in (self.lbl_train, self.lbl_val, self.lbl_test, self.lbl_classes):
+            w.setStyleSheet(f"color: {T.INK2}; font-size: 11pt; border: none;")
+        l2.addLayout(grid)
+        self.body.addWidget(c2)
+
+        # ── Vista previa ──
+        c3, l3 = self.card("Vista previa (6 imágenes random con cajas)", "👁")
+        prev_grid = QGridLayout(); prev_grid.setSpacing(10)
+        self.tiles: list[_PreviewTile] = []
+        for i in range(6):
+            t = _PreviewTile()
+            self.tiles.append(t)
+            prev_grid.addWidget(t, i // 3, i % 3)
+        l3.addLayout(prev_grid)
+        btn_refresh = QPushButton("🔄  Otras 6")
+        btn_refresh.clicked.connect(self._refresh_preview)
+        l3.addWidget(btn_refresh, 0, Qt.AlignLeft)
+        self.body.addWidget(c3)
+
+        # ── Auto-split ──
+        c4, l4 = self.card("Auto-split (si tu dataset no está dividido)", "🪚")
+        info = QLabel(
+            "Toma una carpeta con images/ y labels/ y genera train/val/test automáticamente "
+            "con un nuevo data.yaml. No mueve archivos: usa listas .txt."
+        )
+        info.setWordWrap(True); info.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l4.addWidget(info)
+
+        srow = QHBoxLayout()
+        srow.setSpacing(8)
+        self.ed_split_src = QLineEdit()
+        self.ed_split_src.setPlaceholderText("Carpeta raíz con images/ y labels/…")
+        srow.addWidget(self.ed_split_src, 1)
+        bbtn = QPushButton("…"); bbtn.setFixedWidth(36)
+        bbtn.clicked.connect(self._browse_split_src); srow.addWidget(bbtn)
+        l4.addLayout(srow)
+
+        prow = QHBoxLayout(); prow.setSpacing(12)
+        prow.addWidget(QLabel("Train %:"))
+        self.sb_train = QSpinBox(); self.sb_train.setRange(50, 95); self.sb_train.setValue(80)
+        prow.addWidget(self.sb_train)
+        prow.addWidget(QLabel("Val %:"))
+        self.sb_val = QSpinBox(); self.sb_val.setRange(5, 30); self.sb_val.setValue(15)
+        prow.addWidget(self.sb_val)
+        prow.addWidget(QLabel("Test %:"))
+        self.sb_test = QSpinBox(); self.sb_test.setRange(0, 25); self.sb_test.setValue(5)
+        prow.addWidget(self.sb_test)
+        prow.addStretch(1)
+        btn_split = QPushButton("🪚  Auto-split + generar data.yaml")
+        btn_split.setStyleSheet(
+            f"background: {T.ACCENT}; color: white; border: none; "
+            f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
+        )
+        btn_split.setCursor(Qt.PointingHandCursor)
+        btn_split.clicked.connect(self._auto_split)
+        prow.addWidget(btn_split)
+        l4.addLayout(prow)
+        self.body.addWidget(c4)
+
+    # ──────────────────────────────────────────
+    def _browse(self):
+        f, _ = QFileDialog.getOpenFileName(
+            self, "Seleccionar data.yaml", "", "YAML (*.yaml *.yml)"
+        )
+        if f:
+            self.ed_yaml.setText(f)
+            self._reload_yaml()
+
+    def _browse_split_src(self):
+        d = QFileDialog.getExistingDirectory(self, "Carpeta raíz con images/ y labels/")
+        if d:
+            self.ed_split_src.setText(d)
+
+    def _reload_yaml(self):
+        t = self.ed_yaml.text().strip()
+        if not t:
+            return
+        p = Path(t)
+        if not p.exists():
+            self.lbl_yaml_status.setText("✗ Archivo no encontrado.")
+            self.lbl_yaml_status.setStyleSheet(f"color: {T.ERR}; font-size: 10pt; border: none;")
+            return
+        try:
+            d = _load_yaml(p)
+        except Exception as e:
+            self.lbl_yaml_status.setText(f"✗ Error parseando YAML: {e}")
+            self.lbl_yaml_status.setStyleSheet(f"color: {T.ERR}; font-size: 10pt; border: none;")
+            return
+
+        yaml_dir = p.parent
+        train_p = d.get("train"); val_p = d.get("val"); test_p = d.get("test")
+        n_train = _count_split(yaml_dir, train_p)
+        n_val = _count_split(yaml_dir, val_p)
+        n_test = _count_split(yaml_dir, test_p)
+
+        names = d.get("names", [])
+        if isinstance(names, dict):
+            names = [names[k] for k in sorted(names.keys())]
+
+        self.state.dataset.yaml_path = p
+        self.state.dataset.train_count = n_train
+        self.state.dataset.val_count = n_val
+        self.state.dataset.test_count = n_test
+        self.state.dataset.class_names = list(names) if names else []
+        self.state.dataset_changed.emit()
+
+        self.lbl_yaml_status.setText(f"✓ {p}")
+        self.lbl_yaml_status.setStyleSheet(f"color: {T.OK}; font-size: 10pt; border: none;")
+        self.lbl_train.setText(f"Train: {n_train}")
+        self.lbl_val.setText(f"Val: {n_val}")
+        self.lbl_test.setText(f"Test: {n_test}")
+        self.lbl_classes.setText(
+            f"Clases ({len(self.state.dataset.class_names)}): "
+            + ", ".join(self.state.dataset.class_names[:20])
+        )
+        self._refresh_preview()
+
+    def _refresh_preview(self):
+        yaml_path = self.state.dataset.yaml_path
+        if not yaml_path:
+            return
+        try:
+            d = _load_yaml(yaml_path)
+        except Exception:
+            return
+        yaml_dir = yaml_path.parent
+        # tomar imágenes de train
+        train_p = d.get("train")
+        if not train_p:
+            return
+        train_abs = (yaml_dir / train_p).resolve() if not Path(train_p).is_absolute() else Path(train_p)
+        imgs: list[Path] = []
+        if train_abs.is_dir():
+            for ext in IMAGE_EXTS:
+                imgs.extend(list(train_abs.rglob(f"*{ext}"))[:200])
+        elif train_abs.is_file():
+            for line in train_abs.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line:
+                    pp = Path(line)
+                    if not pp.is_absolute():
+                        pp = (yaml_dir / pp).resolve()
+                    if pp.exists():
+                        imgs.append(pp)
+        if not imgs:
+            return
+        random.shuffle(imgs)
+        sample = imgs[:6]
+        for tile, img_path in zip(self.tiles, sample):
+            self._draw_preview(tile, img_path)
+        # limpiar restantes
+        for tile in self.tiles[len(sample):]:
+            tile.setPixmap(QPixmap()); tile.setText("(vacío)")
+
+    def _draw_preview(self, tile: _PreviewTile, img_path: Path):
+        pm = QPixmap(str(img_path))
+        if pm.isNull():
+            tile.setText("✗")
+            return
+        # buscar .txt
+        stem = img_path.stem
+        candidates = [
+            img_path.parent / f"{stem}.txt",
+            img_path.parent.parent / "labels" / f"{stem}.txt",
+        ]
+        boxes = []
+        for c in candidates:
+            if c.exists():
+                try:
+                    for line in c.read_text(encoding="utf-8").splitlines():
+                        parts = line.strip().split()
+                        if len(parts) >= 5:
+                            cid, cx, cy, w, h = int(float(parts[0])), *[float(x) for x in parts[1:5]]
+                            boxes.append((cid, cx, cy, w, h))
+                except Exception:
+                    pass
+                break
+        # dibujar
+        img = QImage(pm)
+        painter = QPainter(img)
+        painter.setRenderHint(QPainter.Antialiasing)
+        names = self.state.dataset.class_names
+        for cid, cx, cy, w, h in boxes:
+            name = names[cid] if cid < len(names) else str(cid)
+            color = QColor(T.CLASS_COLOR_HEX.get(name, "#33aaff"))
+            painter.setPen(QPen(color, max(2, img.width() // 300)))
+            x = (cx - w / 2) * img.width(); y = (cy - h / 2) * img.height()
+            painter.drawRect(int(x), int(y), int(w * img.width()), int(h * img.height()))
+        painter.end()
+        scaled = QPixmap.fromImage(img).scaled(tile.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        tile.setPixmap(scaled)
+
+    # ── Auto-split ────────────────────────────────────────────
+    def _auto_split(self):
+        src = self.ed_split_src.text().strip()
+        if not src:
+            QMessageBox.warning(self, "Auto-split", "Selecciona la carpeta raíz primero.")
+            return
+        root = Path(src)
+        imgs_dir = root / "images"
+        if not imgs_dir.exists():
+            QMessageBox.warning(self, "Auto-split",
+                                f"No existe {imgs_dir}. Necesitas images/ y labels/ dentro de la carpeta.")
+            return
+        # recolectar imágenes
+        all_imgs: list[Path] = []
+        for ext in IMAGE_EXTS:
+            all_imgs.extend(imgs_dir.rglob(f"*{ext}"))
+        if not all_imgs:
+            QMessageBox.warning(self, "Auto-split", "No se encontraron imágenes en images/.")
+            return
+
+        tp, vp, sp = self.sb_train.value(), self.sb_val.value(), self.sb_test.value()
+        if tp + vp + sp > 100:
+            QMessageBox.warning(self, "Auto-split", "Los porcentajes suman > 100.")
+            return
+
+        random.seed(42)
+        random.shuffle(all_imgs)
+        N = len(all_imgs)
+        n_tr = int(N * tp / 100)
+        n_vl = int(N * vp / 100)
+        train_list = all_imgs[:n_tr]
+        val_list   = all_imgs[n_tr:n_tr + n_vl]
+        test_list  = all_imgs[n_tr + n_vl:] if sp > 0 else []
+
+        # Guardar listas
+        for fname, lst in [("train.txt", train_list), ("val.txt", val_list), ("test.txt", test_list)]:
+            if not lst: continue
+            (root / fname).write_text(
+                "\n".join(str(p.relative_to(root)) for p in lst), encoding="utf-8"
+            )
+
+        # Leer classes.txt si existe
+        cls_path = root / "classes.txt"
+        names: list[str] = []
+        if cls_path.exists():
+            names = [l.strip() for l in cls_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+
+        d = {
+            "path": str(root),
+            "train": "train.txt",
+            "val": "val.txt",
+        }
+        if test_list: d["test"] = "test.txt"
+        if names:     d["names"] = names
+
+        yaml_out = root / "data.yaml"
+        _save_yaml(yaml_out, d)
+        QMessageBox.information(
+            self, "Auto-split",
+            f"Listo:\n• Train: {len(train_list)}\n• Val: {len(val_list)}\n"
+            f"• Test: {len(test_list)}\n\nGenerado: {yaml_out}"
+        )
+        self.ed_yaml.setText(str(yaml_out))
+        self._reload_yaml()
