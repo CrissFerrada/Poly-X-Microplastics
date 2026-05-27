@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QPushButton, QTabWidget,
     QPlainTextEdit, QMessageBox, QFrame, QProgressBar,
@@ -13,6 +13,27 @@ from ._base import TrainerPage
 from ...core import theme as T
 from ...core.widgets import KPICard
 from ..runner import TrainerRunner
+
+
+class _HwProbeWorker(QThread):
+    """Sonda el hardware en background. Devuelve dict con torch info."""
+    done = Signal(dict)
+    def run(self):
+        d = {"ok": False, "msg": "", "color": T.INK3}
+        try:
+            import torch
+            d["torch_version"] = torch.__version__
+            d["cuda_build"] = torch.version.cuda
+            d["cuda_available"] = bool(torch.cuda.is_available())
+            if d["cuda_available"]:
+                d["device_name"] = torch.cuda.get_device_name(0)
+                free, total = torch.cuda.mem_get_info(0)
+                d["vram_free_gb"] = free / 1024**3
+                d["vram_total_gb"] = total / 1024**3
+                d["ok"] = True
+        except Exception as e:
+            d["error"] = str(e)
+        self.done.emit(d)
 
 
 class _LiveCurves(QFrame):
@@ -90,6 +111,26 @@ class EntrenarPage(TrainerPage):
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
         self.runner: TrainerRunner | None = None
+
+        # ── Indicador de hardware (siempre visible) ──
+        hw_frame = QFrame()
+        hw_frame.setStyleSheet(
+            f"QFrame {{ background: {T.BG_SOFT}; border: 1px solid {T.RULE}; "
+            f"border-radius: 6px; }}"
+        )
+        hwl = QHBoxLayout(hw_frame); hwl.setContentsMargins(14, 8, 14, 8); hwl.setSpacing(12)
+        self.lbl_hw = QLabel("⌛  Detectando hardware…")
+        self.lbl_hw.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none;")
+        self.lbl_hw.setTextFormat(Qt.RichText)
+        hwl.addWidget(self.lbl_hw, 1)
+        btn_recheck = QPushButton("🔄")
+        btn_recheck.setFixedWidth(36); btn_recheck.setToolTip("Re-detectar")
+        btn_recheck.clicked.connect(self._refresh_hw)
+        hwl.addWidget(btn_recheck)
+        self.body.addWidget(hw_frame)
+        # detectar diferido para no bloquear el arranque
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(150, self._refresh_hw)
 
         # ── Control ──
         c1, l1 = self.card("Control", "🎮")
@@ -192,6 +233,38 @@ class EntrenarPage(TrainerPage):
         self.state.train_finished.connect(self._on_finished_ok)
         self.state.train_aborted.connect(self._on_aborted)
         self.state.train_failed.connect(self._on_failed)
+        self._hw_worker: _HwProbeWorker | None = None
+
+    # ── Detección de hardware en background ─────────────────
+    def _refresh_hw(self):
+        if self._hw_worker is not None and self._hw_worker.isRunning():
+            return
+        self.lbl_hw.setText("⌛  Detectando hardware…")
+        self._hw_worker = _HwProbeWorker()
+        self._hw_worker.done.connect(self._on_hw_probe)
+        self._hw_worker.start()
+
+    def _on_hw_probe(self, d: dict):
+        if d.get("ok"):
+            self.lbl_hw.setText(
+                f"<b style='color:{T.OK};'>● ENTRENARÁ EN GPU</b> &nbsp; · &nbsp; "
+                f"<b>{d.get('device_name','?')}</b> &nbsp; · &nbsp; "
+                f"VRAM libre {d.get('vram_free_gb',0):.1f} / {d.get('vram_total_gb',0):.1f} GB "
+                f"&nbsp; · &nbsp; torch {d.get('torch_version','?')} (CUDA {d.get('cuda_build','?')})"
+            )
+        elif "error" in d:
+            self.lbl_hw.setText(
+                f"<b style='color:{T.ERR};'>● ERROR</b> al sondear hardware: {d['error']}"
+            )
+        else:
+            tv = d.get("torch_version", "?"); cb = d.get("cuda_build")
+            if cb is None:
+                msg = (f"PyTorch {tv} fue instalado <b>SIN CUDA</b> — entrenará en CPU "
+                       f"(muy lento). Reinstala con SETUP.bat detectando GPU.")
+            else:
+                msg = (f"PyTorch {tv} con CUDA {cb} pero <code>torch.cuda.is_available()</code> "
+                       f"= False — revisa drivers NVIDIA / reinicia el equipo.")
+            self.lbl_hw.setText(f"<b style='color:{T.WARN};'>● ENTRENARÁ EN CPU</b> &nbsp; · &nbsp; {msg}")
 
     # ──────────────────────────────────────────
     def _start(self):

@@ -42,6 +42,34 @@ class TrainerRunner(QThread):
                 self.failed.emit("Falta data.yaml. Cárgalo en la pestaña Dataset.")
                 return
 
+            # ── Diagnóstico explícito de hardware ──
+            cuda_ok = torch.cuda.is_available()
+            self.log_line.emit("=" * 60)
+            self.log_line.emit(f"[HW] PyTorch {torch.__version__}  ·  CUDA build: {torch.version.cuda}")
+            self.log_line.emit(f"[HW] torch.cuda.is_available(): {cuda_ok}")
+            if cuda_ok:
+                dev_name = torch.cuda.get_device_name(0)
+                free, total = torch.cuda.mem_get_info(0)
+                self.log_line.emit(
+                    f"[HW] GPU 0: {dev_name}  ·  "
+                    f"VRAM libre {free/1024**3:.2f} / {total/1024**3:.2f} GB"
+                )
+            self.log_line.emit(f"[HW] Device solicitado: '{p.device}'")
+
+            # Resolver device efectivo
+            req = (p.device or "0").strip().lower()
+            if not cuda_ok and req != "cpu":
+                self.log_line.emit("[ATENCION] CUDA no disponible — se forzará entrenamiento en CPU.")
+                effective_device = "cpu"
+            elif req in ("cpu",):
+                self.log_line.emit("[INFO] Entrenando en CPU (por configuración).")
+                effective_device = "cpu"
+            else:
+                # 'cuda:0' es más explícito que '0' y evita ambigüedades
+                effective_device = f"cuda:{req}" if req.isdigit() else req
+                self.log_line.emit(f"[INFO] Entrenando en GPU: {effective_device}")
+            self.log_line.emit("=" * 60)
+
             # Modelo base
             if mdl.custom_weights and Path(mdl.custom_weights).exists():
                 weights = str(mdl.custom_weights)
@@ -89,6 +117,18 @@ class TrainerRunner(QThread):
                 self.log_line.emit(f"[INFO] Entrenamiento iniciado.")
                 self.log_line.emit(f"[INFO] Run: {run_name}")
                 self.log_line.emit(f"[INFO] Imgsz: {p.imgsz} · Batch: {p.batch} · Epochs: {p.epochs}")
+                # Confirmar device EFECTIVO del modelo (esto es la verdad)
+                try:
+                    model_dev = next(trainer.model.parameters()).device
+                    self.log_line.emit(f"[HW✓] Modelo Ultralytics colocado en: {model_dev}")
+                    if "cuda" not in str(model_dev) and effective_device != "cpu":
+                        self.log_line.emit(
+                            "[ALERTA] Pediste GPU pero Ultralytics movió el modelo a CPU. "
+                            "Causas tipicas: OOM al probar, AMP check fallido, o driver "
+                            "incompatible. Revisa la salida arriba."
+                        )
+                except Exception as e:
+                    self.log_line.emit(f"[WARN] No se pudo verificar device del modelo: {e}")
 
             def _on_train_end(trainer):
                 self.log_line.emit(f"[INFO] Entrenamiento finalizado.")
@@ -118,7 +158,7 @@ class TrainerRunner(QThread):
                 amp=bool(p.amp),
                 cos_lr=bool(p.cos_lr),
                 cache=cache_val,
-                device=p.device,
+                device=effective_device,
                 workers=int(p.workers),
                 # Augmentación
                 hsv_h=float(a.hsv_h),
