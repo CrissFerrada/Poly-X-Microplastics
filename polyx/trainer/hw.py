@@ -35,25 +35,38 @@ def detect_gpu() -> GPUInfo:
         return GPUInfo(available=False)
 
 
-# Footprint aproximado VRAM por (size, imgsz, batch=1).
-# Calibrado para YOLOv8/v11 con AMP=True. Valores conservadores en GB.
-# El consumo escala ~ batch * (imgsz/640)**2.
-_BASE_FOOTPRINT_GB_640_BATCH1 = {
-    "n": 1.0,
-    "s": 1.4,
-    "m": 2.2,
-    "l": 3.4,
-    "x": 5.4,
+# Footprint aproximado de VRAM por arquitectura.
+#   static_gb      = pesos + optimizador + gradientes (NO escala con batch)
+#   act_gb_640_b1  = activaciones por imagen a imgsz=640 con AMP
+#
+# Calibrado contra mediciones reales (yolov8m 640/16 AMP ≈ 6 GB,
+# 1280/8 AMP ≈ 10 GB) en RTX 30xx/40xx. Activaciones escalan con
+# batch * (imgsz/640)^2.
+_FOOTPRINT = {
+    # size: (static_gb, act_gb_640_b1)
+    "n": (0.30, 0.10),
+    "s": (0.50, 0.18),
+    "m": (1.00, 0.30),
+    "l": (1.70, 0.50),
+    "x": (2.80, 0.80),
 }
 
 
 def estimate_vram_gb(size: str, imgsz: int, batch: int, amp: bool = True) -> float:
-    """Aproximación a la VRAM (GB) necesaria para train con AMP."""
-    base = _BASE_FOOTPRINT_GB_640_BATCH1.get(size, 2.2)
-    scale = (imgsz / 640.0) ** 2 * max(1, batch)
+    """Aproximación a la VRAM (GB) necesaria para entrenar.
+
+    Fórmula: static_gb + act_gb_640_b1 * batch * (imgsz/640)^2 + overhead.
+    El término estático (pesos+optim+grad) NO se multiplica por batch — ese
+    era el bug que daba estimaciones absurdas (cientos de GB).
+    """
+    static_gb, act_gb = _FOOTPRINT.get(size, _FOOTPRINT["m"])
     if not amp:
-        scale *= 1.6
-    return base * scale + 0.6   # +overhead Cuda/Cudnn/Allocator
+        # FP32 ~ duplica activaciones y aumenta optimizador
+        act_gb *= 1.8
+        static_gb *= 1.5
+    activations = act_gb * max(1, batch) * (imgsz / 640.0) ** 2
+    overhead = 0.5   # CUDA/cuDNN/allocator
+    return static_gb + activations + overhead
 
 
 def recommend_max_imgsz(size: str, batch: int, vram_free_gb: float,

@@ -28,22 +28,74 @@ def _save_yaml(path: Path, d: dict):
         yaml.safe_dump(d, f, sort_keys=False, allow_unicode=True)
 
 
-def _count_split(yaml_dir: Path, split_path_value) -> int:
-    if not split_path_value:
+def _resolve_split_path(yaml_dir: Path, data: dict, split_value) -> Path | None:
+    """Resuelve la ruta de un split aplicando la lógica de Ultralytics.
+
+    Convención YOLO:
+        path: ../datasets/coco128     <- raíz (opcional)
+        train: images/train2017       <- relativo a 'path' si existe, si no a yaml_dir
+        val:   images/val2017
+    """
+    if not split_value:
+        return None
+    p = Path(split_value)
+    if p.is_absolute():
+        return p
+    root_value = data.get("path")
+    if root_value:
+        root = Path(root_value)
+        if not root.is_absolute():
+            root = (yaml_dir / root).resolve()
+        candidate = (root / p).resolve()
+        if candidate.exists():
+            return candidate
+        # Si no existe relativo a 'path', intentar relativo al yaml
+    return (yaml_dir / p).resolve()
+
+
+def _count_split(yaml_dir: Path, data: dict, split_value) -> int:
+    p = _resolve_split_path(yaml_dir, data, split_value)
+    if p is None:
         return 0
-    p = (yaml_dir / split_path_value).resolve() if not Path(split_path_value).is_absolute() else Path(split_path_value)
     if p.is_dir():
         n = 0
         for ext in IMAGE_EXTS:
             n += sum(1 for _ in p.rglob(f"*{ext}"))
         return n
     if p.is_file():
-        # archivo de listado .txt
+        # archivo de listado .txt con paths a imágenes
         try:
             return sum(1 for line in p.read_text(encoding="utf-8").splitlines() if line.strip())
         except Exception:
             return 0
     return 0
+
+
+def _find_label_for(img_path: Path) -> Path | None:
+    """Encuentra el .txt YOLO de una imagen, siguiendo la convención Ultralytics:
+    reemplaza el segmento 'images' por 'labels' en la ruta."""
+    # 1) Reemplazo de 'images' -> 'labels' en la ruta
+    parts = list(img_path.parts)
+    for i in range(len(parts) - 1, -1, -1):
+        if parts[i].lower() == "images":
+            new_parts = parts[:i] + ["labels"] + parts[i+1:]
+            candidate = Path(*new_parts).with_suffix(".txt")
+            if candidate.exists():
+                return candidate
+            break
+    # 2) Mismo directorio
+    same = img_path.with_suffix(".txt")
+    if same.exists():
+        return same
+    # 3) labels/ hermana del padre
+    sibling = img_path.parent.parent / "labels" / (img_path.stem + ".txt")
+    if sibling.exists():
+        return sibling
+    # 4) labels/ dentro del mismo directorio
+    nested = img_path.parent / "labels" / (img_path.stem + ".txt")
+    if nested.exists():
+        return nested
+    return None
 
 
 class _PreviewTile(QLabel):
@@ -185,9 +237,9 @@ class DatasetPage(TrainerPage):
 
         yaml_dir = p.parent
         train_p = d.get("train"); val_p = d.get("val"); test_p = d.get("test")
-        n_train = _count_split(yaml_dir, train_p)
-        n_val = _count_split(yaml_dir, val_p)
-        n_test = _count_split(yaml_dir, test_p)
+        n_train = _count_split(yaml_dir, d, train_p)
+        n_val = _count_split(yaml_dir, d, val_p)
+        n_test = _count_split(yaml_dir, d, test_p)
 
         names = d.get("names", [])
         if isinstance(names, dict):
@@ -220,11 +272,27 @@ class DatasetPage(TrainerPage):
         except Exception:
             return
         yaml_dir = yaml_path.parent
-        # tomar imágenes de train
+
+        # raíz para resolver paths relativos dentro de listas .txt
+        root_value = d.get("path")
+        if root_value:
+            root = Path(root_value)
+            if not root.is_absolute():
+                root = (yaml_dir / root).resolve()
+        else:
+            root = yaml_dir
+
         train_p = d.get("train")
         if not train_p:
             return
-        train_abs = (yaml_dir / train_p).resolve() if not Path(train_p).is_absolute() else Path(train_p)
+        train_abs = _resolve_split_path(yaml_dir, d, train_p)
+        if train_abs is None or not train_abs.exists():
+            # Mostrar mensaje en los tiles
+            for tile in self.tiles:
+                tile.setPixmap(QPixmap())
+                tile.setText("(no se encontró\nla carpeta de train)")
+            return
+
         imgs: list[Path] = []
         if train_abs.is_dir():
             for ext in IMAGE_EXTS:
@@ -232,19 +300,26 @@ class DatasetPage(TrainerPage):
         elif train_abs.is_file():
             for line in train_abs.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
-                if line:
-                    pp = Path(line)
-                    if not pp.is_absolute():
-                        pp = (yaml_dir / pp).resolve()
-                    if pp.exists():
-                        imgs.append(pp)
+                if not line or line.startswith("#"):
+                    continue
+                pp = Path(line)
+                if not pp.is_absolute():
+                    # Ultralytics resuelve los listados respecto a 'path' o al yaml
+                    pp = (root / pp).resolve()
+                    if not pp.exists():
+                        pp = (yaml_dir / line).resolve()
+                if pp.exists():
+                    imgs.append(pp)
         if not imgs:
+            for tile in self.tiles:
+                tile.setPixmap(QPixmap())
+                tile.setText("(sin imágenes\nen train)")
             return
+
         random.shuffle(imgs)
         sample = imgs[:6]
         for tile, img_path in zip(self.tiles, sample):
             self._draw_preview(tile, img_path)
-        # limpiar restantes
         for tile in self.tiles[len(sample):]:
             tile.setPixmap(QPixmap()); tile.setText("(vacío)")
 
@@ -253,24 +328,19 @@ class DatasetPage(TrainerPage):
         if pm.isNull():
             tile.setText("✗")
             return
-        # buscar .txt
-        stem = img_path.stem
-        candidates = [
-            img_path.parent / f"{stem}.txt",
-            img_path.parent.parent / "labels" / f"{stem}.txt",
-        ]
+        # Buscar .txt YOLO con la convención Ultralytics
         boxes = []
-        for c in candidates:
-            if c.exists():
-                try:
-                    for line in c.read_text(encoding="utf-8").splitlines():
-                        parts = line.strip().split()
-                        if len(parts) >= 5:
-                            cid, cx, cy, w, h = int(float(parts[0])), *[float(x) for x in parts[1:5]]
-                            boxes.append((cid, cx, cy, w, h))
-                except Exception:
-                    pass
-                break
+        label_path = _find_label_for(img_path)
+        if label_path is not None:
+            try:
+                for line in label_path.read_text(encoding="utf-8").splitlines():
+                    parts = line.strip().split()
+                    if len(parts) >= 5:
+                        cid = int(float(parts[0]))
+                        cx, cy, w, h = [float(x) for x in parts[1:5]]
+                        boxes.append((cid, cx, cy, w, h))
+            except Exception:
+                pass
         # dibujar
         img = QImage(pm)
         painter = QPainter(img)
