@@ -378,9 +378,9 @@ class LauncherWindow(QMainWindow):
 
     # ── Lanzadores ──────────────────────────────────────────────
     def open_detector(self): self._launch_module("polyx.detector")
-    def open_trainer(self):  self._launch_module("polyx.trainer", fallback="🎯 Entrenador en construcción")
-    def open_labeler(self):  self._launch_module("polyx.etiquetador", fallback="🏷 Etiquetador en construcción")
-    def open_viewer(self):   self._launch_module("polyx.visor", fallback="📐 Visor en construcción")
+    def open_trainer(self):  self._launch_module("polyx.trainer")
+    def open_labeler(self):  self._launch_module("polyx.etiquetador")
+    def open_viewer(self):   self._launch_module("polyx.visor")
 
     def _launch_module(self, dotted: str, fallback: str = ""):
         """Lanza el módulo en un proceso aparte para no bloquear el launcher."""

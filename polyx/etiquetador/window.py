@@ -1,0 +1,435 @@
+"""Ventana principal del Etiquetador — 3 paneles: lista | canvas | clases."""
+from __future__ import annotations
+import sys
+from pathlib import Path
+
+from PySide6.QtCore import Qt, QTimer, QSize
+from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QPushButton,
+    QLabel, QListWidget, QListWidgetItem, QFileDialog, QMessageBox,
+    QInputDialog, QComboBox, QProgressDialog,
+)
+
+from ..core import theme as T
+from ..core.widgets import LogoBadge, HLine
+from .state import LabelerState
+from .canvas import BboxCanvas
+
+
+_PRESETS: dict[str, list[str]] = {
+    "Microplásticos Nile Red": ["PET", "PP", "LDPE"],
+    "General (1 clase)":       ["objeto"],
+    "Personalizado":            [],
+}
+
+# Colores paralelos a los del canvas
+_CLS_COLORS = ["#e3342f", "#ff8c00", "#ffd700", "#00b4d8",
+               "#48cae4", "#0077b6", "#023e8a", "#7b2d8b"]
+
+
+class LabelerWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Poly-X · Etiquetador")
+        self.resize(1400, 880)
+        self.setStyleSheet(T.GLOBAL_QSS + f"QMainWindow {{ background: {T.BG_SOFT}; }}")
+
+        self.state = LabelerState()
+        self._pre_model = None   # YoloModel cargado bajo demanda
+
+        central = QWidget()
+        self.setCentralWidget(central)
+        root = QHBoxLayout(central)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        root.addWidget(self._build_left())
+        self.canvas = BboxCanvas(self.state)
+        root.addWidget(self.canvas, 1)
+        root.addWidget(self._build_right())
+
+        self._connect_signals()
+        self._install_shortcuts()
+        self._apply_preset("Microplásticos Nile Red")
+
+        # ── Auto-guardado cada 60 s ──
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.timeout.connect(self._autosave)
+        self._autosave_timer.start(60_000)
+
+    # ── Panel izquierdo ────────────────────────────────────────
+    def _build_left(self) -> QFrame:
+        panel = QFrame()
+        panel.setFixedWidth(230)
+        panel.setStyleSheet(
+            f"QFrame {{ background: {T.BG}; border-right: 1px solid {T.RULE}; }}"
+        )
+        lv = QVBoxLayout(panel)
+        lv.setContentsMargins(12, 14, 12, 12)
+        lv.setSpacing(8)
+
+        lv.addWidget(LogoBadge("POLY-X", "Etiquetador"))
+        lv.addSpacing(6)
+
+        btn_open = QPushButton("📂  Abrir carpeta…")
+        btn_open.setObjectName("primary")
+        btn_open.setCursor(Qt.PointingHandCursor)
+        btn_open.clicked.connect(self._open_folder)
+        lv.addWidget(btn_open)
+
+        self.lbl_count = QLabel("Sin imágenes")
+        self.lbl_count.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
+        lv.addWidget(self.lbl_count)
+
+        self.img_list = QListWidget()
+        self.img_list.setIconSize(QSize(52, 40))
+        self.img_list.setStyleSheet(f"""
+            QListWidget {{
+                border: 1px solid {T.RULE}; border-radius: 6px; background: {T.BG};
+            }}
+            QListWidget::item {{ padding: 4px 6px; font-size: 9pt; }}
+            QListWidget::item:selected {{
+                background: #dde7f4; color: {T.ACCENT_D};
+            }}
+        """)
+        self.img_list.currentRowChanged.connect(self._on_list_select)
+        lv.addWidget(self.img_list, 1)
+
+        nav = QHBoxLayout()
+        nav.setSpacing(6)
+        btn_prev = QPushButton("← Anterior")
+        btn_next = QPushButton("Siguiente →")
+        for b in (btn_prev, btn_next):
+            b.setFixedHeight(28)
+        btn_prev.clicked.connect(self.state.prev_image)
+        btn_next.clicked.connect(self.state.next_image)
+        nav.addWidget(btn_prev)
+        nav.addWidget(btn_next)
+        lv.addLayout(nav)
+
+        self.lbl_idx = QLabel("")
+        self.lbl_idx.setAlignment(Qt.AlignCenter)
+        self.lbl_idx.setStyleSheet(f"color: {T.INK3}; font-size: 8.5pt;")
+        lv.addWidget(self.lbl_idx)
+
+        return panel
+
+    # ── Panel derecho ─────────────────────────────────────────
+    def _build_right(self) -> QFrame:
+        panel = QFrame()
+        panel.setFixedWidth(244)
+        panel.setStyleSheet(
+            f"QFrame {{ background: {T.BG}; border-left: 1px solid {T.RULE}; }}"
+        )
+        rv = QVBoxLayout(panel)
+        rv.setContentsMargins(14, 14, 14, 14)
+        rv.setSpacing(9)
+
+        # Preset
+        rv.addWidget(QLabel("Preset de clases:"))
+        self.combo_preset = QComboBox()
+        self.combo_preset.addItems(_PRESETS.keys())
+        self.combo_preset.currentTextChanged.connect(self._apply_preset)
+        rv.addWidget(self.combo_preset)
+
+        rv.addWidget(HLine())
+        rv.addWidget(QLabel("Clases activas:"))
+
+        self.class_frame = QFrame()
+        self.class_frame.setStyleSheet("QFrame { border: none; background: transparent; }")
+        self._class_layout = QVBoxLayout(self.class_frame)
+        self._class_layout.setContentsMargins(0, 0, 0, 0)
+        self._class_layout.setSpacing(4)
+        self._class_btns: list[QPushButton] = []
+        rv.addWidget(self.class_frame)
+
+        btn_add = QPushButton("+ Agregar clase")
+        btn_add.setStyleSheet(
+            f"QPushButton {{ background: transparent; color: {T.ACCENT}; "
+            f"border: 1px dashed {T.ACCENT}; border-radius: 4px; padding: 4px; }}"
+            f"QPushButton:hover {{ background: {T.BG_SOFT}; }}"
+        )
+        btn_add.clicked.connect(self._add_class)
+        rv.addWidget(btn_add)
+
+        rv.addWidget(HLine())
+
+        # Estadísticas de la imagen actual
+        lbl_stat = QLabel("Anotaciones (imagen actual):")
+        lbl_stat.setStyleSheet(f"color: {T.INK2}; font-weight: 600;")
+        rv.addWidget(lbl_stat)
+        self.lbl_box_info = QLabel("—")
+        self.lbl_box_info.setWordWrap(True)
+        self.lbl_box_info.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
+        rv.addWidget(self.lbl_box_info)
+
+        rv.addWidget(HLine())
+
+        # Pre-anotación
+        lbl_pre = QLabel("Pre-anotación automática")
+        lbl_pre.setStyleSheet(f"font-weight: 600; font-size: 10pt;")
+        rv.addWidget(lbl_pre)
+
+        rv.addWidget(QLabel("Modelo .pt:"))
+        self.lbl_model = QLabel("Sin modelo")
+        self.lbl_model.setWordWrap(True)
+        self.lbl_model.setStyleSheet(
+            f"color: {T.INK3}; font-size: 9pt; background: {T.BG_SOFT}; "
+            f"border: 1px solid {T.RULE}; border-radius: 4px; padding: 4px;"
+        )
+        rv.addWidget(self.lbl_model)
+
+        btn_load_model = QPushButton("📂  Cargar modelo…")
+        btn_load_model.clicked.connect(self._load_model)
+        rv.addWidget(btn_load_model)
+
+        btn_pre_one = QPushButton("🤖  Pre-anotar imagen actual")
+        btn_pre_one.clicked.connect(self._preannotar_current)
+        rv.addWidget(btn_pre_one)
+
+        btn_pre_all = QPushButton("🤖  Pre-anotar TODAS")
+        btn_pre_all.setObjectName("primary")
+        btn_pre_all.clicked.connect(self._preannotar_all)
+        rv.addWidget(btn_pre_all)
+
+        rv.addStretch(1)
+
+        btn_save = QPushButton("💾  Guardar (.txt)")
+        btn_save.setObjectName("primary")
+        btn_save.clicked.connect(self._save)
+        rv.addWidget(btn_save)
+
+        self.lbl_status = QLabel("● Listo")
+        self.lbl_status.setAlignment(Qt.AlignCenter)
+        self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt;")
+        rv.addWidget(self.lbl_status)
+
+        return panel
+
+    # ── Conexiones y atajos ───────────────────────────────────
+    def _connect_signals(self):
+        self.state.images_loaded.connect(self._on_images_loaded)
+        self.state.image_changed.connect(self._on_image_changed)
+        self.state.annotations_changed.connect(self._on_annotations_changed)
+        self.state.active_class_changed.connect(self._on_active_class_changed)
+        self.state.classes_changed.connect(self._rebuild_class_buttons)
+
+    def _install_shortcuts(self):
+        QShortcut(QKeySequence("Ctrl+S"), self, self._save)
+        QShortcut(QKeySequence("Ctrl+Z"), self, self.state.undo)
+        QShortcut(QKeySequence("Ctrl+Y"), self, self.state.redo)
+        QShortcut(QKeySequence(Qt.Key_Left),  self, self.state.prev_image)
+        QShortcut(QKeySequence(Qt.Key_Right), self, self.state.next_image)
+
+    # ── Gestión de clases ─────────────────────────────────────
+    def _rebuild_class_buttons(self, names: list[str] | None = None):
+        if names is None:
+            names = self.state.class_names
+        for b in self._class_btns:
+            b.setParent(None)
+        self._class_btns.clear()
+
+        for i, name in enumerate(names):
+            color = _CLS_COLORS[i % len(_CLS_COLORS)]
+            b = QPushButton(f"  {i + 1}  {name}")
+            b.setCheckable(True)
+            b.setChecked(i == self.state.active_class)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setStyleSheet(
+                f"QPushButton {{ background: {T.BG}; color: {T.INK2}; "
+                f"border: 1.5px solid {T.RULE}; border-radius: 5px; "
+                f"padding: 5px 8px; text-align: left; }}"
+                f"QPushButton:checked {{ background: {color}22; border-color: {color}; "
+                f"color: {T.INK}; font-weight: 600; }}"
+                f"QPushButton:hover {{ background: {T.BG_SOFT}; }}"
+            )
+            b.clicked.connect(lambda _, x=i: self.state.set_active_class(x))
+            self._class_layout.addWidget(b)
+            self._class_btns.append(b)
+
+    def _on_active_class_changed(self, cls_id: int):
+        for i, b in enumerate(self._class_btns):
+            b.setChecked(i == cls_id)
+
+    def _apply_preset(self, preset: str):
+        names = _PRESETS.get(preset, [])
+        if names:
+            self.state.set_class_names(names)
+
+    def _add_class(self):
+        name, ok = QInputDialog.getText(self, "Nueva clase", "Nombre de la clase:")
+        if ok and name.strip():
+            self.state.set_class_names(list(self.state.class_names) + [name.strip()])
+
+    # ── Archivos ─────────────────────────────────────────────
+    def _open_folder(self):
+        folder = QFileDialog.getExistingDirectory(
+            self, "Seleccionar carpeta de imágenes"
+        )
+        if folder:
+            self.state.load_images(Path(folder))
+            self.state.save_classes_txt()
+            self._set_status("● Carpeta cargada", T.OK)
+
+    def _save(self):
+        self.state.save_current()
+        self.state.save_classes_txt()
+        self._set_status("● Guardado", T.OK)
+
+    # ── Pre-anotación ─────────────────────────────────────────
+    def _load_model(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Cargar modelo YOLO", "", "Modelo YOLO (*.pt)"
+        )
+        if not path:
+            return
+        try:
+            from ..core.yolo_wrap import YoloModel
+            self._pre_model = YoloModel(path)
+            self.lbl_model.setText(Path(path).name)
+            self._set_status("● Modelo cargado", T.OK)
+        except Exception as e:
+            QMessageBox.warning(self, "Error al cargar modelo", str(e))
+
+    def _preannotar_current(self):
+        if not self._pre_model:
+            QMessageBox.warning(self, "Sin modelo", "Carga un modelo .pt primero.")
+            return
+        img = self.state.current_image
+        if img is None:
+            return
+        if self.state.current_boxes:
+            r = QMessageBox.question(
+                self, "Sobrescribir",
+                "Esta imagen ya tiene anotaciones. ¿Sobrescribir con el modelo?"
+            )
+            if r != QMessageBox.Yes:
+                return
+        try:
+            dets = self._pre_model.predict(str(img), conf=0.25, device="cpu")
+            boxes = self._dets_to_boxes(dets, img)
+            self.state.set_current_boxes(boxes)
+            self._set_status(f"● Pre-anotadas {len(boxes)} cajas", T.OK)
+        except Exception as e:
+            QMessageBox.warning(self, "Error en pre-anotación", str(e))
+
+    def _preannotar_all(self):
+        if not self._pre_model:
+            QMessageBox.warning(self, "Sin modelo", "Carga un modelo .pt primero.")
+            return
+        if not self.state.images:
+            return
+
+        total = len(self.state.images)
+        pd = QProgressDialog("Pre-anotando imágenes…", "Cancelar", 0, total, self)
+        pd.setWindowTitle("Pre-anotando")
+        pd.setMinimumDuration(0)
+        pd.setValue(0)
+
+        for i, img_path in enumerate(self.state.images):
+            if pd.wasCanceled():
+                break
+            pd.setValue(i)
+            pd.setLabelText(f"{i + 1}/{total}: {img_path.name}")
+            key = str(img_path)
+            # Solo anotar las vacías
+            existing = self.state._annotations.get(key)
+            if existing:
+                continue
+            try:
+                dets = self._pre_model.predict(str(img_path), conf=0.25, device="cpu")
+                boxes = self._dets_to_boxes(dets, img_path)
+                self.state._annotations[key] = boxes
+                self.state._save_labels_for(img_path, boxes)
+            except Exception:
+                pass
+
+        pd.setValue(total)
+        self.state.annotations_changed.emit()
+        self._set_status("● Pre-anotación completa", T.OK)
+
+    def _dets_to_boxes(self, dets, img_path: Path):
+        from .state import BBox
+        try:
+            from PIL import Image
+            with Image.open(str(img_path)) as im:
+                iw, ih = im.size
+        except Exception:
+            iw = ih = 640
+
+        boxes = []
+        for d in dets:
+            w = d.x2 - d.x1
+            h = d.y2 - d.y1
+            cx = (d.x1 + w / 2) / iw
+            cy = (d.y1 + h / 2) / ih
+            boxes.append(BBox(d.class_id, cx, cy, w / iw, h / ih))
+        return boxes
+
+    # ── Callbacks de estado ───────────────────────────────────
+    def _on_images_loaded(self, imgs: list):
+        self.img_list.clear()
+        for img in imgs:
+            item = QListWidgetItem(f"○ {img.name}")
+            item.setIcon(self._make_thumb(img))
+            self.img_list.addItem(item)
+        self.lbl_count.setText(f"{len(imgs)} imagen(es)")
+
+    def _make_thumb(self, img_path: Path) -> QIcon:
+        """Carga miniatura 52×40 de la imagen."""
+        try:
+            pix = QPixmap(str(img_path))
+            if pix.isNull():
+                return QIcon()
+            return QIcon(pix.scaled(QSize(52, 40), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        except Exception:
+            return QIcon()
+
+    def _on_image_changed(self, idx: int):
+        self.img_list.blockSignals(True)
+        self.img_list.setCurrentRow(idx)
+        self.img_list.blockSignals(False)
+        total = len(self.state.images)
+        self.lbl_idx.setText(f"{idx + 1} / {total}")
+
+    def _on_annotations_changed(self):
+        boxes = self.state.current_boxes
+        n = len(boxes)
+
+        cls_counts: dict[str, int] = {}
+        for b in boxes:
+            name = (self.state.class_names[b.class_id]
+                    if b.class_id < len(self.state.class_names)
+                    else str(b.class_id))
+            cls_counts[name] = cls_counts.get(name, 0) + 1
+
+        if cls_counts:
+            lines = [f"{n} caja(s)"] + [f"  {k}: {v}" for k, v in cls_counts.items()]
+            self.lbl_box_info.setText("\n".join(lines))
+        else:
+            self.lbl_box_info.setText("Sin anotaciones")
+
+        # Actualizar indicador ✓/○ en la lista (sin perder el icono)
+        idx = self.state.current_idx
+        if 0 <= idx < self.img_list.count():
+            item = self.img_list.item(idx)
+            name = self.state.images[idx].name
+            item.setText(f"{'✓' if n > 0 else '○'} {name}")
+
+    def _on_list_select(self, row: int):
+        if row >= 0 and row != self.state.current_idx:
+            self.state.goto(row)
+
+    def _autosave(self):
+        """Auto-guardado silencioso cada 60 s."""
+        if self.state.current_image is None:
+            return
+        self.state.save_current()
+        self.state.save_classes_txt()
+        self._set_status("● Autoguardado", T.INK3)
+        QTimer.singleShot(2500, lambda: self._set_status("● Listo", T.OK))
+
+    def _set_status(self, text: str, color: str = T.OK):
+        self.lbl_status.setText(text)
+        self.lbl_status.setStyleSheet(f"color: {color}; font-size: 9pt;")

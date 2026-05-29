@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog,
     QTableWidget, QTableWidgetItem, QHeaderView,
@@ -25,6 +26,7 @@ class ImagenesPage(DetectorPage):
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
+        self.setAcceptDrops(True)
 
         # ── Tarjeta Origen ──
         c1, l1 = self.card("Origen", "📁")
@@ -121,6 +123,34 @@ class ImagenesPage(DetectorPage):
         txt = self.ed_gt.text().strip()
         self.state.gt_folder = Path(txt) if txt else None
         self._refresh_table()
+
+    # ── Drag & Drop ───────────────────────────────────────────
+    def dragEnterEvent(self, ev: QDragEnterEvent):
+        if ev.mimeData().hasUrls():
+            urls = ev.mimeData().urls()
+            # Acepta carpetas o archivos de imagen
+            for u in urls:
+                p = u.toLocalFile()
+                from pathlib import Path as _P
+                pp = _P(p)
+                if pp.is_dir() or pp.suffix.lower() in IMAGE_EXTS:
+                    ev.acceptProposedAction()
+                    return
+        ev.ignore()
+
+    def dropEvent(self, ev: QDropEvent):
+        imgs: list[Path] = []
+        for url in ev.mimeData().urls():
+            p = Path(url.toLocalFile())
+            if p.is_dir():
+                for ext in IMAGE_EXTS:
+                    imgs.extend(p.rglob(f"*{ext}"))
+            elif p.suffix.lower() in IMAGE_EXTS:
+                imgs.append(p)
+        if imgs:
+            self.state.images = sorted(set(imgs))
+            self._refresh_table()
+        ev.acceptProposedAction()
 
     def _refresh_table(self):
         imgs = self.state.images

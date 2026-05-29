@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog,
     QFrame, QMessageBox,
@@ -19,6 +20,7 @@ class _ModelSlotCard(QFrame):
         super().__init__()
         self.idx = idx
         self._on_change = on_path_changed
+        self.setAcceptDrops(True)
         self.setStyleSheet(
             f"QFrame {{ background: {T.BG}; border: 1px solid {T.RULE}; border-radius: 8px; }}"
         )
@@ -83,6 +85,36 @@ class _ModelSlotCard(QFrame):
         if f:
             self.ed_path.setText(f)
             self._emit_change()
+
+    # ── Drag & Drop ──────────────────────────────────────────
+    def dragEnterEvent(self, ev: QDragEnterEvent):
+        if ev.mimeData().hasUrls():
+            urls = ev.mimeData().urls()
+            if any(u.toLocalFile().lower().endswith(".pt") for u in urls):
+                ev.acceptProposedAction()
+                self.setStyleSheet(
+                    f"QFrame {{ background: #ddf4ff; border: 2px solid {T.ACCENT}; "
+                    f"border-radius: 8px; }}"
+                )
+                return
+        ev.ignore()
+
+    def dragLeaveEvent(self, ev):
+        self.setStyleSheet(
+            f"QFrame {{ background: {T.BG}; border: 1px solid {T.RULE}; border-radius: 8px; }}"
+        )
+
+    def dropEvent(self, ev: QDropEvent):
+        self.setStyleSheet(
+            f"QFrame {{ background: {T.BG}; border: 1px solid {T.RULE}; border-radius: 8px; }}"
+        )
+        for url in ev.mimeData().urls():
+            path = url.toLocalFile()
+            if path.lower().endswith(".pt"):
+                self.ed_path.setText(path)
+                self._emit_change()
+                break
+        ev.acceptProposedAction()
 
     def _clear(self):
         self.ed_path.setText("")

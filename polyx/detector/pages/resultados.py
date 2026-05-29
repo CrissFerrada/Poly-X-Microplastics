@@ -1,12 +1,16 @@
-"""Página 6 — Resultados. KPIs grandes + tabla por imagen."""
+"""Página 6 — Resultados. KPIs grandes + histograma de tamaños + tabla por imagen."""
 from __future__ import annotations
+import csv
+import io
 import os
 from pathlib import Path
+
+import numpy as np
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QTableWidget, QTableWidgetItem,
-    QHeaderView,
+    QHeaderView, QPushButton, QFileDialog, QFrame,
 )
 
 from ._base import DetectorPage
@@ -62,6 +66,31 @@ class ResultadosPage(DetectorPage):
         l2.addLayout(row)
         self.body.addWidget(c2)
 
+        # ── Histograma de tamaños (solo con calibración) ──
+        self.c_hist, l_hist = self.card(
+            "Distribución de tamaños (μm) — solo con calibración activa", "📐"
+        )
+        self._hist_placeholder = QLabel(
+            "Configura μm/px en Parámetros para ver la distribución de tamaños."
+        )
+        self._hist_placeholder.setAlignment(Qt.AlignCenter)
+        self._hist_placeholder.setStyleSheet(
+            f"color: {T.INK3}; font-size: 10pt; border: none; padding: 24px;"
+        )
+        l_hist.addWidget(self._hist_placeholder)
+        self._hist_canvas = None
+        self.body.addWidget(self.c_hist)
+
+        # ── Exportar CSV ──
+        c_csv, l_csv = self.card("Exportar datos", "💾")
+        row_csv = QHBoxLayout()
+        btn_csv = QPushButton("📄  Exportar CSV de detecciones")
+        btn_csv.clicked.connect(self._export_csv)
+        row_csv.addWidget(btn_csv)
+        row_csv.addStretch(1)
+        l_csv.addLayout(row_csv)
+        self.body.addWidget(c_csv)
+
         # ── Tabla por imagen ──
         c3, l3 = self.card("Por imagen", "🖼")
         self.table = QTableWidget(0, 8)
@@ -112,6 +141,9 @@ class ResultadosPage(DetectorPage):
         mc = sum(r.miscls for r in all_results)
         self.lbl_mis.setText(f"MisCls:  {mc}" if any_gt else "MisCls:  —")
 
+        # Histograma de tamaños (solo si hay calibración)
+        self._update_histogram()
+
         # Tabla
         rows = []
         for mi, rs in state.results.items():
@@ -132,6 +164,92 @@ class ResultadosPage(DetectorPage):
             # guardamos la ruta para doble-clic
             self.table.item(i, 1).setData(Qt.UserRole, str(p))
             self.table.item(i, 0).setData(Qt.UserRole, alias)
+
+    def _update_histogram(self):
+        """Dibuja histograma de diam_um por clase; solo si hay calibración."""
+        um_per_px = getattr(self.state.params, "um_per_px", 0.0)
+        all_results = [r for rs in self.state.results.values() for r in rs]
+        sizes_by_class: dict[str, list[float]] = {}
+        for r in all_results:
+            for p in r.predictions:
+                if p.diam_um and p.diam_um > 0:
+                    sizes_by_class.setdefault(p.class_name, []).append(p.diam_um)
+
+        has_data = um_per_px > 0 and any(sizes_by_class.values())
+
+        if not has_data:
+            if self._hist_canvas:
+                self._hist_canvas.setVisible(False)
+            self._hist_placeholder.setVisible(True)
+            return
+
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            from matplotlib.figure import Figure
+            from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+
+            if self._hist_canvas is None:
+                fig = Figure(figsize=(7, 3), tight_layout=True)
+                self._hist_ax = fig.add_subplot(111)
+                self._hist_canvas = FigureCanvasQTAgg(fig)
+                self._hist_canvas.setMinimumHeight(220)
+                # Insertar después del placeholder
+                l_hist = self.c_hist.layout()
+                l_hist.addWidget(self._hist_canvas)
+
+            ax = self._hist_ax
+            ax.clear()
+            ax.set_facecolor("#f6f8fa")
+            ax.figure.set_facecolor("#ffffff")
+
+            colors = {"PET": "#e3342f", "PP": "#ff8c00", "LDPE": "#ffd700"}
+            for cls_name, vals in sizes_by_class.items():
+                color = colors.get(cls_name, "#0969da")
+                ax.hist(vals, bins=20, alpha=0.72, label=f"{cls_name} (n={len(vals)})",
+                        color=color, edgecolor="white", linewidth=0.5)
+
+            ax.set_xlabel("Diámetro equivalente (μm)", fontsize=9)
+            ax.set_ylabel("Frecuencia", fontsize=9)
+            ax.set_title("Distribución de tamaños por clase", fontsize=10, fontweight="bold")
+            ax.legend(fontsize=8)
+            ax.grid(axis="y", alpha=0.3)
+            ax.tick_params(labelsize=8)
+            self._hist_canvas.draw()
+            self._hist_placeholder.setVisible(False)
+            self._hist_canvas.setVisible(True)
+        except Exception as e:
+            self._hist_placeholder.setText(f"matplotlib no disponible: {e}")
+            self._hist_placeholder.setVisible(True)
+
+    def _export_csv(self):
+        """Exporta todas las detecciones a un archivo CSV."""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exportar CSV", "detecciones.csv", "CSV (*.csv)"
+        )
+        if not path:
+            return
+        all_results = [r for rs in self.state.results.values() for r in rs]
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(["modelo", "imagen", "clase", "conf",
+                             "x1", "y1", "x2", "y2", "diam_um"])
+                for mi, rs in self.state.results.items():
+                    alias = self.state.model_slots[mi].alias
+                    for r in rs:
+                        for p in r.predictions:
+                            w.writerow([
+                                alias, r.image_path.name,
+                                p.class_name, f"{p.conf:.4f}",
+                                f"{p.x1:.1f}", f"{p.y1:.1f}",
+                                f"{p.x2:.1f}", f"{p.y2:.1f}",
+                                f"{p.diam_um:.2f}" if p.diam_um else "",
+                            ])
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Error", f"No se pudo guardar: {e}")
 
     def _open_row(self, row: int, col: int):
         if row < 0 or self.state.run_dir is None: return

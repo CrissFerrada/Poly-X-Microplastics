@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QPixmap, QPainter, QPen, QColor, QImage, QFont
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton,
-    QFileDialog, QMessageBox, QFrame, QSpinBox, QComboBox,
+    QFileDialog, QMessageBox, QFrame, QSpinBox, QComboBox, QProgressDialog,
 )
 
 from ._base import TrainerPage
@@ -205,6 +205,42 @@ class DatasetPage(TrainerPage):
         l4.addLayout(prow)
         self.body.addWidget(c4)
 
+        # ── Validación del dataset ──
+        c5, l5 = self.card("Validación del dataset", "🔍")
+        info_val = QLabel(
+            "Verifica que el dataset sea correcto antes de entrenar. "
+            "Se comprueba automáticamente al cargar data.yaml."
+        )
+        info_val.setWordWrap(True)
+        info_val.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l5.addWidget(info_val)
+
+        # Labels de validación
+        self._val_checks: list[QLabel] = []
+        val_checks_names = [
+            "data.yaml cargado y válido",
+            "Split train con imágenes",
+            "Split val con imágenes",
+            "Labels encontradas (≥ 80 %)",
+            "Clases definidas en YAML",
+        ]
+        val_grid = QGridLayout(); val_grid.setSpacing(6)
+        for i, name in enumerate(val_checks_names):
+            icon = QLabel("○")
+            icon.setFixedWidth(20)
+            icon.setStyleSheet(f"color: {T.INK3}; font-size: 11pt; border: none;")
+            lbl = QLabel(name)
+            lbl.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+            val_grid.addWidget(icon, i, 0)
+            val_grid.addWidget(lbl, i, 1)
+            self._val_checks.append((icon, lbl))
+        l5.addLayout(val_grid)
+
+        btn_val = QPushButton("🔍  Validar ahora")
+        btn_val.clicked.connect(self._validate_dataset)
+        l5.addWidget(btn_val, 0, Qt.AlignLeft)
+        self.body.addWidget(c5)
+
     # ──────────────────────────────────────────
     def _browse(self):
         f, _ = QFileDialog.getOpenFileName(
@@ -262,6 +298,7 @@ class DatasetPage(TrainerPage):
             + ", ".join(self.state.dataset.class_names[:20])
         )
         self._refresh_preview()
+        self._validate_dataset()
 
     def _refresh_preview(self):
         yaml_path = self.state.dataset.yaml_path
@@ -355,6 +392,76 @@ class DatasetPage(TrainerPage):
         painter.end()
         scaled = QPixmap.fromImage(img).scaled(tile.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         tile.setPixmap(scaled)
+
+    # ── Validación ────────────────────────────────────────────
+    def _set_check(self, idx: int, ok: bool | None, msg: str = ""):
+        icon_lbl, text_lbl = self._val_checks[idx]
+        if ok is True:
+            icon_lbl.setText("✓")
+            icon_lbl.setStyleSheet(f"color: {T.OK}; font-size: 11pt; border: none;")
+            text_lbl.setStyleSheet(f"color: {T.OK}; font-size: 10pt; border: none;")
+        elif ok is False:
+            icon_lbl.setText("✗")
+            icon_lbl.setStyleSheet(f"color: {T.ERR}; font-size: 11pt; border: none;")
+            text_lbl.setStyleSheet(f"color: {T.ERR}; font-size: 10pt; border: none;")
+        else:
+            icon_lbl.setText("○")
+            icon_lbl.setStyleSheet(f"color: {T.INK3}; font-size: 11pt; border: none;")
+            text_lbl.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        if msg:
+            text_lbl.setToolTip(msg)
+
+    def _validate_dataset(self):
+        """Valida el dataset y actualiza los indicadores de validación."""
+        # Reset
+        for i in range(len(self._val_checks)):
+            self._set_check(i, None)
+
+        yaml_path = self.state.dataset.yaml_path
+        if not yaml_path or not yaml_path.exists():
+            self._set_check(0, False, "No hay data.yaml cargado.")
+            return
+        try:
+            d = _load_yaml(yaml_path)
+        except Exception as e:
+            self._set_check(0, False, str(e))
+            return
+        self._set_check(0, True)
+
+        yaml_dir = yaml_path.parent
+        n_train = self.state.dataset.train_count
+        n_val   = self.state.dataset.val_count
+        self._set_check(1, n_train > 0,
+                        f"{n_train} imagen(es) en train." if n_train else "Sin imágenes en train.")
+        self._set_check(2, n_val > 0,
+                        f"{n_val} imagen(es) en val." if n_val else "Sin imágenes en val.")
+
+        # Verificar labels para las primeras 50 imágenes de train
+        train_p = d.get("train")
+        train_abs = _resolve_split_path(yaml_dir, d, train_p)
+        if train_abs and train_abs.exists():
+            imgs: list[Path] = []
+            if train_abs.is_dir():
+                for ext in IMAGE_EXTS:
+                    imgs.extend(list(train_abs.rglob(f"*{ext}"))[:50])
+            if imgs:
+                with_label = sum(1 for img in imgs if _find_label_for(img))
+                pct = with_label / len(imgs) * 100
+                ok_labels = pct >= 80
+                self._set_check(3, ok_labels,
+                                f"{pct:.0f} % de imágenes tienen label ({with_label}/{len(imgs)} revisadas).")
+            else:
+                self._set_check(3, None, "No se encontraron imágenes para revisar.")
+        else:
+            self._set_check(3, None, "No se pudo acceder al split train.")
+
+        names = d.get("names", [])
+        if isinstance(names, dict):
+            names = list(names.values())
+        has_names = bool(names)
+        self._set_check(4, has_names,
+                        f"Clases: {', '.join(str(n) for n in names[:10])}" if has_names
+                        else "No hay clave 'names' en el YAML.")
 
     # ── Auto-split ────────────────────────────────────────────
     def _auto_split(self):
