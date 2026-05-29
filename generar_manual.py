@@ -34,16 +34,34 @@ from PySide6.QtWidgets import QApplication
 # ────────────────────────────────────────────────────────────────────
 FIGURE_MAP = {
     # fig_01 — Launcher principal
-    1: dict(module="polyx.launcher", cls="LauncherWindow", size=(1180, 820), wait_ms=900),
-    # fig_02..09 — Detector, una por pestaña del sidebar
-    2: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=0),
-    3: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=1),
-    4: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=3),  # Parametros
-    5: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=4),  # Ejecutar
-    6: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=5),  # Resultados
-    7: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=6),  # Errores
-    8: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=7),  # Comparar
-    9: dict(module="polyx.detector", cls="DetectorWindow", size=(1280, 820), tab=8),  # Reporte
+    1:  dict(module="polyx.launcher",     cls="LauncherWindow",  size=(1180, 820), wait_ms=900),
+
+    # fig_02..09 — Detector (9 pestañas)
+    2:  dict(module="polyx.detector",     cls="DetectorWindow",  size=(1280, 820), tab=0),  # Modelos
+    3:  dict(module="polyx.detector",     cls="DetectorWindow",  size=(1280, 820), tab=1),  # Imágenes
+    4:  dict(module="polyx.detector",     cls="DetectorWindow",  size=(1280, 820), tab=3),  # Parámetros
+    5:  dict(module="polyx.detector",     cls="DetectorWindow",  size=(1280, 820), tab=4),  # Ejecutar
+    6:  dict(module="polyx.detector",     cls="DetectorWindow",  size=(1280, 820), tab=5),  # Resultados
+    7:  dict(module="polyx.detector",     cls="DetectorWindow",  size=(1280, 820), tab=6),  # Errores
+    8:  dict(module="polyx.detector",     cls="DetectorWindow",  size=(1280, 820), tab=7),  # Comparar
+    9:  dict(module="polyx.detector",     cls="DetectorWindow",  size=(1280, 820), tab=8),  # Reporte
+
+    # fig_10..18 — Entrenador (9 pestañas)
+    10: dict(module="polyx.trainer",      cls="TrainerWindow",   size=(1320, 840), tab=0),  # Modelo
+    11: dict(module="polyx.trainer",      cls="TrainerWindow",   size=(1320, 840), tab=1),  # Dataset
+    12: dict(module="polyx.trainer",      cls="TrainerWindow",   size=(1320, 840), tab=2),  # Parámetros
+    13: dict(module="polyx.trainer",      cls="TrainerWindow",   size=(1320, 840), tab=3),  # Augmentación
+    14: dict(module="polyx.trainer",      cls="TrainerWindow",   size=(1320, 840), tab=4),  # Entrenar
+    15: dict(module="polyx.trainer",      cls="TrainerWindow",   size=(1320, 840), tab=5),  # Evaluar
+    16: dict(module="polyx.trainer",      cls="TrainerWindow",   size=(1320, 840), tab=6),  # Comparar
+    17: dict(module="polyx.trainer",      cls="TrainerWindow",   size=(1320, 840), tab=7),  # Exportar
+    18: dict(module="polyx.trainer",      cls="TrainerWindow",   size=(1320, 840), tab=8),  # Informe
+
+    # fig_19 — Etiquetador
+    19: dict(module="polyx.etiquetador",  cls="LabelerWindow",   size=(1400, 880), wait_ms=800),
+
+    # fig_20 — Visor
+    20: dict(module="polyx.visor",        cls="VisorWindow",     size=(1420, 900), wait_ms=800),
 }
 
 
