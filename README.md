@@ -132,6 +132,19 @@ O directamente desde terminal:
 .venv\Scripts\python.exe -m polyx.visor
 ```
 
+## Actualizar
+
+Para traer la última versión publicada en GitHub **sin reinstalar nada**, doble clic en:
+
+```bat
+actualizar.bat
+```
+
+Comprueba si hay un commit nuevo en `main`; si lo hay, descarga y reemplaza solo los
+archivos del programa. **Conserva** tu entorno `.venv`, tus modelos `models\*.pt`, tus
+`runs\` y cualquier dato local. No necesita tener Git instalado (descarga por HTTPS) —
+solo conexión a internet.
+
 ---
 
 ## Estructura del proyecto

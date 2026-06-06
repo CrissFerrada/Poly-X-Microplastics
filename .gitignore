@@ -64,3 +64,6 @@ desktop.ini
 *.log
 *.tmp
 venv.txt
+
+# Estado local del actualizador (SHA del commit instalado)
+.polyx_version

@@ -29,6 +29,14 @@ INSTALACIÓN (PRIMERA VEZ)
    por su tamaño. Copia tu archivo .pt dentro de la carpeta  models\
    para usar el Detector y el Visor.
 
+ACTUALIZAR (TRAER LO NUEVO DE GITHUB)
+-------------------------------------
+Doble clic en  actualizar.bat
+  - Mira si hay una version nueva en GitHub y la descarga.
+  - Reemplaza solo el codigo del programa.
+  - CONSERVA tu .venv, tus modelos models\*.pt, tus runs\ y datos.
+  - No necesita Git, solo internet.
+
 USO DIARIO
 ----------
 Doble clic en el acceso directo "Poly-X" del Escritorio
