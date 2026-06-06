@@ -25,12 +25,13 @@
 ### 🔬 Detector (análisis en lote)
 - Carga hasta **3 modelos .pt** en paralelo para comparación directa
 - Inferencia sobre carpetas de imágenes con barra de progreso
-- Análisis de errores: **TP/FP/FN**, matriz de confusión, galería de falsos positivos/negativos
+- Análisis de errores: **Verdaderos Positivos / Falsos Positivos / Falsos Negativos / Mal Clasificados**, matriz de confusión, galería de falsos positivos/negativos
 - Calibración **μm/px** para reportar tamaños reales de partículas
 - **Histograma de distribución de tamaños** por clase (PET/PP/LDPE) — visible cuando hay calibración activa
 - **Exportar CSV** directo desde la página de resultados
 - **Drag & Drop** de modelos `.pt` e imágenes/carpetas
-- Reporte HTML autocontenido (imágenes en base64, calidad paper)
+- Reporte HTML autocontenido (todas las imágenes en **base64**, calidad paper) con **galería comparativa Predicción vs Ground Truth (lado a lado)**
+- **Exportación a PDF** del reporte (un clic), listo para enviar por correo
 
 ### 🎯 Entrenador
 - Soporte para **YOLO v8 y v11**, tamaños nano → xlarge
@@ -89,13 +90,31 @@ Dependencias principales: `PySide6 6.7`, `Ultralytics 8.3`, `OpenCV 4.10`, `NumP
 
 ## Instalación
 
+Tras descargar el proyecto desde GitHub (botón **Code → Download ZIP**, y descomprimir;
+o `git clone`), haz **doble clic en**:
+
 ```bat
 SETUP.bat
 ```
 
-Crea el entorno `.venv`, detecta GPU NVIDIA y descarga PyTorch (CUDA o CPU automáticamente).
+El instalador:
+
+1. **Pregunta dónde instalar Poly-X** (pulsa ENTER para instalarlo en la misma carpeta, o escribe otra ruta).
+2. Detecta Python 3.11 y crea el entorno `.venv`.
+3. Detecta GPU NVIDIA y descarga PyTorch (CUDA o CPU automáticamente).
+4. Instala el resto de dependencias y verifica que todo importa.
+5. Te ofrece **crear un acceso directo "Poly-X" en el Escritorio** y **te dice cómo iniciarlo**.
+
+> **Importante:** los modelos entrenados (`*.pt`) **no** se incluyen en la descarga de GitHub
+> por su tamaño. Copia tu archivo `.pt` dentro de la carpeta `models\` para usar el Detector y el Visor.
+
+> Requiere **Python 3.11.x** (no 3.12+). Si no lo tienes, descárgalo desde
+> [python.org/downloads/release/python-3119](https://www.python.org/downloads/release/python-3119/)
+> marcando *"Add Python to PATH"*.
 
 ## Uso
+
+Doble clic en el acceso directo **Poly-X** del Escritorio, o en:
 
 ```bat
 iniciar_polyx.bat

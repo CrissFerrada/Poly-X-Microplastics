@@ -18,13 +18,21 @@ INSTALACIÓN (PRIMERA VEZ)
 2. (Opcional, si tienes GPU NVIDIA) instala los drivers actualizados.
 
 3. Doble clic en  SETUP.bat
+   - Te PREGUNTA DÓNDE INSTALAR (ENTER = aquí mismo, o escribe otra carpeta)
    - Crea el entorno virtual .venv
    - Detecta GPU automáticamente
    - Instala PyTorch + ultralytics + PySide6 (5-15 min la 1ª vez)
+   - Te ofrece crear un acceso directo en el Escritorio
+   - Al terminar te dice CÓMO INICIARLO
+
+   NOTA: los modelos entrenados (.pt) NO vienen en la descarga de GitHub
+   por su tamaño. Copia tu archivo .pt dentro de la carpeta  models\
+   para usar el Detector y el Visor.
 
 USO DIARIO
 ----------
-Doble clic en  iniciar_polyx.bat
+Doble clic en el acceso directo "Poly-X" del Escritorio
+(o en  iniciar_polyx.bat).
 Se abre el menú principal con 4 módulos:
 
    🔬 Detector     · Analiza imágenes con un modelo .pt entrenado
@@ -41,7 +49,9 @@ FLUJO RÁPIDO (usar modelo ya entrenado)
 3. Pestaña "Imágenes" → selecciona tu carpeta.
 4. Pestaña "Parámetros" → ajusta μm/píxel del microscopio.
 5. Pestaña "Ejecutar" → ▶ Iniciar detección.
-6. Pestaña "Reporte" → 📄 Generar reporte HTML.
+6. Pestaña "Reporte" → 📄 Generar reporte HTML  o  📑 Exportar a PDF
+   (el reporte incluye la comparación Predicción vs Ground Truth lado a
+   lado; todas las imágenes van embebidas, no se rompen al enviarlo).
 
 ESTRUCTURA DE CARPETAS
 ----------------------
