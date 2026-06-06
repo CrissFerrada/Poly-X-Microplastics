@@ -386,7 +386,7 @@ class LauncherWindow(QMainWindow):
         """Lanza el módulo en un proceso aparte para no bloquear el launcher."""
         try:
             # Verificar que existe sin importarlo (evita errores de Qt)
-            import importlib
+            import importlib.util
             spec = importlib.util.find_spec(dotted)
             if spec is None:
                 self._toast(fallback or f"Módulo {dotted} no encontrado")

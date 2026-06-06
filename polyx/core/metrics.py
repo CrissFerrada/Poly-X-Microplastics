@@ -7,6 +7,28 @@ import numpy as np
 from .yolo_wrap import Detection
 
 
+# ────────────────────────────────────────────────────────────────────
+# Etiquetas para visualización (español).
+#
+# IMPORTANTE: la lógica interna sigue usando los atributos cortos
+# tp / fp / fn / miscls (y las propiedades precision/recall/f1). Estas
+# constantes SOLO cambian cómo se le muestran al usuario final en la
+# interfaz, la consola y los reportes; el cálculo no se ve afectado.
+# ────────────────────────────────────────────────────────────────────
+LABEL_TP = "Verdaderos Positivos"
+LABEL_FP = "Falsos Positivos"
+LABEL_FN = "Falsos Negativos"
+LABEL_MISCLS = "Mal Clasificados"
+
+# Mapa código → etiqueta legible (útil para tablas/filtros)
+LABELS_BY_CODE = {
+    "TP": LABEL_TP,
+    "FP": LABEL_FP,
+    "FN": LABEL_FN,
+    "MISCLS": LABEL_MISCLS,
+}
+
+
 def iou(a: Detection, b: Detection) -> float:
     x1 = max(a.x1, b.x1); y1 = max(a.y1, b.y1)
     x2 = min(a.x2, b.x2); y2 = min(a.y2, b.y2)

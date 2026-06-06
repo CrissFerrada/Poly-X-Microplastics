@@ -62,7 +62,8 @@ class ImagenesPage(DetectorPage):
 
         hint = QLabel(
             "Si dejas vacío, busca .txt junto a cada imagen y en /labels/ hermana. "
-            "Si una imagen tiene GT, se incluirá en el análisis de errores (TP/FP/FN). "
+            "Si una imagen tiene GT, se incluirá en el análisis de errores "
+            "(Verdaderos Positivos, Falsos Positivos y Falsos Negativos). "
             "Si no, solo se reportan las detecciones del modelo."
         )
         hint.setWordWrap(True)

@@ -26,7 +26,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from . import theme as T
-from .metrics import aggregate_per_class, confusion_matrix
+from .metrics import (
+    aggregate_per_class, confusion_matrix,
+    LABEL_TP, LABEL_FP, LABEL_FN, LABEL_MISCLS,
+)
 from .yolo_wrap import Detection
 
 
@@ -76,6 +79,22 @@ table.data td.r{text-align:right;font-variant-numeric:tabular-nums;}
 .gallery .item{border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--bg_soft);}
 .gallery .item img{width:100%;display:block;}
 .gallery .item .cap{font-size:8.5pt;color:var(--ink3);padding:5px 8px;}
+/* Comparación lado a lado: Predicción vs Ground Truth */
+.compare{border:1px solid var(--rule);border-radius:8px;overflow:hidden;
+margin:18px 0;background:var(--bg_soft);}
+.compare-pair{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.compare-pair figure{margin:0;border-right:1px solid var(--rule);background:var(--bg);}
+.compare-pair figure:last-child{border-right:none;}
+.compare-pair img{width:100%;display:block;}
+.compare-pair figcaption{font-size:9pt;color:var(--ink2);font-weight:600;
+padding:7px 10px;text-align:center;border-top:1px solid var(--rule_soft);}
+.compare-pair figcaption .sub{display:block;font-weight:400;color:var(--ink3);font-size:8.5pt;margin-top:2px;}
+.compare-meta{font-size:9pt;color:var(--ink2);padding:9px 12px;
+border-top:1px solid var(--rule);font-variant-numeric:tabular-nums;}
+.compare-meta .tag{display:inline-block;margin-right:10px;}
+.nogt{display:flex;align-items:center;justify-content:center;min-height:180px;
+color:var(--muted);font-size:10pt;text-align:center;padding:16px;
+background:repeating-linear-gradient(45deg,#fbfcfd,#fbfcfd 12px,#f0f2f4 12px,#f0f2f4 24px);}
 .badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:8.5pt;
 font-weight:600;letter-spacing:.04em;}
 .b-blue{background:#ddf4ff;color:var(--accent_d);}
@@ -213,9 +232,9 @@ def generate_report(state, output_path: Path,
         <h3>5.1 Matriz de confusión</h3>
         <div class='fig'><img src='data:image/png;base64,{cm_img}' />
             <div class='caption'>Figura. Matriz de confusión (modelo principal: {active[0].alias}, IoU = {state.params.iou_tp}).</div></div>
-        <h3>5.2 P / R / F1 por clase</h3>
-        <table class='data'><tr><th>Clase</th><th>TP</th><th>FP</th><th>FN</th>
-        <th>Precision</th><th>Recall</th><th>F1</th></tr>{rows}</table>
+        <h3>5.2 Precisión / Recall / F1 por clase</h3>
+        <table class='data'><tr><th>Clase</th><th>{LABEL_TP}</th><th>{LABEL_FP}</th><th>{LABEL_FN}</th>
+        <th>Precisión</th><th>Recall</th><th>F1</th></tr>{rows}</table>
         """
 
     # ── Resumen por modelo (tabla comparativa) ──
@@ -238,22 +257,72 @@ def generate_report(state, output_path: Path,
             f"<td class='r'>{f1_cell}</td></tr>"
         )
 
-    # ── Galería ──
+    # ── Galería comparativa: Predicción vs Ground Truth (lado a lado) ──
     gallery_html = ""
-    if include_gallery and state.run_dir:
-        items = []
+    if include_gallery:
+        blocks = []
         for mi, rs in state.results.items():
             slot = state.model_slots[mi]
             for r in rs:
-                if r.annotated_png:
-                    b64 = _img_b64(r.annotated_png)
-                    items.append(
-                        f"<div class='item'><img src='data:image/png;base64,{b64}' />"
-                        f"<div class='cap'>{slot.alias} · {r.image_path.name} · "
-                        f"pred {len(r.predictions)} · GT {len(r.gt)}</div></div>"
+                # Imagen de predicción (preferimos pred_png; si no, la combinada)
+                pred_bytes = getattr(r, "pred_png", None) or r.annotated_png
+                if not pred_bytes:
+                    continue
+                pred_b64 = _img_b64(pred_bytes)
+                left = (
+                    f"<figure><img src='data:image/png;base64,{pred_b64}' />"
+                    f"<figcaption>Predicción del modelo · {slot.alias}"
+                    f"<span class='sub'>{len(r.predictions)} detección(es) por YOLO</span>"
+                    f"</figcaption></figure>"
+                )
+
+                # Imagen de Ground Truth (control)
+                gt_bytes = getattr(r, "gt_png", None)
+                if r.has_gt and gt_bytes:
+                    gt_b64 = _img_b64(gt_bytes)
+                    right = (
+                        f"<figure><img src='data:image/png;base64,{gt_b64}' />"
+                        f"<figcaption>Ground Truth (control)"
+                        f"<span class='sub'>{len(r.gt)} etiqueta(s) reales</span>"
+                        f"</figcaption></figure>"
                     )
-        if items:
-            gallery_html = f"<h2 id='gallery'>7. Galería por imagen</h2><div class='gallery'>{''.join(items)}</div>"
+                else:
+                    right = (
+                        "<figure><div class='nogt'>Sin Ground Truth para esta imagen</div>"
+                        "<figcaption>Ground Truth (control)"
+                        "<span class='sub'>no disponible</span></figcaption></figure>"
+                    )
+
+                # Métricas por imagen (con nombres completos en español)
+                if r.has_gt:
+                    meta = (
+                        f"<strong>{r.image_path.name}</strong> &nbsp; "
+                        f"<span class='tag'>{LABEL_TP}: {r.tp}</span>"
+                        f"<span class='tag'>{LABEL_FP}: {r.fp}</span>"
+                        f"<span class='tag'>{LABEL_FN}: {r.fn}</span>"
+                        f"<span class='tag'>{LABEL_MISCLS}: {r.miscls}</span>"
+                    )
+                else:
+                    meta = (
+                        f"<strong>{r.image_path.name}</strong> &nbsp; "
+                        f"<span class='tag'>{len(r.predictions)} detección(es)</span>"
+                        f"<span class='tag'>sin Ground Truth</span>"
+                    )
+
+                blocks.append(
+                    f"<div class='compare'><div class='compare-pair'>{left}{right}</div>"
+                    f"<div class='compare-meta'>{meta}</div></div>"
+                )
+
+        if blocks:
+            gallery_html = (
+                "<h2 id='gallery'>7. Galería comparativa: Predicción vs Ground Truth</h2>"
+                "<p>Cada bloque muestra, a la izquierda, las detecciones del modelo "
+                "(<em>bounding boxes</em> dibujadas por YOLO con su clase y confianza) y, a la "
+                "derecha, las etiquetas reales de control (<em>Ground Truth</em>). Esta vista "
+                "lado a lado permite evaluar visualmente dónde acertó o falló el modelo.</p>"
+                + "".join(blocks)
+            )
 
     # ── Figuras agregadas ──
     fig_classes = _fig_class_distribution(dict(per_class))
@@ -274,7 +343,7 @@ def generate_report(state, output_path: Path,
         ("Modelos cargados", ", ".join(s.alias for s in active) or "—"),
         ("Confianza mínima", f"{p.conf}"),
         ("IoU NMS", f"{p.iou_nms}"),
-        ("IoU emparejar TP", f"{p.iou_tp}"),
+        ("IoU para emparejar Verdaderos Positivos", f"{p.iou_tp}"),
         ("Tamaño de imagen (imgsz)", f"{p.imgsz}"),
         ("Dispositivo", p.device),
         ("μm por píxel", f"{p.um_per_px}" if p.um_per_px > 0 else "—"),
@@ -342,7 +411,7 @@ def generate_report(state, output_path: Path,
 <strong>{len(active)} modelo{'s' if len(active)!=1 else ''}</strong> YOLO entrenado para detectar
 microplásticos de PET, PP y LDPE bajo fluorescencia Nile Red (254 nm). El total de detecciones
 fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.3f}</strong>.
-{"Se incluyó análisis de errores con Ground Truth (TP/FP/FN/MISCLS)." if any_gt else "No se aportó Ground Truth, por lo que no se reportan métricas de error."}
+{"Se incluyó análisis de errores con Ground Truth (Verdaderos Positivos, Falsos Positivos, Falsos Negativos y Mal Clasificados)." if any_gt else "No se aportó Ground Truth, por lo que no se reportan métricas de error."}
 </p>
 
 <h2 id='methods'>2. Métodos</h2>
@@ -353,7 +422,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 
 <h2 id='models'>4. Resumen por modelo</h2>
 <table class='data'><tr><th>Modelo</th><th>Imágenes</th><th>Detecciones</th>
-<th>Conf. media</th><th>TP</th><th>FP</th><th>FN</th><th>F1</th></tr>{rows_models}</table>
+<th>Conf. media</th><th>{LABEL_TP}</th><th>{LABEL_FP}</th><th>{LABEL_FN}</th><th>F1</th></tr>{rows_models}</table>
 
 {err_section}
 

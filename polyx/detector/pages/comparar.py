@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 
 from ._base import DetectorPage
 from ...core import theme as T
+from ...core.metrics import LABEL_TP, LABEL_FP, LABEL_FN
 
 
 def _safe_div(a, b): return a / b if b else 0.0
@@ -27,7 +28,8 @@ class CompararPage(DetectorPage):
         c1, l1 = self.card("Resumen por modelo", "📊")
         self.tbl_summary = QTableWidget(0, 8)
         self.tbl_summary.setHorizontalHeaderLabels(
-            ["Modelo", "Imágenes", "Detecciones", "Conf media", "TP", "FP", "FN", "F1"]
+            ["Modelo", "Imágenes", "Detecciones", "Conf media",
+             LABEL_TP, LABEL_FP, LABEL_FN, "F1"]
         )
         self.tbl_summary.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.tbl_summary.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)

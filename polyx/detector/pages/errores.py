@@ -1,4 +1,8 @@
-"""Página 7 — Errores (FP / FN / MISCLS). Lista filtrable + preview."""
+"""Página 7 — Errores (Falsos Positivos / Falsos Negativos / Mal Clasificados).
+
+Lista filtrable + preview. Internamente se siguen usando los códigos cortos
+FP/FN/MISCLS para la lógica; al usuario se le muestran los nombres completos.
+"""
 from __future__ import annotations
 import os
 from pathlib import Path
@@ -12,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from ._base import DetectorPage
 from ...core import theme as T
-from ...core.metrics import match_image
+from ...core.metrics import match_image, LABEL_FP, LABEL_FN, LABEL_MISCLS
 
 
 class ErroresPage(DetectorPage):
@@ -20,7 +24,8 @@ class ErroresPage(DetectorPage):
     STEP_TITLE = "Errores"
     STEP_DESCRIPTION = (
         "Lista de cajas problemáticas (solo si hay Ground Truth). "
-        "FP: detección sin GT cercano. FN: GT no detectado. MISCLS: bien localizado, mala clase."
+        "Falsos Positivos: detección sin GT cercano. Falsos Negativos: GT no detectado. "
+        "Mal Clasificados: bien localizado, mala clase."
     )
 
     def __init__(self, state, parent=None):
@@ -32,7 +37,11 @@ class ErroresPage(DetectorPage):
         row.setSpacing(12)
         row.addWidget(QLabel("Tipo:"))
         self.combo_type = QComboBox()
-        self.combo_type.addItems(["Todos", "FP", "FN", "MISCLS"])
+        # Texto mostrado (nombre completo) + dato interno (código corto)
+        self.combo_type.addItem("Todos", "ALL")
+        self.combo_type.addItem(LABEL_FP, "FP")
+        self.combo_type.addItem(LABEL_FN, "FN")
+        self.combo_type.addItem(LABEL_MISCLS, "MISCLS")
         self.combo_type.currentIndexChanged.connect(self.refresh)
         row.addWidget(self.combo_type)
 
@@ -80,7 +89,10 @@ class ErroresPage(DetectorPage):
 
     def refresh(self):
         state = self.state
-        type_filter = self.combo_type.currentText()
+        # currentData() devuelve el código interno (ALL/FP/FN/MISCLS), no el texto
+        type_code = self.combo_type.currentData()
+        if type_code is None:
+            type_code = "ALL"
         model_filter = self.combo_model.currentData()
         rows = []
         iou_tp = state.params.iou_tp
@@ -92,18 +104,18 @@ class ErroresPage(DetectorPage):
             for r in rs:
                 if not r.has_gt: continue
                 m = match_image(r.predictions, r.gt, iou_thr=iou_tp)
-                # FP
-                if type_filter in ("Todos", "FP"):
+                # Falsos Positivos
+                if type_code in ("ALL", "FP"):
                     for pi in m.fp_idx:
                         d = r.predictions[pi]
                         rows.append((alias, r.image_path, "FP", "—", d.class_name, f"{d.conf:.2f}"))
-                # FN
-                if type_filter in ("Todos", "FN"):
+                # Falsos Negativos
+                if type_code in ("ALL", "FN"):
                     for gi in m.fn_idx:
                         d = r.gt[gi]
                         rows.append((alias, r.image_path, "FN", d.class_name, "—", "—"))
-                # MISCLS
-                if type_filter in ("Todos", "MISCLS"):
+                # Mal Clasificados
+                if type_code in ("ALL", "MISCLS"):
                     for pi, gi in m.miscls_pairs:
                         rows.append((
                             alias, r.image_path, "MISCLS",
@@ -114,13 +126,14 @@ class ErroresPage(DetectorPage):
         self.lbl_count.setText(f"{len(rows)} error{'es' if len(rows)!=1 else ''}")
         self.table.setRowCount(len(rows))
         badge_colors = {"FP": T.WARN, "FN": T.ERR, "MISCLS": T.VIO}
-        for i, (alias, p, tp_kind, cgt, cpr, cf) in enumerate(rows):
+        label_by_code = {"FP": LABEL_FP, "FN": LABEL_FN, "MISCLS": LABEL_MISCLS}
+        from PySide6.QtGui import QBrush, QColor
+        for i, (alias, p, code, cgt, cpr, cf) in enumerate(rows):
             self.table.setItem(i, 0, QTableWidgetItem(alias))
             self.table.setItem(i, 1, QTableWidgetItem(p.name))
-            it = QTableWidgetItem(tp_kind)
+            it = QTableWidgetItem(label_by_code.get(code, code))
             it.setTextAlignment(Qt.AlignCenter)
-            from PySide6.QtGui import QBrush, QColor
-            it.setForeground(QBrush(QColor(badge_colors.get(tp_kind, T.INK))))
+            it.setForeground(QBrush(QColor(badge_colors.get(code, T.INK))))
             self.table.setItem(i, 2, it)
             self.table.setItem(i, 3, QTableWidgetItem(cgt))
             self.table.setItem(i, 4, QTableWidgetItem(cpr))

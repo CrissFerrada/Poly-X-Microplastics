@@ -76,7 +76,7 @@ class ParametrosPage(DetectorPage):
         c2, l2 = self.card("Análisis de errores (si hay GT)", "🎯")
         g2 = QGridLayout()
         g2.setHorizontalSpacing(24); g2.setVerticalSpacing(10)
-        g2.addWidget(QLabel("IoU para emparejar TP:"), 0, 0)
+        g2.addWidget(QLabel("IoU para emparejar Verdaderos Positivos:"), 0, 0)
         self.sb_iou_tp = QDoubleSpinBox()
         self.sb_iou_tp.setRange(0.1, 0.95); self.sb_iou_tp.setSingleStep(0.05)
         self.sb_iou_tp.setDecimals(2); self.sb_iou_tp.setValue(state.params.iou_tp)
@@ -85,8 +85,10 @@ class ParametrosPage(DetectorPage):
         g2.addWidget(_hint("Estándar COCO: 0.50. Más estricto: 0.75."), 0, 2)
         l2.addLayout(g2)
         l2.addWidget(_hint(
-            "TP: clase correcta + IoU ≥ umbral.  FP: predicción sin GT cercano.  "
-            "FN: GT no detectado.  MISCLS: IoU alto pero clase distinta."
+            "Verdaderos Positivos: clase correcta + IoU ≥ umbral.  "
+            "Falsos Positivos: predicción sin GT cercano.  "
+            "Falsos Negativos: GT no detectado.  "
+            "Mal Clasificados: IoU alto pero clase distinta."
         ))
         self.body.addWidget(c2)
 

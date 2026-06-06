@@ -45,8 +45,12 @@ class ImageResult:
     fp: int = 0
     fn: int = 0
     miscls: int = 0
-    # bytes PNG de la imagen anotada
+    # bytes PNG de la imagen anotada combinada (predicción + GT) — preview/errores
     annotated_png: Optional[bytes] = None
+    # bytes PNG solo con las predicciones del modelo (cajas de YOLO)
+    pred_png: Optional[bytes] = None
+    # bytes PNG solo con el Ground Truth (None si la imagen no tiene GT)
+    gt_png: Optional[bytes] = None
 
 
 # ────────────────────────────────────────────────────────────────────

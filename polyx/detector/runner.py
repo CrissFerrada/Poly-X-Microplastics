@@ -97,6 +97,9 @@ class DetectorRunner(QThread):
                 gts: list[Detection] = []
                 if gt_txt is not None:
                     gts = read_yolo_txt(gt_txt, W, H, names_first)
+                    # El tamaño del GT no depende del modelo → se calcula una vez
+                    for d in gts:
+                        compute_box_size_um(d, params.um_per_px if params.um_per_px > 0 else None)
 
                 for mi_idx, slot in enumerate(slots):
                     # mi_idx es el orden dentro de active_models()
@@ -110,10 +113,8 @@ class DetectorRunner(QThread):
                         device=params.device,
                     )
 
-                    # Calcular tamaño
+                    # Calcular tamaño de las predicciones (el GT ya se calculó arriba)
                     for d in preds:
-                        compute_box_size_um(d, params.um_per_px if params.um_per_px > 0 else None)
-                    for d in gts:
                         compute_box_size_um(d, params.um_per_px if params.um_per_px > 0 else None)
 
                     # Filtro por tamaño
@@ -135,33 +136,57 @@ class DetectorRunner(QThread):
                     else:
                         tp = fp = fn = mc = 0
 
-                    # Imagen anotada (predicciones en color de clase; GT en cian claro)
-                    annotated = _draw_annotated(
+                    # ── Imágenes anotadas ──────────────────────────────
+                    # 1) Predicciones del modelo (cajas de YOLO en color de clase).
+                    pred_img = _draw_annotated(
                         img_bgr, preds,
                         color_for=lambda d: _color_bgr_for_class(d.class_name),
                         label_for=lambda d: f"{d.class_name} {d.conf:.2f}",
                     )
+                    # 2) Combinada (predicción + GT en cian) para preview e
+                    #    inspección de errores. Si no hay GT, coincide con pred.
+                    combined = pred_img
+                    gt_img = None
                     if has_gt:
-                        annotated = _draw_annotated(
-                            annotated, gts,
+                        combined = _draw_annotated(
+                            pred_img, gts,
                             color_for=lambda d: (255, 200, 80),
                             label_for=lambda d: f"GT {d.class_name}",
                         )
+                        # 3) Ground Truth solo (cajas reales en color de clase)
+                        #    sobre la imagen original → comparación lado a lado.
+                        gt_img = _draw_annotated(
+                            img_bgr, gts,
+                            color_for=lambda d: _color_bgr_for_class(d.class_name),
+                            label_for=lambda d: f"{d.class_name}",
+                        )
 
-                    # Guardar PNG en run_dir
+                    # ── Guardar PNGs en run_dir ────────────────────────
                     sub = state.run_dir / slot.alias
                     sub.mkdir(parents=True, exist_ok=True)
-                    out_path = sub / f"{img_path.stem}_annot.png"
-                    is_ok, buf = cv2.imencode(".png", annotated)
-                    annotated_bytes = bytes(buf) if is_ok else None
-                    if annotated_bytes:
-                        out_path.write_bytes(annotated_bytes)
+
+                    def _encode_and_save(image, suffix: str):
+                        """Codifica a PNG, lo guarda en disco y devuelve los bytes."""
+                        if image is None:
+                            return None
+                        is_ok, buf = cv2.imencode(".png", image)
+                        if not is_ok:
+                            return None
+                        data = bytes(buf)
+                        (sub / f"{img_path.stem}{suffix}.png").write_bytes(data)
+                        return data
+
+                    annotated_bytes = _encode_and_save(combined, "_annot")
+                    pred_bytes = _encode_and_save(pred_img, "_pred")
+                    gt_bytes = _encode_and_save(gt_img, "_gt") if has_gt else None
 
                     res = ImageResult(
                         image_path=img_path, model_idx=real_idx,
                         predictions=preds, gt=gts, has_gt=has_gt,
                         tp=tp, fp=fp, fn=fn, miscls=mc,
                         annotated_png=annotated_bytes,
+                        pred_png=pred_bytes,
+                        gt_png=gt_bytes,
                     )
                     state.results.setdefault(real_idx, []).append(res)
                     self.image_done.emit(real_idx, res)

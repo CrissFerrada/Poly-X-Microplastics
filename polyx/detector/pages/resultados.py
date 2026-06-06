@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from ._base import DetectorPage
 from ...core import theme as T
 from ...core.widgets import KPICard
+from ...core.metrics import LABEL_TP, LABEL_FP, LABEL_FN, LABEL_MISCLS
 
 
 class ResultadosPage(DetectorPage):
@@ -37,9 +38,9 @@ class ResultadosPage(DetectorPage):
         self.kpi_dets   = KPICard("Detecciones", T.ACCENT)
         self.kpi_conf   = KPICard("Confianza media", T.VIO)
         self.kpi_size   = KPICard("Tamaño medio (μm)", T.WARN)
-        self.kpi_tp     = KPICard("TP", T.OK)
-        self.kpi_fp     = KPICard("FP", T.WARN)
-        self.kpi_fn     = KPICard("FN", T.ERR)
+        self.kpi_tp     = KPICard(LABEL_TP, T.OK)
+        self.kpi_fp     = KPICard(LABEL_FP, T.WARN)
+        self.kpi_fn     = KPICard(LABEL_FN, T.ERR)
         self.kpi_f1     = KPICard("F1", T.ACCENT_D)
         grid.addWidget(self.kpi_imgs, 0, 0)
         grid.addWidget(self.kpi_dets, 0, 1)
@@ -56,9 +57,9 @@ class ResultadosPage(DetectorPage):
         c2, l2 = self.card("Métricas detalladas (modelo principal)", "📋")
         row = QHBoxLayout()
         row.setSpacing(20)
-        self.lbl_prec = QLabel("Precision:  —")
+        self.lbl_prec = QLabel("Precisión:  —")
         self.lbl_rec  = QLabel("Recall:  —")
-        self.lbl_mis  = QLabel("MisCls:  —")
+        self.lbl_mis  = QLabel(f"{LABEL_MISCLS}:  —")
         for l in (self.lbl_prec, self.lbl_rec, self.lbl_mis):
             l.setStyleSheet(f"color: {T.INK2}; font-size: 10.5pt; font-weight: 500; border: none;")
             row.addWidget(l)
@@ -95,7 +96,7 @@ class ResultadosPage(DetectorPage):
         c3, l3 = self.card("Por imagen", "🖼")
         self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels(
-            ["Modelo", "Imagen", "Pred", "GT", "TP", "FP", "FN", "Conf media"]
+            ["Modelo", "Imagen", "Pred", "GT", LABEL_TP, LABEL_FP, LABEL_FN, "Conf media"]
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -136,10 +137,10 @@ class ResultadosPage(DetectorPage):
         f1   = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
         any_gt = any(r.has_gt for r in all_results)
         self.kpi_f1.set_value(f"{f1:.3f}" if any_gt else None)
-        self.lbl_prec.setText(f"Precision:  {prec:.3f}" if any_gt else "Precision:  —")
+        self.lbl_prec.setText(f"Precisión:  {prec:.3f}" if any_gt else "Precisión:  —")
         self.lbl_rec.setText(f"Recall:  {rec:.3f}" if any_gt else "Recall:  —")
         mc = sum(r.miscls for r in all_results)
-        self.lbl_mis.setText(f"MisCls:  {mc}" if any_gt else "MisCls:  —")
+        self.lbl_mis.setText(f"{LABEL_MISCLS}:  {mc}" if any_gt else f"{LABEL_MISCLS}:  —")
 
         # Histograma de tamaños (solo si hay calibración)
         self._update_histogram()

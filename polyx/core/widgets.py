@@ -104,6 +104,7 @@ class KPICard(QFrame):
         lay.setSpacing(8)
 
         self.lbl_title = QLabel(label)
+        self.lbl_title.setWordWrap(True)   # etiquetas largas (p. ej. "Verdaderos Positivos")
         self.lbl_title.setStyleSheet(
             f"color: {T.INK3}; font-size: 10pt; font-weight: 500; border: none;"
         )
