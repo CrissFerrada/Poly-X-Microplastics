@@ -67,3 +67,9 @@ venv.txt
 
 # Estado local del actualizador (SHA del commit instalado)
 .polyx_version
+
+# Datos de active learning (imagenes pesadas, no van al repo)
+dataset_correcciones/
+# Scripts temporales de diagnostico
+_diag_*.py
+_diag_overlays/

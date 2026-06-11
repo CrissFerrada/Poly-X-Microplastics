@@ -4,7 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QDoubleSpinBox, QSpinBox,
-    QLineEdit, QFrame, QPushButton, QMessageBox,
+    QLineEdit, QFrame, QPushButton, QMessageBox, QComboBox,
 )
 
 from ._base import DetectorPage
@@ -16,6 +16,16 @@ def _hint(text: str) -> QLabel:
     l.setStyleSheet(f"color: {T.INK3}; font-size: 9pt; border: none;")
     l.setWordWrap(True)
     return l
+
+
+# Perfiles de calidad: ocultan la jerga YOLO tras una elección simple.
+# "Máxima detección" apunta a partículas diminutas en fotos de alta resolución
+# (si la GPU no aguanta el imgsz, el auto-fallback baja de tamaño solo).
+PRESETS = {
+    "🚀 Rápido": {"conf": 0.25, "imgsz": 1280},
+    "⚖️ Equilibrado": {"conf": 0.15, "imgsz": 2560},
+    "🔬 Máxima detección": {"conf": 0.10, "imgsz": 4096},
+}
 
 
 class _ProbeThread(QThread):
@@ -54,6 +64,24 @@ class ParametrosPage(DetectorPage):
 
         # ── Inferencia ──
         c1, l1 = self.card("Inferencia", "⚙️")
+
+        # Perfil de calidad (preset): aplica conf + imgsz de una vez
+        self._applying_preset = False
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(8)
+        preset_row.addWidget(QLabel("Perfil:"))
+        self.combo_preset = QComboBox()
+        self.combo_preset.addItem("Personalizado")
+        self.combo_preset.addItems(list(PRESETS.keys()))
+        self.combo_preset.currentTextChanged.connect(self._apply_preset)
+        self.combo_preset.setMinimumWidth(190)
+        preset_row.addWidget(self.combo_preset)
+        preset_row.addWidget(_hint(
+            "Elige un perfil y listo. «Máxima detección» es el recomendado para "
+            "microplásticos pequeños en fotos de microscopía de alta resolución."
+        ), 1)
+        l1.addLayout(preset_row)
+
         g = QGridLayout()
         g.setHorizontalSpacing(24)
         g.setVerticalSpacing(10)
@@ -166,6 +194,18 @@ class ParametrosPage(DetectorPage):
         l4.addLayout(g4)
         self.body.addWidget(c4)
 
+    def _apply_preset(self, name: str):
+        """Aplica el perfil elegido (conf + imgsz) a los controles."""
+        cfg = PRESETS.get(name)
+        if not cfg:
+            return
+        self._applying_preset = True
+        try:
+            self.sb_conf.setValue(cfg["conf"])
+            self.sb_imgsz.setValue(cfg["imgsz"])
+        finally:
+            self._applying_preset = False
+
     def _probe_max_imgsz(self):
         """Lanza el probe del imgsz máximo en background sobre el modelo/imagen activos."""
         models = self.state.active_models()
@@ -212,6 +252,11 @@ class ParametrosPage(DetectorPage):
         QMessageBox.warning(self, "No se pudo medir", err)
 
     def _on_change(self, *_):
+        # Edición manual → el perfil deja de aplicar (vuelve a "Personalizado")
+        if not self._applying_preset and hasattr(self, "combo_preset"):
+            self.combo_preset.blockSignals(True)
+            self.combo_preset.setCurrentIndex(0)
+            self.combo_preset.blockSignals(False)
         p = self.state.params
         p.conf = float(self.sb_conf.value())
         p.iou_nms = float(self.sb_iou_nms.value())

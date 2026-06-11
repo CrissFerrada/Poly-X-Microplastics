@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 from ._base import DetectorPage
 from ...core import theme as T
 from ...core.widgets import KPICard
-from ...core.metrics import LABEL_TP, LABEL_FP, LABEL_FN, LABEL_MISCLS
+from ...core.metrics import LABEL_TP, LABEL_FP, LABEL_FN, LABEL_MISCLS, match_image
 
 
 class ResultadosPage(DetectorPage):
@@ -65,6 +65,12 @@ class ResultadosPage(DetectorPage):
             row.addWidget(l)
         row.addStretch(1)
         l2.addLayout(row)
+        # Sugerencia automática del umbral de confianza óptimo (F1 máximo)
+        self.lbl_sugg = QLabel("")
+        self.lbl_sugg.setWordWrap(True)
+        self.lbl_sugg.setStyleSheet(
+            f"color: {T.OK}; font-size: 10pt; font-weight: 600; border: none;")
+        l2.addWidget(self.lbl_sugg)
         self.body.addWidget(c2)
 
         # ── Histograma de tamaños (solo con calibración) ──
@@ -142,6 +148,18 @@ class ResultadosPage(DetectorPage):
         mc = sum(r.miscls for r in all_results)
         self.lbl_mis.setText(f"{LABEL_MISCLS}:  {mc}" if any_gt else f"{LABEL_MISCLS}:  —")
 
+        # Sugerencia de umbral óptimo
+        sugg = self._suggest_operating_point(all_results) if any_gt else None
+        if sugg:
+            t, f1s, ps, rs_ = sugg
+            self.lbl_sugg.setText(
+                f"💡 Punto de operación sugerido: confianza ≥ {t:.2f} → "
+                f"F1 {f1s:.3f} (Precisión {ps:.3f} / Recall {rs_:.3f}). "
+                f"Consejo: ejecuta con confianza baja (ej. 0.05) para explorar "
+                f"todo el rango y deja que esta sugerencia elija el corte.")
+        else:
+            self.lbl_sugg.setText("")
+
         # Histograma de tamaños (solo si hay calibración)
         self._update_histogram()
 
@@ -165,6 +183,31 @@ class ResultadosPage(DetectorPage):
             # guardamos la ruta para doble-clic
             self.table.item(i, 1).setData(Qt.UserRole, str(p))
             self.table.item(i, 0).setData(Qt.UserRole, alias)
+
+    def _suggest_operating_point(self, all_results):
+        """Barre umbrales de confianza sobre las predicciones guardadas y
+        devuelve (conf, f1, precision, recall) del F1 máximo contra el GT."""
+        gt_results = [r for r in all_results if r.has_gt]
+        if not gt_results:
+            return None
+        confs = sorted({round(p.conf, 2) for r in gt_results for p in r.predictions})
+        if not confs:
+            return None
+        step = max(1, len(confs) // 25)   # acotar a ~25 umbrales
+        iou_thr = self.state.params.iou_tp
+        best = None
+        for t in confs[::step]:
+            tp = fp = fn = 0
+            for r in gt_results:
+                preds = [p for p in r.predictions if p.conf >= t]
+                m = match_image(preds, r.gt, iou_thr)
+                tp += m.tp; fp += m.fp; fn += m.fn
+            prec = tp / (tp + fp) if (tp + fp) else 0.0
+            rec = tp / (tp + fn) if (tp + fn) else 0.0
+            f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
+            if best is None or f1 > best[1]:
+                best = (t, f1, prec, rec)
+        return best
 
     def _update_histogram(self):
         """Dibuja histograma de diam_um por clase; solo si hay calibración."""

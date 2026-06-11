@@ -8,6 +8,7 @@ a .txt YOLO.
 Reutiliza ``AnnotCanvas`` (el mismo editor potente de la página GT manual).
 """
 from __future__ import annotations
+import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -124,6 +125,13 @@ class ReviewDialog(QDialog):
         btns.addWidget(self.btn_bad)
 
         btns.addStretch(1)
+        b_dataset = QPushButton("📤  Enviar al dataset de reentrenamiento")
+        b_dataset.setToolTip(
+            "Copia esta imagen y sus cajas corregidas a dataset_correcciones/ "
+            "para mejorar el modelo con fine-tuning (active learning).")
+        b_dataset.setCursor(Qt.PointingHandCursor)
+        b_dataset.clicked.connect(self._send_to_dataset)
+        btns.addWidget(b_dataset)
         b_save = QPushButton("💾  Guardar correcciones (.txt YOLO)")
         b_save.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
@@ -236,22 +244,8 @@ class ReviewDialog(QDialog):
         self.canvas.setFocus()
 
     # ── Guardado de correcciones ──
-    def _save_current(self):
-        if not (0 <= self._current_idx < len(self._results)):
-            return
-        res = self._results[self._current_idx]
-        path = Path(res.image_path)
-        dets = self.canvas.detections()
-        img = QImage(str(path))
-        W, H = img.width(), img.height()
-        if W == 0 or H == 0:
-            QMessageBox.warning(self, "Error", "No se pudo leer la imagen.")
-            return
-        # destino: junto a la imagen, sufijo _corrected
-        out_dir = self.state.run_dir if self.state.run_dir else path.parent
-        out_dir = Path(out_dir)
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{path.stem}_corrected.txt"
+    @staticmethod
+    def _yolo_lines(dets: List[Detection], W: int, H: int) -> List[str]:
         lines = []
         for d in dets:
             cx = (d.x1 + d.x2) / 2 / W
@@ -259,8 +253,59 @@ class ReviewDialog(QDialog):
             w = (d.x2 - d.x1) / W
             h = (d.y2 - d.y1) / H
             lines.append(f"{d.class_id} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
-        out_path.write_text("\n".join(lines), encoding="utf-8")
+        return lines
+
+    def _current_image_and_dets(self):
+        """(path, dets, W, H) de la imagen actual, o None si algo falla."""
+        if not (0 <= self._current_idx < len(self._results)):
+            return None
+        res = self._results[self._current_idx]
+        path = Path(res.image_path)
+        dets = self.canvas.detections()
+        img = QImage(str(path))
+        W, H = img.width(), img.height()
+        if W == 0 or H == 0:
+            QMessageBox.warning(self, "Error", "No se pudo leer la imagen.")
+            return None
+        return path, dets, W, H
+
+    def _save_current(self):
+        cur = self._current_image_and_dets()
+        if cur is None:
+            return
+        path, dets, W, H = cur
+        # destino: carpeta del run, sufijo _corrected
+        out_dir = Path(self.state.run_dir) if self.state.run_dir else path.parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{path.stem}_corrected.txt"
+        out_path.write_text("\n".join(self._yolo_lines(dets, W, H)), encoding="utf-8")
         cls_path = out_dir / "classes.txt"
         if not cls_path.exists():
             cls_path.write_text("\n".join(DEFAULT_CLASSES), encoding="utf-8")
         self.lbl_status.setText(f"✓ Guardado: {out_path}  ({len(dets)} cajas)")
+
+    def _send_to_dataset(self):
+        """Active learning: acumula imagen + cajas corregidas para reentrenar."""
+        cur = self._current_image_and_dets()
+        if cur is None:
+            return
+        path, dets, W, H = cur
+        if not dets:
+            QMessageBox.information(
+                self, "Dataset",
+                "No hay cajas en esta imagen. Corrige o dibuja antes de enviarla.")
+            return
+        root = Path(__file__).resolve().parents[2] / "dataset_correcciones"
+        (root / "images").mkdir(parents=True, exist_ok=True)
+        (root / "labels").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, root / "images" / path.name)
+        (root / "labels" / f"{path.stem}.txt").write_text(
+            "\n".join(self._yolo_lines(dets, W, H)), encoding="utf-8")
+        cls_path = root / "classes.txt"
+        if not cls_path.exists():
+            cls_path.write_text("\n".join(DEFAULT_CLASSES), encoding="utf-8")
+        n = len(list((root / "labels").glob("*.txt")))
+        self.lbl_status.setText(
+            f"📤 Enviada al dataset de reentrenamiento — {n} imagen(es) "
+            f"acumuladas en dataset_correcciones/. Cuando juntes ~50, haz "
+            f"fine-tuning en el Entrenador.")

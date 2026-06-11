@@ -33,14 +33,41 @@ class Detection:
     def cy(self) -> float: return 0.5 * (self.y1 + self.y2)
 
 
+def _is_oom(e: Exception) -> bool:
+    """¿La excepción es por falta de memoria GPU?"""
+    try:
+        import torch
+        if isinstance(e, torch.cuda.OutOfMemoryError):
+            return True
+    except Exception:
+        pass
+    return "out of memory" in str(e).lower()
+
+
+def _cuda_empty_cache() -> None:
+    try:
+        import torch
+        torch.cuda.empty_cache()
+    except Exception:
+        pass
+
+
 class YoloModel:
     """Carga perezosa de Ultralytics YOLO. Permite múltiples modelos en paralelo."""
+
+    # Escalera descendente para el auto-fallback cuando la GPU se queda sin
+    # memoria: en vez de fallar, se reintenta con el siguiente tamaño menor.
+    FALLBACK_SIZES = (8192, 7168, 6144, 5120, 4096, 3008, 2048, 1536, 1280, 1024, 640)
 
     def __init__(self, weights_path: str | Path, alias: str = ""):
         self.weights_path = str(weights_path)
         self.alias = alias or Path(self.weights_path).stem
         self._model = None
         self.names: Dict[int, str] = {}
+        # imgsz realmente usado en la última inferencia (puede ser menor al
+        # pedido si actuó el auto-fallback por falta de memoria GPU)
+        self.last_imgsz: int = 0
+        self.last_fallback: bool = False
 
     def load(self):
         if self._model is not None:
@@ -92,12 +119,28 @@ class YoloModel:
         return (max_ok or 1920), detail
 
     def predict(self, image_path: str | Path, conf: float = 0.25, iou: float = 0.45,
-                imgsz: int = 640, device: str = "0") -> List[Detection]:
+                imgsz: int = 640, device: str = "0",
+                auto_fallback: bool = True) -> List[Detection]:
         self.load()
-        res = self._model.predict(
-            source=str(image_path), conf=conf, iou=iou, imgsz=imgsz,
-            device=device, verbose=False, save=False
-        )
+        # Auto-fallback: si el imgsz pedido agota la VRAM, reintenta con cada
+        # tamaño menor de la escalera en vez de abortar el análisis completo.
+        sizes = [int(imgsz)]
+        if auto_fallback:
+            sizes += [s for s in self.FALLBACK_SIZES if s < int(imgsz)]
+        res = None
+        for i, sz in enumerate(sizes):
+            try:
+                res = self._model.predict(
+                    source=str(image_path), conf=conf, iou=iou, imgsz=sz,
+                    device=device, verbose=False, save=False
+                )
+                self.last_imgsz = sz
+                self.last_fallback = (i > 0)
+                break
+            except Exception as e:
+                if not auto_fallback or i == len(sizes) - 1 or not _is_oom(e):
+                    raise
+                _cuda_empty_cache()
         out: List[Detection] = []
         if not res:
             return out

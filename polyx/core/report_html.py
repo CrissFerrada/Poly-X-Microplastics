@@ -354,6 +354,29 @@ def generate_report(state, output_path: Path,
     ]
     methods_html = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in methods_rows)
 
+    # Párrafo de métodos redactado, listo para copiar al manuscrito
+    # (reproducibilidad: modelo, versión, parámetros y fecha exactos).
+    try:
+        import ultralytics
+        _ul_ver = ultralytics.__version__
+    except Exception:
+        _ul_ver = "—"
+    _model_names = ", ".join(s.alias for s in active) if active else "—"
+    methods_para = (
+        "<p><strong>Texto sugerido para la sección de métodos del manuscrito:</strong></p>"
+        "<blockquote style='border-left:3px solid var(--accent); margin:8px 0; "
+        "padding:6px 14px; color:#424a53; background:#f6f8fa; border-radius:0 6px 6px 0;'>"
+        f"La detección automatizada se realizó con el modelo YOLO «{_model_names}» "
+        f"(Ultralytics {_ul_ver}) a una resolución de entrada de {p.imgsz} px, "
+        f"umbral de confianza {p.conf} y supresión de no-máximos con IoU {p.iou_nms}. "
+        + (f"Las métricas de error se calcularon contra anotación manual independiente, "
+           f"emparejando predicciones y etiquetas con IoU ≥ {p.iou_tp}. " if any_gt else "")
+        + (f"La calibración óptica fue de {p.um_per_px} μm/píxel. " if p.um_per_px > 0 else "")
+        + f"Se procesaron {total_imgs} imágenes con un total de {total_dets} detecciones "
+        f"(análisis del {now})."
+        "</blockquote>"
+    )
+
     refs_html = ""
     if include_refs:
         refs_html = """
@@ -416,6 +439,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 
 <h2 id='methods'>2. Métodos</h2>
 <table class='data'><tr><th>Parámetro</th><th>Valor</th></tr>{methods_html}</table>
+{methods_para}
 
 <h2 id='results'>3. Resultados generales</h2>
 {figures_html}
