@@ -1,10 +1,10 @@
 """Página 4 — Parámetros de inferencia + calibración óptica + filtros."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QDoubleSpinBox, QSpinBox,
-    QLineEdit, QFrame,
+    QLineEdit, QFrame, QPushButton, QMessageBox,
 )
 
 from ._base import DetectorPage
@@ -16,6 +16,29 @@ def _hint(text: str) -> QLabel:
     l.setStyleSheet(f"color: {T.INK3}; font-size: 9pt; border: none;")
     l.setWordWrap(True)
     return l
+
+
+class _ProbeThread(QThread):
+    """Prueba en background el imgsz máximo que aguanta la GPU para el modelo cargado."""
+    progress = Signal(int)
+    done = Signal(int, dict)
+    failed = Signal(str)
+
+    def __init__(self, model, image_path, device, parent=None):
+        super().__init__(parent)
+        self.model = model
+        self.image_path = image_path
+        self.device = device
+
+    def run(self):
+        try:
+            mx, detail = self.model.probe_max_imgsz(
+                self.image_path, device=self.device,
+                progress=lambda sz: self.progress.emit(sz),
+            )
+            self.done.emit(mx, detail)
+        except Exception as e:
+            self.failed.emit(f"{type(e).__name__}: {e}")
 
 
 class ParametrosPage(DetectorPage):
@@ -53,14 +76,26 @@ class ParametrosPage(DetectorPage):
         g.addWidget(self.sb_iou_nms, 1, 1)
         g.addWidget(_hint("0.30–0.70. Suprime cajas superpuestas."), 1, 2)
 
-        # imgsz
+        # imgsz + botón "detectar máximo"
         g.addWidget(QLabel("Tamaño imagen (imgsz):"), 2, 0)
+        imgsz_row = QHBoxLayout()
+        imgsz_row.setSpacing(8)
         self.sb_imgsz = QSpinBox()
-        self.sb_imgsz.setRange(320, 1920); self.sb_imgsz.setSingleStep(32)
+        self.sb_imgsz.setRange(320, 8192); self.sb_imgsz.setSingleStep(64)
         self.sb_imgsz.setValue(state.params.imgsz)
         self.sb_imgsz.valueChanged.connect(self._on_change)
-        g.addWidget(self.sb_imgsz, 2, 1)
-        g.addWidget(_hint("Debe coincidir con el del entrenamiento. Típico: 640 o 1280."), 2, 2)
+        imgsz_row.addWidget(self.sb_imgsz)
+        self.btn_probe = QPushButton("🔍 Detectar máximo (GPU)")
+        self.btn_probe.setCursor(Qt.PointingHandCursor)
+        self.btn_probe.clicked.connect(self._probe_max_imgsz)
+        imgsz_row.addWidget(self.btn_probe)
+        imgsz_row.addStretch(1)
+        g.addLayout(imgsz_row, 2, 1)
+        g.addWidget(_hint(
+            "Más grande = detecta partículas más pequeñas (clave para microplásticos), "
+            "pero más lento y usa más memoria GPU. Para fotos de alta resolución sube "
+            "a 4096+. El botón prueba el máximo que aguanta tu GPU con el modelo cargado."
+        ), 2, 2)
 
         # device
         g.addWidget(QLabel("Device (0/cpu):"), 3, 0)
@@ -130,6 +165,51 @@ class ParametrosPage(DetectorPage):
         g4.addWidget(_hint("0 = sin filtro. Aplica sobre el diámetro equivalente."), 1, 0, 1, 4)
         l4.addLayout(g4)
         self.body.addWidget(c4)
+
+    def _probe_max_imgsz(self):
+        """Lanza el probe del imgsz máximo en background sobre el modelo/imagen activos."""
+        models = self.state.active_models()
+        if not models:
+            QMessageBox.warning(self, "Sin modelo",
+                                "Carga al menos un modelo en la pestaña Modelos.")
+            return
+        if not self.state.images:
+            QMessageBox.warning(self, "Sin imágenes",
+                                "Selecciona imágenes en la pestaña Imágenes "
+                                "(se usa una para medir).")
+            return
+        slot = models[0]
+        if slot.loaded is None:
+            from ...core.yolo_wrap import YoloModel
+            slot.loaded = YoloModel(str(slot.path), alias=slot.alias)
+        device = self.state.params.device
+        self.btn_probe.setEnabled(False)
+        self.btn_probe.setText("⏳ Probando…")
+        self._probe = _ProbeThread(slot.loaded, str(self.state.images[0]), device, self)
+        self._probe.progress.connect(
+            lambda sz: self.btn_probe.setText(f"⏳ Probando {sz}px…"))
+        self._probe.done.connect(self._on_probe_done)
+        self._probe.failed.connect(self._on_probe_failed)
+        self._probe.start()
+
+    def _on_probe_done(self, max_ok: int, detail: dict):
+        self.btn_probe.setEnabled(True)
+        self.btn_probe.setText("🔍 Detectar máximo (GPU)")
+        self.sb_imgsz.setValue(max_ok)
+        oom = [str(k) for k, v in detail.items() if v == "oom"]
+        msg = (f"Máximo seguro para «{self.state.active_models()[0].alias}»: "
+               f"{max_ok} px.\n\nSe fijó imgsz = {max_ok}.")
+        if oom:
+            msg += f"\n(A {oom[0]} px se quedó sin memoria.)"
+        if any(v == "cpu" for v in detail.values()):
+            msg = (f"En CPU no hay tope de memoria GPU. Se fijó imgsz = {max_ok} "
+                   "pero será lento. Con GPU el detector es mucho más rápido.")
+        QMessageBox.information(self, "imgsz máximo", msg)
+
+    def _on_probe_failed(self, err: str):
+        self.btn_probe.setEnabled(True)
+        self.btn_probe.setText("🔍 Detectar máximo (GPU)")
+        QMessageBox.warning(self, "No se pudo medir", err)
 
     def _on_change(self, *_):
         p = self.state.params

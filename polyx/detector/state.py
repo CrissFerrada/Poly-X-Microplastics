@@ -51,6 +51,8 @@ class ImageResult:
     pred_png: Optional[bytes] = None
     # bytes PNG solo con el Ground Truth (None si la imagen no tiene GT)
     gt_png: Optional[bytes] = None
+    # veredicto del usuario tras revisión visual: None / "buena" / "mala"
+    verdict: Optional[str] = None
 
 
 # ────────────────────────────────────────────────────────────────────

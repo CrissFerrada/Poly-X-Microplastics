@@ -6,6 +6,7 @@ from typing import List, Dict, Optional, Tuple
 import os
 
 import numpy as np
+import cv2
 
 
 @dataclass
@@ -50,6 +51,46 @@ class YoloModel:
         self.names = dict(nm)
         return self
 
+    def probe_max_imgsz(self, image_path: str | Path, device: str = "0",
+                        candidates: Tuple[int, ...] = (2048, 3008, 4096, 5120, 6144, 7168, 8192),
+                        progress=None) -> Tuple[int, Dict[int, str]]:
+        """Encuentra el imgsz más grande que la GPU aguanta para ESTE modelo.
+
+        Prueba inferencia real a tamaños ascendentes hasta que falle por memoria.
+        Devuelve (max_ok, detalle) donde detalle es {imgsz: "ok"/"oom"/"err"}.
+        En CPU no hay tope de VRAM → devuelve el mayor candidato sin probar.
+        """
+        self.load()
+        detail: Dict[int, str] = {}
+        dev = str(device).strip().lower()
+        if dev in ("cpu", "-1"):
+            return candidates[-1], {c: "cpu" for c in candidates}
+        try:
+            import torch
+        except Exception:
+            return 1920, {}
+        max_ok = 0
+        for sz in candidates:
+            if progress is not None:
+                progress(sz)
+            try:
+                self._model.predict(source=str(image_path), imgsz=sz, conf=0.25,
+                                    device=device, verbose=False, save=False)
+                detail[sz] = "ok"
+                max_ok = sz
+            except torch.cuda.OutOfMemoryError:
+                detail[sz] = "oom"
+                break
+            except Exception as e:
+                detail[sz] = f"err: {type(e).__name__}"
+                break
+            finally:
+                try:
+                    torch.cuda.empty_cache()
+                except Exception:
+                    pass
+        return (max_ok or 1920), detail
+
     def predict(self, image_path: str | Path, conf: float = 0.25, iou: float = 0.45,
                 imgsz: int = 640, device: str = "0") -> List[Detection]:
         self.load()
@@ -74,6 +115,112 @@ class YoloModel:
                 x1=float(x1), y1=float(y1), x2=float(x2), y2=float(y2),
             ))
         return out
+
+    def predict_sliced(self, image_path: str | Path, conf: float = 0.10,
+                       iou: float = 0.45, tile: int = 1024, overlap: float = 0.25,
+                       device: str = "0", agnostic_nms: bool = True,
+                       imgsz: Optional[int] = None, batch: int = 8) -> List[Detection]:
+        """Inferencia por tiles (técnica SAHI/Slicing Aided Hyper Inference).
+
+        Divide la imagen en recortes solapados de ``tile``×``tile`` px, infiere
+        cada uno a resolución nativa del tile y reproyecta las cajas a la imagen
+        completa. Pensado para partículas diminutas en fotos de alta resolución,
+        donde un único pase a imgsz bajo las haría desaparecer.
+
+        Las cajas de todos los tiles se fusionan con NMS global (``agnostic_nms``
+        suprime duplicados aunque difieran en clase, útil cuando interesa la
+        detección por encima de la clase).
+        """
+        self.load()
+        img = cv2.imdecode(np.fromfile(str(image_path), dtype=np.uint8), cv2.IMREAD_COLOR)
+        if img is None:
+            return []
+        H, W = img.shape[:2]
+        overlap = min(max(overlap, 0.0), 0.9)
+        step = max(1, int(round(tile * (1.0 - overlap))))
+        xs = _tile_starts(W, tile, step)
+        ys = _tile_starts(H, tile, step)
+
+        crops: List[np.ndarray] = []
+        origins: List[Tuple[int, int]] = []
+        for y0 in ys:
+            for x0 in xs:
+                crops.append(img[y0:y0 + tile, x0:x0 + tile])
+                origins.append((x0, y0))
+        if not crops:
+            return []
+
+        # imgsz controla la resolución de entrada del tile. Si es mayor que el
+        # tile, el recorte se upscalea → partículas diminutas se agrandan hacia
+        # la escala con que se entrenó el modelo (clave para objetos pequeños).
+        infer_sz = int(imgsz) if imgsz else tile
+
+        dets: List[Detection] = []
+        bs = max(1, int(batch))
+        # Procesar en sub-lotes para no agotar la VRAM (muchos tiles a imgsz alto).
+        for start in range(0, len(crops), bs):
+            chunk = crops[start:start + bs]
+            chunk_org = origins[start:start + bs]
+            results = self._model.predict(
+                source=chunk, conf=conf, iou=iou, imgsz=infer_sz,
+                device=device, verbose=False, save=False,
+            )
+            for (x0, y0), r in zip(chunk_org, results):
+                if r.boxes is None or len(r.boxes) == 0:
+                    continue
+                xyxy = r.boxes.xyxy.cpu().numpy()
+                cf = r.boxes.conf.cpu().numpy()
+                cl = r.boxes.cls.cpu().numpy().astype(int)
+                for (a, b, c, d), cc, k in zip(xyxy, cf, cl):
+                    dets.append(Detection(
+                        class_id=int(k),
+                        class_name=self.names.get(int(k), str(int(k))),
+                        conf=float(cc),
+                        x1=float(a) + x0, y1=float(b) + y0,
+                        x2=float(c) + x0, y2=float(d) + y0,
+                    ))
+        return _nms(dets, iou_thr=iou, agnostic=agnostic_nms)
+
+
+def _tile_starts(total: int, tile: int, step: int) -> List[int]:
+    """Posiciones de inicio de los tiles a lo largo de un eje (último pegado al borde)."""
+    if total <= tile:
+        return [0]
+    starts = list(range(0, total - tile + 1, step))
+    if not starts or starts[-1] != total - tile:
+        starts.append(total - tile)
+    return starts
+
+
+def _box_iou(a: Detection, b: Detection) -> float:
+    x1 = max(a.x1, b.x1); y1 = max(a.y1, b.y1)
+    x2 = min(a.x2, b.x2); y2 = min(a.y2, b.y2)
+    iw = max(0.0, x2 - x1); ih = max(0.0, y2 - y1)
+    inter = iw * ih
+    if inter <= 0:
+        return 0.0
+    union = a.w * a.h + b.w * b.h - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _nms(dets: List[Detection], iou_thr: float = 0.45,
+         agnostic: bool = True) -> List[Detection]:
+    """NMS greedy sobre detecciones de todos los tiles. Conserva la de mayor conf."""
+    order = sorted(range(len(dets)), key=lambda i: -dets[i].conf)
+    keep: List[int] = []
+    suppressed = [False] * len(dets)
+    for idx in order:
+        if suppressed[idx]:
+            continue
+        keep.append(idx)
+        for jdx in order:
+            if jdx == idx or suppressed[jdx]:
+                continue
+            if not agnostic and dets[jdx].class_id != dets[idx].class_id:
+                continue
+            if _box_iou(dets[idx], dets[jdx]) >= iou_thr:
+                suppressed[jdx] = True
+    return [dets[i] for i in keep]
 
 
 def read_yolo_txt(txt_path: str | Path, img_w: int, img_h: int,

@@ -88,6 +88,16 @@ class EjecutarPage(DetectorPage):
         self.btn_stop.clicked.connect(self._stop)
         row.addWidget(self.btn_stop)
 
+        self.btn_review = QPushButton("👁  Revisar en pantalla grande")
+        self.btn_review.setStyleSheet(
+            f"background: {T.OK}; color: white; border: none; "
+            f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
+        )
+        self.btn_review.setCursor(Qt.PointingHandCursor)
+        self.btn_review.setEnabled(False)
+        self.btn_review.clicked.connect(self._open_review)
+        row.addWidget(self.btn_review)
+
         self.btn_open = QPushButton("📂  Abrir carpeta de resultados")
         self.btn_open.clicked.connect(self._open_results)
         row.addWidget(self.btn_open)
@@ -167,6 +177,16 @@ class EjecutarPage(DetectorPage):
         else:
             QMessageBox.information(self, "Sin resultados", "Aún no se ha ejecutado ninguna corrida.")
 
+    def _open_review(self):
+        if not any(self.state.results.values()):
+            QMessageBox.information(self, "Sin resultados",
+                                    "Ejecuta una detección primero.")
+            return
+        from ..review_dialog import ReviewDialog
+        dlg = ReviewDialog(self.state, self)
+        dlg.showMaximized()
+        dlg.exec()
+
     # ── slots del runner ──
     def _on_progress(self, done: int, total: int, name: str):
         self.progress.setMaximum(total)
@@ -190,13 +210,17 @@ class EjecutarPage(DetectorPage):
         self.state.set_running(False)
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
-        self.lbl_progress_info.setText("Listo. Revisa Resultados / Errores / Reporte.")
+        self.btn_review.setEnabled(True)
+        self.lbl_progress_info.setText(
+            "Listo. Pulsa «Revisar en pantalla grande» para inspeccionar y corregir.")
         self.state.run_finished.emit()
 
     def _on_aborted(self):
         self.state.set_running(False)
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
+        if any(self.state.results.values()):
+            self.btn_review.setEnabled(True)
         self.lbl_progress_info.setText("Detenido por el usuario.")
         self.state.run_aborted.emit()
 
