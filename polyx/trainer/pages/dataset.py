@@ -9,11 +9,15 @@ from PySide6.QtGui import QPixmap, QPainter, QPen, QColor, QImage, QFont
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton,
     QFileDialog, QMessageBox, QFrame, QSpinBox, QComboBox, QProgressDialog,
+    QListWidget, QListWidgetItem,
 )
 
 from ._base import TrainerPage
 from ...core import theme as T
 from ...core.paths import IMAGE_EXTS
+from ...core.dataset_audit import (
+    audit_dataset, LEVEL_OK, LEVEL_WARN, LEVEL_ERROR,
+)
 
 
 def _load_yaml(path: Path) -> dict:
@@ -239,6 +243,24 @@ class DatasetPage(TrainerPage):
         btn_val = QPushButton("🔍  Validar ahora")
         btn_val.clicked.connect(self._validate_dataset)
         l5.addWidget(btn_val, 0, Qt.AlignLeft)
+
+        # Panel de análisis profundo (distribución de clases, etc.)
+        self.lbl_audit_title = QLabel("Análisis profundo")
+        self.lbl_audit_title.setStyleSheet(
+            f"color: {T.INK2}; font-weight: 600; font-size: 10.5pt; "
+            f"border: none; margin-top: 8px;")
+        l5.addWidget(self.lbl_audit_title)
+        self.lbl_dist = QLabel("")
+        self.lbl_dist.setWordWrap(True)
+        self.lbl_dist.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none;")
+        l5.addWidget(self.lbl_dist)
+        self.audit_list = QListWidget()
+        self.audit_list.setMinimumHeight(150)
+        self.audit_list.setStyleSheet(
+            f"QListWidget {{ border: 1px solid {T.RULE}; border-radius: 6px; "
+            f"background: {T.BG_SOFT}; }}")
+        self.audit_list.setWordWrap(True)
+        l5.addWidget(self.audit_list)
         self.body.addWidget(c5)
 
     # ──────────────────────────────────────────
@@ -462,6 +484,46 @@ class DatasetPage(TrainerPage):
         self._set_check(4, has_names,
                         f"Clases: {', '.join(str(n) for n in names[:10])}" if has_names
                         else "No hay clave 'names' en el YAML.")
+
+        # Análisis profundo (distribución de clases, validación por clase, etc.)
+        self._run_deep_audit(yaml_path)
+
+    def _run_deep_audit(self, yaml_path):
+        """Ejecuta la auditoría profunda y vuelca los hallazgos al panel."""
+        self.audit_list.clear()
+        try:
+            audit = audit_dataset(yaml_path)
+        except Exception as e:
+            self.lbl_dist.setText("")
+            it = QListWidgetItem(f"No se pudo analizar: {e}")
+            it.setForeground(QColor(T.ERR))
+            self.audit_list.addItem(it)
+            return
+
+        # Tabla compacta de distribución por clase (train vs val)
+        tr = audit.per_class.get("train", {})
+        vl = audit.per_class.get("val", {})
+        if audit.class_names:
+            partes = []
+            for c in audit.class_names:
+                t = tr.get(c, 0)
+                v = vl.get(c, 0)
+                marca = "  ⚠️sin val" if (t > 0 and v == 0) else ""
+                partes.append(f"<b>{c}</b>: train {t} / val {v}{marca}")
+            self.lbl_dist.setText("Distribución por clase &nbsp; — &nbsp; "
+                                  + " &nbsp;•&nbsp; ".join(partes))
+        else:
+            self.lbl_dist.setText("")
+
+        colors = {LEVEL_ERROR: T.ERR, LEVEL_WARN: T.WARN, LEVEL_OK: T.OK}
+        icons = {LEVEL_ERROR: "✗", LEVEL_WARN: "⚠", LEVEL_OK: "✓"}
+        for f in audit.findings:
+            txt = f"{icons.get(f.level,'•')}  {f.title}"
+            if f.detail:
+                txt += f"\n     {f.detail}"
+            it = QListWidgetItem(txt)
+            it.setForeground(QColor(colors.get(f.level, T.INK2)))
+            self.audit_list.addItem(it)
 
     # ── Auto-split ────────────────────────────────────────────
     def _auto_split(self):

@@ -73,3 +73,5 @@ dataset_correcciones/
 # Scripts temporales de diagnostico
 _diag_*.py
 _diag_overlays/
+_diag_train_vis/
+_tmp_*.yaml
