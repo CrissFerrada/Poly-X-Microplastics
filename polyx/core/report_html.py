@@ -120,6 +120,40 @@ def _img_b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
+# Ancho máximo de las imágenes de galería, en píxeles. Se incrustan en base64
+# dentro del HTML, así que su tamaño es el del reporte: sin reducir, cuatro
+# imágenes de 4096 px pesaban 14.5 MB y un lote de varios cientos generaba un
+# archivo de gigabytes que ningún navegador abre.
+_ANCHO_GALERIA = 1100
+
+
+def _uri_galeria(data: bytes, ancho_max: int = _ANCHO_GALERIA) -> str:
+    """Data URI de una imagen de galería: siempre JPEG, reescalada si es ancha.
+
+    Se recodifica **siempre**, no solo al reducir. Las anotadas se generan en
+    PNG (sin pérdida), formato pésimo para fotografía: una sola placa ocupaba
+    ~3.6 MB y cuatro imágenes producían un reporte de 14.5 MB. En JPEG la misma
+    imagen baja un orden de magnitud sin diferencia visible.
+
+    Devuelve el URI completo con su tipo MIME, no solo el base64: declararlo
+    como PNG tras recodificar impediría que el navegador lo mostrara.
+    """
+    try:
+        import cv2
+        arr = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if arr is not None:
+            if arr.shape[1] > ancho_max:
+                alto = int(round(arr.shape[0] * ancho_max / arr.shape[1]))
+                arr = cv2.resize(arr, (ancho_max, alto), interpolation=cv2.INTER_AREA)
+            ok, buf = cv2.imencode(".jpg", arr, [cv2.IMWRITE_JPEG_QUALITY, 88])
+            if ok:
+                return ("data:image/jpeg;base64,"
+                        + base64.b64encode(buf.tobytes()).decode("ascii"))
+    except Exception:
+        pass
+    return "data:image/png;base64," + _img_b64(data)
+
+
 def _fig_class_distribution(per_class_counts: Dict[str, int]) -> str:
     if not per_class_counts:
         return ""
@@ -180,8 +214,14 @@ def _fig_confusion_matrix(cm: np.ndarray, class_names: List[str]) -> str:
 # ────────────────────────────────────────────────────────────────────
 def generate_report(state, output_path: Path,
                     include_refs: bool = True,
-                    include_gallery: bool = True) -> Path:
-    """Genera el reporte HTML. `state` es un DetectorState con resultados."""
+                    include_gallery: bool = True,
+                    max_gallery: int = 60) -> Path:
+    """Genera el reporte HTML. `state` es un DetectorState con resultados.
+
+    ``max_gallery`` limita cuántas imágenes se incrustan en la galería. Las
+    imágenes van en base64 dentro del propio HTML, de modo que sin tope un lote
+    grande generaba un archivo inabrible (14.5 MB con solo 4 imágenes).
+    """
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -259,18 +299,22 @@ def generate_report(state, output_path: Path,
 
     # ── Galería comparativa: Predicción vs Ground Truth (lado a lado) ──
     gallery_html = ""
+    omitidas = 0
     if include_gallery:
         blocks = []
-        for mi, rs in state.results.items():
+        # Tope de imágenes en galería: cada una se incrusta en base64, así que
+        # sin límite un lote de varios cientos produce un HTML de gigabytes.
+        candidatas = [(mi, r) for mi, rs in state.results.items() for r in rs]
+        omitidas = max(0, len(candidatas) - max_gallery)
+        for mi, r in candidatas[:max_gallery]:
             slot = state.model_slots[mi]
-            for r in rs:
+            if True:
                 # Imagen de predicción (preferimos pred_png; si no, la combinada)
                 pred_bytes = getattr(r, "pred_png", None) or r.annotated_png
                 if not pred_bytes:
                     continue
-                pred_b64 = _img_b64(pred_bytes)
                 left = (
-                    f"<figure><img src='data:image/png;base64,{pred_b64}' />"
+                    f"<figure><img src='{_uri_galeria(pred_bytes)}' />"
                     f"<figcaption>Predicción del modelo · {slot.alias}"
                     f"<span class='sub'>{len(r.predictions)} detección(es) por YOLO</span>"
                     f"</figcaption></figure>"
@@ -279,9 +323,8 @@ def generate_report(state, output_path: Path,
                 # Imagen de Ground Truth (control)
                 gt_bytes = getattr(r, "gt_png", None)
                 if r.has_gt and gt_bytes:
-                    gt_b64 = _img_b64(gt_bytes)
                     right = (
-                        f"<figure><img src='data:image/png;base64,{gt_b64}' />"
+                        f"<figure><img src='{_uri_galeria(gt_bytes)}' />"
                         f"<figcaption>Ground Truth (control)"
                         f"<span class='sub'>{len(r.gt)} etiqueta(s) reales</span>"
                         f"</figcaption></figure>"
@@ -315,13 +358,19 @@ def generate_report(state, output_path: Path,
                 )
 
         if blocks:
+            nota = ""
+            if omitidas:
+                nota = (f"<p class='caption'>Se muestran las primeras {max_gallery} "
+                        f"imágenes; {omitidas} quedaron fuera de la galería para que "
+                        f"el archivo siga siendo manejable. Las métricas de las "
+                        f"secciones anteriores sí incluyen todas.</p>")
             gallery_html = (
                 "<h2 id='gallery'>7. Galería comparativa: Predicción vs Ground Truth</h2>"
                 "<p>Cada bloque muestra, a la izquierda, las detecciones del modelo "
                 "(<em>bounding boxes</em> dibujadas por YOLO con su clase y confianza) y, a la "
                 "derecha, las etiquetas reales de control (<em>Ground Truth</em>). Esta vista "
                 "lado a lado permite evaluar visualmente dónde acertó o falló el modelo.</p>"
-                + "".join(blocks)
+                + nota + "".join(blocks)
             )
 
     # ── Figuras agregadas ──

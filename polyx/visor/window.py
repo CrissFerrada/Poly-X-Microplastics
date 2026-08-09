@@ -11,13 +11,23 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QPushButton,
     QLabel, QFileDialog, QMessageBox, QInputDialog, QComboBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QScrollArea,
-    QDoubleSpinBox, QProgressDialog, QSizePolicy,
+    QDoubleSpinBox, QProgressDialog, QSizePolicy, QSpinBox, QCheckBox,
+    QApplication,
 )
 
 from ..core import theme as T
 from ..core.widgets import LogoBadge, HLine
 from .state import VisorState
 from .canvas import VisorCanvas
+
+
+def _hay_gpu() -> bool:
+    """CUDA disponible. Se consulta perezosamente: importar torch tarda."""
+    try:
+        import torch
+        return bool(torch.cuda.is_available())
+    except Exception:
+        return False
 
 
 class VisorWindow(QMainWindow):
@@ -150,10 +160,38 @@ class VisorWindow(QMainWindow):
         self.spin_conf.setDecimals(2)
         rv.addWidget(self.spin_conf)
 
+        # Resolución de inferencia: decisiva con partículas diminutas. A 640 px
+        # una partícula de 12 px en una foto de 4096 colapsa a ~2 px y no se
+        # detecta nada. Debe poder subirse.
+        rv.addWidget(QLabel("Resolución de inferencia (px):"))
+        self.spin_imgsz = QSpinBox()
+        self.spin_imgsz.setRange(320, 8192)
+        self.spin_imgsz.setSingleStep(32)
+        self.spin_imgsz.setValue(2080)
+        self.spin_imgsz.setToolTip(
+            "Lado mayor al que se redimensiona la imagen para inferir.\n"
+            "Más alto = partículas más grandes para la red, pero más memoria.\n"
+            "Se redondea al múltiplo de 32 más cercano."
+        )
+        rv.addWidget(self.spin_imgsz)
+
+        self.chk_gpu = QCheckBox("Usar GPU si está disponible")
+        self.chk_gpu.setChecked(True)
+        rv.addWidget(self.chk_gpu)
+
         self.btn_detect = QPushButton("▶  Detectar")
         self.btn_detect.setObjectName("primary")
         self.btn_detect.clicked.connect(self._detect)
         rv.addWidget(self.btn_detect)
+
+        self.btn_cargar_txt = QPushButton("📄  Cargar etiquetas (.txt)")
+        self.btn_cargar_txt.setToolTip(
+            "Muestra las anotaciones YOLO que acompañan a la imagen.\n"
+            "Sirve para revisar el conteo manual sobre la placa, con las\n"
+            "tallas ya convertidas a µm por la calibración."
+        )
+        self.btn_cargar_txt.clicked.connect(self._cargar_etiquetas)
+        rv.addWidget(self.btn_cargar_txt)
 
         rv.addWidget(HLine())
 
@@ -304,17 +342,95 @@ class VisorWindow(QMainWindow):
         if img is None:
             QMessageBox.warning(self, "Sin imagen", "Abre una imagen primero.")
             return
+        imgsz = int(round(self.spin_imgsz.value() / 32)) * 32   # múltiplo de stride
+        device = "0" if (self.chk_gpu.isChecked() and _hay_gpu()) else "cpu"
         try:
-            self._set_status("● Detectando…", T.ACCENT)
+            self._set_status(f"● Detectando (imgsz {imgsz}, {device})…", T.ACCENT)
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            QApplication.processEvents()
             dets = self.state.model.predict(
-                str(img), conf=self.spin_conf.value(), device="cpu"
+                str(img), conf=self.spin_conf.value(), imgsz=imgsz, device=device
             )
             self.state.detections = dets
             self.state.detections_changed.emit(dets)
-            self._set_status(f"● {len(dets)} detecciones", T.OK)
+            self._set_status(f"● {len(dets)} detecciones (imgsz {imgsz})", T.OK)
         except Exception as e:
-            QMessageBox.warning(self, "Error en detección", str(e))
+            # Sin VRAM suficiente el fallo es habitual al subir imgsz: se dice
+            # qué hacer en vez de mostrar la excepción cruda.
+            msg = str(e)
+            if "out of memory" in msg.lower():
+                msg = (f"Sin memoria de GPU a imgsz {imgsz}.\n\n"
+                       f"Baja la resolución de inferencia o desmarca «Usar GPU».")
+            QMessageBox.warning(self, "Error en detección", msg)
             self._set_status("● Error en detección", T.ERR)
+        finally:
+            QApplication.restoreOverrideCursor()
+
+    def _cargar_etiquetas(self):
+        """Carga el .txt YOLO de la imagen actual y lo muestra como detecciones.
+
+        Permite revisar el conteo manual sobre la placa completa y ver las
+        tallas en µm sin volver al Etiquetador.
+        """
+        img = self.state.current_image
+        if img is None:
+            QMessageBox.warning(self, "Sin imagen", "Abre una imagen primero.")
+            return
+        txt = img.with_suffix(".txt")
+        if not txt.exists():
+            QMessageBox.information(
+                self, "Sin etiquetas",
+                f"No hay archivo de etiquetas junto a la imagen:\n{txt.name}")
+            return
+
+        import cv2
+        import numpy as np
+        from ..core.yolo_wrap import Detection
+
+        arr = cv2.imdecode(np.fromfile(str(img), dtype=np.uint8), cv2.IMREAD_COLOR)
+        if arr is None:
+            QMessageBox.warning(self, "Error", "No se pudo leer la imagen.")
+            return
+        alto, ancho = arr.shape[:2]
+
+        nombres = self._nombres_de_clase(txt.parent)
+        dets, malformadas = [], 0
+        for linea in txt.read_text(encoding="utf-8", errors="ignore").splitlines():
+            partes = linea.split()
+            if len(partes) < 5:
+                if linea.strip():
+                    malformadas += 1
+                continue
+            try:
+                k = int(partes[0])
+                cx, cy, w, h = (float(v) for v in partes[1:5])
+            except ValueError:
+                malformadas += 1
+                continue
+            dets.append(Detection(
+                class_id=k,
+                class_name=nombres[k] if 0 <= k < len(nombres) else str(k),
+                conf=1.0,                       # anotación manual: certeza total
+                x1=(cx - w / 2) * ancho, y1=(cy - h / 2) * alto,
+                x2=(cx + w / 2) * ancho, y2=(cy + h / 2) * alto,
+            ))
+
+        self.state.detections = dets
+        self.state.detections_changed.emit(dets)
+        aviso = f"  ({malformadas} línea(s) ilegible(s))" if malformadas else ""
+        self._set_status(f"● {len(dets)} etiquetas cargadas de {txt.name}{aviso}",
+                         T.WARN if malformadas else T.OK)
+
+    @staticmethod
+    def _nombres_de_clase(carpeta: Path) -> list[str]:
+        """Lee classes.txt de la carpeta; si no está, usa las clases del estudio."""
+        f = carpeta / "classes.txt"
+        if f.exists():
+            nombres = [l.strip() for l in
+                       f.read_text(encoding="utf-8").splitlines() if l.strip()]
+            if nombres:
+                return nombres
+        return ["PET", "PP", "LDPE"]
 
     def _on_detections_changed(self, dets: list):
         self._rebuild_table(dets)
@@ -386,13 +502,18 @@ class VisorWindow(QMainWindow):
         )
 
     def _on_calib_ready(self):
-        """Suficientes puntos recogidos → pedir tamaño real al usuario."""
+        """Suficientes puntos recogidos → pedir tamaño real al usuario.
+
+        Los argumentos posicionales son obligatorios: PySide6 no acepta ``min``
+        ni ``max`` como palabras clave en ``getDouble`` y lanzaba AttributeError,
+        lo que dejaba la calibración inutilizable.
+        """
         mode = self.state.calib_mode
         if mode == "linea":
             val, ok = QInputDialog.getDouble(
                 self, "Calibración — Línea",
-                "Ingresa el tamaño real de la línea marcada (μm):",
-                value=10.0, min=0.001, max=1_000_000, decimals=3
+                "Tamaño real de la línea marcada (μm):",
+                1000.0, 0.001, 1_000_000.0, 3
             )
             if ok and val > 0:
                 self.state.finish_calib_linea(val)
@@ -400,10 +521,12 @@ class VisorWindow(QMainWindow):
                 self.state.cancel_calib()
 
         elif mode == "circulo":
+            # Por defecto 100 mm: es el diámetro de las placas Petri del estudio
             val, ok = QInputDialog.getDouble(
                 self, "Calibración — Círculo",
-                "Ingresa el diámetro real del objeto circular (μm):",
-                value=10.0, min=0.001, max=1_000_000, decimals=3
+                "Diámetro real del objeto circular (μm):\n"
+                "Placa Petri de 100 mm → 100000",
+                100_000.0, 0.001, 10_000_000.0, 3
             )
             if ok and val > 0:
                 self.state.finish_calib_circulo(val)
@@ -460,12 +583,14 @@ class VisorWindow(QMainWindow):
     def _save_annotated_image(self, img: Path, save_dir: Path):
         import cv2
         import numpy as np
-        frame = cv2.imread(str(img))
+        # imdecode y no imread: en Windows imread falla con rutas que llevan
+        # acentos o caracteres no ASCII, y devuelve None sin avisar.
+        frame = cv2.imdecode(np.fromfile(str(img), dtype=np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
             return
 
         CLASS_COLORS_BGR = [
-            (47,  52, 227),   # PET  → azul (BGR)
+            (47,  52, 227),   # PET  → rojo
             (0,  140, 255),   # PP   → naranjo
             (0,  215, 255),   # LDPE → amarillo
             (216, 180,   0),
@@ -488,7 +613,9 @@ class VisorWindow(QMainWindow):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
 
         out_path = save_dir / f"{img.stem}_anotada.png"
-        cv2.imwrite(str(out_path), frame)
+        ok, buf = cv2.imencode(".png", frame)
+        if ok:
+            buf.tofile(str(out_path))
 
     def _save_csv(self, save_dir: Path):
         import csv

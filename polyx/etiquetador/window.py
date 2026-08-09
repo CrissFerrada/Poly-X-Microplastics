@@ -8,7 +8,8 @@ from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QPushButton,
     QLabel, QListWidget, QListWidgetItem, QFileDialog, QMessageBox,
-    QInputDialog, QComboBox, QProgressDialog,
+    QInputDialog, QComboBox, QProgressDialog, QProgressBar, QCheckBox,
+    QDoubleSpinBox, QSpinBox,
 )
 
 from ..core import theme as T
@@ -37,6 +38,13 @@ class LabelerWindow(QMainWindow):
 
         self.state = LabelerState()
         self._pre_model = None   # YoloModel cargado bajo demanda
+
+        # Miniaturas en segundo plano: generarlas todas de golpe congelaba la
+        # ventana ~9 s con 552 recortes, porque cada una decodifica la imagen
+        # completa.
+        self._cola_thumbs: list[int] = []
+        self._thumb_timer = QTimer(self)
+        self._thumb_timer.timeout.connect(self._procesar_thumbs)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -113,6 +121,27 @@ class LabelerWindow(QMainWindow):
         self.lbl_idx.setStyleSheet(f"color: {T.INK3}; font-size: 8.5pt;")
         lv.addWidget(self.lbl_idx)
 
+        # Avance del conteo: imprescindible cuando son cientos de recortes
+        # repartidos en varias sesiones.
+        self.barra = QProgressBar()
+        self.barra.setTextVisible(False)
+        self.barra.setFixedHeight(6)
+        self.barra.setStyleSheet(
+            f"QProgressBar {{ border: none; background: {T.RULE}; border-radius: 3px; }}"
+            f"QProgressBar::chunk {{ background: {T.OK}; border-radius: 3px; }}"
+        )
+        lv.addWidget(self.barra)
+
+        self.lbl_progreso = QLabel("")
+        self.lbl_progreso.setAlignment(Qt.AlignCenter)
+        self.lbl_progreso.setStyleSheet(f"color: {T.INK2}; font-size: 8.5pt;")
+        lv.addWidget(self.lbl_progreso)
+
+        btn_pend = QPushButton("⏭  Siguiente sin revisar")
+        btn_pend.setToolTip("Salta a la próxima imagen que aún no has revisado (Tab)")
+        btn_pend.clicked.connect(self._ir_siguiente_pendiente)
+        lv.addWidget(btn_pend)
+
         return panel
 
     # ── Panel derecho ─────────────────────────────────────────
@@ -184,6 +213,27 @@ class LabelerWindow(QMainWindow):
         btn_load_model.clicked.connect(self._load_model)
         rv.addWidget(btn_load_model)
 
+        fila_pre = QHBoxLayout()
+        fila_pre.setSpacing(6)
+        fila_pre.addWidget(QLabel("conf:"))
+        self.sb_pre_conf = QDoubleSpinBox()
+        self.sb_pre_conf.setRange(0.01, 0.99)
+        self.sb_pre_conf.setSingleStep(0.05)
+        self.sb_pre_conf.setDecimals(2)
+        self.sb_pre_conf.setValue(0.10)
+        fila_pre.addWidget(self.sb_pre_conf)
+        fila_pre.addWidget(QLabel("imgsz:"))
+        self.sb_pre_imgsz = QSpinBox()
+        self.sb_pre_imgsz.setRange(320, 8192)
+        self.sb_pre_imgsz.setSingleStep(64)
+        self.sb_pre_imgsz.setValue(2080)
+        self.sb_pre_imgsz.setToolTip(
+            "Resolución de inferencia. Con partículas diminutas en fotos grandes,\n"
+            "un valor bajo no propone nada."
+        )
+        fila_pre.addWidget(self.sb_pre_imgsz)
+        rv.addLayout(fila_pre)
+
         btn_pre_one = QPushButton("🤖  Pre-anotar imagen actual")
         btn_pre_one.clicked.connect(self._preannotar_current)
         rv.addWidget(btn_pre_one)
@@ -193,7 +243,28 @@ class LabelerWindow(QMainWindow):
         btn_pre_all.clicked.connect(self._preannotar_all)
         rv.addWidget(btn_pre_all)
 
+        rv.addWidget(HLine())
+
+        self.chk_zoom = QCheckBox("Mantener zoom entre imágenes")
+        self.chk_zoom.setChecked(True)
+        self.chk_zoom.setToolTip(
+            "Conserva el nivel de acercamiento al cambiar de recorte.\n"
+            "Con cientos de recortes, reencuadrar cada vez cuesta mucho tiempo.\n"
+            "F reencuadra manualmente."
+        )
+        self.chk_zoom.toggled.connect(
+            lambda v: setattr(self.canvas, "mantener_zoom", v))
+        rv.addWidget(self.chk_zoom)
+
         rv.addStretch(1)
+
+        btn_rev = QPushButton("✓  Revisada, siguiente   (Espacio)")
+        btn_rev.setToolTip(
+            "Deja constancia de que miraste esta imagen aunque no tenga partículas.\n"
+            "Sin esto, una placa vacía revisada es indistinguible de una sin mirar."
+        )
+        btn_rev.clicked.connect(self._marcar_revisada)
+        rv.addWidget(btn_rev)
 
         btn_save = QPushButton("💾  Guardar (.txt)")
         btn_save.setObjectName("primary")
@@ -214,6 +285,19 @@ class LabelerWindow(QMainWindow):
         self.state.annotations_changed.connect(self._on_annotations_changed)
         self.state.active_class_changed.connect(self._on_active_class_changed)
         self.state.classes_changed.connect(self._rebuild_class_buttons)
+        self.state.progress_changed.connect(self._on_progress_changed)
+        self.canvas.box_rechazada.connect(self._on_box_rechazada)
+
+    def _on_progress_changed(self):
+        idx = self.state.current_idx
+        if 0 <= idx < self.img_list.count():
+            self.img_list.item(idx).setText(self._texto_item(self.state.images[idx]))
+        self._actualizar_progreso()
+
+    def _on_box_rechazada(self, lado: float):
+        self._set_status(f"⚠ Caja de {lado:.1f} px descartada (mínimo "
+                         f"{self.canvas.LADO_MINIMO_PX:.0f} px) — acerca el zoom", T.WARN)
+        QTimer.singleShot(3500, lambda: self._set_status("● Listo", T.OK))
 
     def _install_shortcuts(self):
         QShortcut(QKeySequence("Ctrl+S"), self, self._save)
@@ -221,6 +305,7 @@ class LabelerWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Y"), self, self.state.redo)
         QShortcut(QKeySequence(Qt.Key_Left),  self, self.state.prev_image)
         QShortcut(QKeySequence(Qt.Key_Right), self, self.state.next_image)
+        QShortcut(QKeySequence(Qt.Key_Tab),   self, self._ir_siguiente_pendiente)
 
     # ── Gestión de clases ─────────────────────────────────────
     def _rebuild_class_buttons(self, names: list[str] | None = None):
@@ -307,7 +392,7 @@ class LabelerWindow(QMainWindow):
             if r != QMessageBox.Yes:
                 return
         try:
-            dets = self._pre_model.predict(str(img), conf=0.25, device="cpu")
+            dets = self._pre_model.predict(str(img), **self._params_preanotacion())
             boxes = self._dets_to_boxes(dets, img)
             self.state.set_current_boxes(boxes)
             self._set_status(f"● Pre-anotadas {len(boxes)} cajas", T.OK)
@@ -338,7 +423,7 @@ class LabelerWindow(QMainWindow):
             if existing:
                 continue
             try:
-                dets = self._pre_model.predict(str(img_path), conf=0.25, device="cpu")
+                dets = self._pre_model.predict(str(img_path), **self._params_preanotacion())
                 boxes = self._dets_to_boxes(dets, img_path)
                 self.state._annotations[key] = boxes
                 self.state._save_labels_for(img_path, boxes)
@@ -348,6 +433,22 @@ class LabelerWindow(QMainWindow):
         pd.setValue(total)
         self.state.annotations_changed.emit()
         self._set_status("● Pre-anotación completa", T.OK)
+
+    def _params_preanotacion(self) -> dict:
+        """Parámetros de inferencia para la pre-anotación.
+
+        Antes iban fijos a ``conf=0.25, device="cpu"`` y sin ``imgsz``, es decir
+        640 por defecto: con partículas de ~12 px en fotos de alta resolución no
+        proponía nada, y en CPU tardaba una eternidad.
+        """
+        try:
+            import torch
+            device = "0" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            device = "cpu"
+        return dict(conf=float(self.sb_pre_conf.value()),
+                    imgsz=int(self.sb_pre_imgsz.value()),
+                    device=device)
 
     def _dets_to_boxes(self, dets, img_path: Path):
         from .state import BBox
@@ -371,10 +472,41 @@ class LabelerWindow(QMainWindow):
     def _on_images_loaded(self, imgs: list):
         self.img_list.clear()
         for img in imgs:
-            item = QListWidgetItem(f"○ {img.name}")
-            item.setIcon(self._make_thumb(img))
+            item = QListWidgetItem(self._texto_item(img, contar=True))
             self.img_list.addItem(item)
         self.lbl_count.setText(f"{len(imgs)} imagen(es)")
+        # Las miniaturas se generan después, en tandas, para no congelar la
+        # ventana: cada una decodifica la imagen completa y son cientos.
+        self._cola_thumbs = list(range(len(imgs)))
+        self._thumb_timer.start(0)
+        self._actualizar_progreso()
+
+    def _texto_item(self, img: Path, contar: bool = False) -> str:
+        """Marca de estado: ✓ con partículas · revisada vacía · ○ sin revisar."""
+        if not self.state.is_reviewed(img):
+            return f"○  {img.name}"
+        n = len(self.state._annotations.get(str(img), []))
+        if contar and str(img) not in self.state._annotations:
+            # Sin cargar en memoria: cuenta las líneas del .txt directamente
+            txt = self.state._label_path_for(img)
+            try:
+                n = sum(1 for l in txt.read_text(encoding="utf-8").splitlines() if l.strip())
+            except OSError:
+                n = 0
+        return f"✓  {img.name}  ({n})" if n else f"·  {img.name}  (0)"
+
+    def _procesar_thumbs(self):
+        """Genera unas pocas miniaturas por tick, sin bloquear la interfaz."""
+        if not self._cola_thumbs:
+            self._thumb_timer.stop()
+            return
+        for _ in range(4):
+            if not self._cola_thumbs:
+                break
+            i = self._cola_thumbs.pop(0)
+            if i >= self.img_list.count() or i >= len(self.state.images):
+                continue
+            self.img_list.item(i).setIcon(self._make_thumb(self.state.images[i]))
 
     def _make_thumb(self, img_path: Path) -> QIcon:
         """Carga miniatura 52×40 de la imagen."""
@@ -385,6 +517,32 @@ class LabelerWindow(QMainWindow):
             return QIcon(pix.scaled(QSize(52, 40), Qt.KeepAspectRatio, Qt.SmoothTransformation))
         except Exception:
             return QIcon()
+
+    def _actualizar_progreso(self):
+        total = len(self.state.images)
+        hechas = self.state.n_reviewed()
+        if not total:
+            self.lbl_progreso.setText("")
+            self.barra.setValue(0)
+            return
+        self.barra.setMaximum(total)
+        self.barra.setValue(hechas)
+        self.lbl_progreso.setText(
+            f"{hechas} / {total} revisadas  ({100 * hechas / total:.0f}%)   "
+            f"faltan {total - hechas}"
+        )
+
+    def _ir_siguiente_pendiente(self):
+        i = self.state.next_unreviewed()
+        if i < 0:
+            QMessageBox.information(self, "Conteo completo",
+                                    "No quedan imágenes sin revisar.")
+            return
+        self.state.goto(i)
+
+    def _marcar_revisada(self):
+        self.state.mark_reviewed()
+        self.state.next_image()
 
     def _on_image_changed(self, idx: int):
         self.img_list.blockSignals(True)
@@ -410,12 +568,11 @@ class LabelerWindow(QMainWindow):
         else:
             self.lbl_box_info.setText("Sin anotaciones")
 
-        # Actualizar indicador ✓/○ en la lista (sin perder el icono)
+        # Actualizar indicador de estado en la lista (sin perder el icono)
         idx = self.state.current_idx
         if 0 <= idx < self.img_list.count():
-            item = self.img_list.item(idx)
-            name = self.state.images[idx].name
-            item.setText(f"{'✓' if n > 0 else '○'} {name}")
+            self.img_list.item(idx).setText(self._texto_item(self.state.images[idx]))
+        self._actualizar_progreso()
 
     def _on_list_select(self, row: int):
         if row >= 0 and row != self.state.current_idx:

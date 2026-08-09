@@ -26,7 +26,10 @@ class InferenceParams:
     conf: float = 0.25
     iou_nms: float = 0.45
     iou_tp: float = 0.50            # para análisis de errores
-    imgsz: int = 640
+    # 1280 y no 640: los microplásticos ocupan ~12 px en fotos de 4096, y a 640
+    # colapsan bajo el stride de la red, así que de fábrica no se detectaba nada.
+    # Coincide con el perfil «Rápido» de la página de Parámetros.
+    imgsz: int = 1280
     device: str = "0"               # "0", "cpu", ...
     um_per_px: float = 0.0          # 0 = no hay calibración
     size_min_um: float = 0.0        # 0 = sin filtro inferior

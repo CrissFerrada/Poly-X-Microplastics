@@ -37,6 +37,7 @@ class LabelerState(QObject):
     annotations_changed = Signal()
     classes_changed    = Signal(list)   # List[str]
     active_class_changed = Signal(int)
+    progress_changed   = Signal()       # cambió el conjunto de revisadas
 
     def __init__(self):
         super().__init__()
@@ -44,10 +45,15 @@ class LabelerState(QObject):
         self.current_idx: int = -1
         self.class_names: list[str] = list(CLASS_NAMES_DEFAULT)
         self.active_class: int = 0
+        self.root_folder: Optional[Path] = None
 
         self._annotations: dict[str, list[BBox]] = {}
         self._undo_stacks: dict[str, list[list[BBox]]] = {}
         self._redo_stacks: dict[str, list[list[BBox]]] = {}
+        # Imágenes que el operador declaró revisadas. Un conteo censal necesita
+        # distinguir "revisada, cero partículas" de "todavía no mirada": ambas
+        # tienen cero cajas, pero solo la primera es un dato.
+        self._reviewed: set[str] = set()
 
     # ── Propiedades ───────────────────────────────────────────
     @property
@@ -108,9 +114,13 @@ class LabelerState(QObject):
     def load_images(self, folder: Path):
         imgs = sorted(p for p in folder.rglob("*") if p.suffix.lower() in IMAGE_EXTS)
         self.images = imgs
+        self.root_folder = folder
         self._annotations.clear()
         self._undo_stacks.clear()
         self._redo_stacks.clear()
+        # Recupera el avance de sesiones anteriores: un .txt en disco significa
+        # que esa imagen ya fue revisada, tenga o no cajas.
+        self._reviewed = {str(p) for p in imgs if self._label_path_for(p).exists()}
         self.images_loaded.emit(imgs)
         if imgs:
             self.current_idx = -1  # forzar goto a emitir image_changed
@@ -136,6 +146,38 @@ class LabelerState(QObject):
     def prev_image(self):
         self.goto(self.current_idx - 1)
 
+    # ── Revisión ─────────────────────────────────────────────
+    def is_reviewed(self, img: Path) -> bool:
+        return str(img) in self._reviewed
+
+    def mark_reviewed(self, revisada: bool = True):
+        """Declara la imagen actual como revisada, aunque no tenga partículas."""
+        img = self.current_image
+        if img is None:
+            return
+        key = str(img)
+        if revisada:
+            self._reviewed.add(key)
+            self._save_labels_for(img, self.current_boxes, forzar=True)
+        else:
+            self._reviewed.discard(key)
+            txt = self._label_path_for(img)
+            if txt.exists() and not self.current_boxes:
+                txt.unlink()
+        self.progress_changed.emit()
+
+    def n_reviewed(self) -> int:
+        return len(self._reviewed)
+
+    def next_unreviewed(self) -> int:
+        """Índice de la siguiente imagen sin revisar; -1 si no queda ninguna."""
+        n = len(self.images)
+        for salto in range(1, n + 1):
+            i = (self.current_idx + salto) % n
+            if str(self.images[i]) not in self._reviewed:
+                return i
+        return -1
+
     # ── Persistencia ─────────────────────────────────────────
     def save_current(self):
         img = self.current_image
@@ -151,10 +193,20 @@ class LabelerState(QObject):
         lbl_dir.mkdir(parents=True, exist_ok=True)
         return lbl_dir / (img.stem + ".txt")
 
-    def _save_labels_for(self, img: Path, boxes: list[BBox]):
+    def _save_labels_for(self, img: Path, boxes: list[BBox], forzar: bool = False):
+        """Escribe el .txt. Sin cajas y sin revisar, NO crea archivo.
+
+        Crear .txt vacíos al solo pasar por encima falsearía el avance: una
+        imagen apenas ojeada quedaría registrada como revisada con cero
+        partículas, que es un dato distinto.
+        """
+        if not boxes and not forzar and str(img) not in self._reviewed:
+            return
         txt = self._label_path_for(img)
         content = "\n".join(b.to_yolo_line() for b in boxes)
         txt.write_text(content + "\n" if content else "", encoding="utf-8")
+        if boxes:
+            self._reviewed.add(str(img))
 
     def _load_labels_for(self, img: Path):
         key = str(img)
@@ -173,14 +225,23 @@ class LabelerState(QObject):
         self._annotations[key] = boxes
 
     def save_classes_txt(self):
+        """Escribe classes.txt en la raíz y en cada subcarpeta con imágenes.
+
+        Con carpetas anidadas (un directorio por testigo) no basta la raíz: las
+        herramientas YOLO buscan classes.txt junto a las etiquetas.
+        """
         if not self.images:
             return
-        root = self.images[0].parent
-        if root.name.lower() == "images":
-            root = root.parent
-        (root / "classes.txt").write_text(
-            "\n".join(self.class_names) + "\n", encoding="utf-8"
-        )
+        contenido = "\n".join(self.class_names) + "\n"
+        destinos = {self._label_path_for(p).parent for p in self.images}
+        if self.root_folder is not None:
+            destinos.add(self.root_folder)
+        for d in destinos:
+            try:
+                d.mkdir(parents=True, exist_ok=True)
+                (d / "classes.txt").write_text(contenido, encoding="utf-8")
+            except OSError:
+                pass
 
     # ── Clases ───────────────────────────────────────────────
     def set_active_class(self, cls_id: int):

@@ -76,3 +76,23 @@ _diag_overlays/
 _diag_train_vis/
 _tmp_*.yaml
 PolyX_dataset.zip
+
+# ── Datos de investigacion sin publicar ─────────────────────────────
+# ESTE REPOSITORIO ES PUBLICO. Las fotos de los testigos del rio Loa son
+# material inedito de un paper en preparacion: publicarlas aqui adelantaria
+# resultados propios y ajenos. No agregar sin decision explicita del autor.
+fotos sed testigos/
+PolyX_recortes/
+
+# Pesos entrenados (500 MB) y carpetas de trabajo pesadas
+Wheigts/
+poly-x-repo/
+
+# MATLAB: instalador de 220 MB (GitHub rechaza >100 MB) y producto licenciado
+matlab_R2024b_Windows.exe
+_temp_matlab_R2024b_Windows/
+Microplasticos con MATLAB/
+
+# Herramientas locales de agentes
+.agents/
+.claude/

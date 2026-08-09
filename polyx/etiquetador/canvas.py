@@ -35,6 +35,8 @@ class BboxCanvas(QWidget):
       - Clic der. sobre caja  → asigna clase activa
       - Del / Backspace        → borra caja seleccionada
       - 1-9                   → cambia clase activa
+      - Espacio               → marca revisada y avanza
+      - F                     → reencuadra (vuelve a ajustar a la ventana)
       - Ctrl+Z / Ctrl+Y       → undo / redo
       - Ctrl+S                → guardar
       - ← →                  → imagen anterior / siguiente
@@ -43,6 +45,11 @@ class BboxCanvas(QWidget):
     """
 
     box_drawn = Signal()
+    box_rechazada = Signal(float)   # lado en px de la caja descartada
+
+    # Lado mínimo de caja, en píxeles de imagen. Las partículas más pequeñas del
+    # estudio miden ~8 px, así que un umbral de 5 px descartaba marcas legítimas.
+    LADO_MINIMO_PX = 2.0
 
     def __init__(self, state: LabelerState):
         super().__init__()
@@ -54,6 +61,10 @@ class BboxCanvas(QWidget):
         self._pixmap: Optional[QPixmap] = None
         self._scale = 1.0
         self._offset = QPointF(0.0, 0.0)
+        # Con cientos de recortes, reencuadrar en cada imagen obliga a rehacer el
+        # zoom cientos de veces. Conservarlo mantiene el ritmo de trabajo.
+        self.mantener_zoom = True
+        self._zoom_usuario = False
 
         # Dibujo de nueva caja
         self._drawing = False
@@ -91,8 +102,20 @@ class BboxCanvas(QWidget):
                 pix = QPixmap.fromImage(qimg)
             except Exception:
                 pass
+        anterior = self._pixmap
         self._pixmap = pix if not pix.isNull() else None
-        self._fit_to_window()
+        # Conserva zoom y encuadre si el usuario los ajustó y la imagen es de
+        # tamaño equivalente. Con tolerancia: al partir en rejilla los recortes
+        # difieren en 1 px por redondeo (815x1630 frente a 814x1629), y exigir
+        # igualdad exacta hacía que el zoom se perdiera casi siempre.
+        mismo_tamano = False
+        if anterior is not None and self._pixmap is not None:
+            da = abs(anterior.width() - self._pixmap.width())
+            db = abs(anterior.height() - self._pixmap.height())
+            mismo_tamano = (da <= max(4, anterior.width() * 0.02)
+                            and db <= max(4, anterior.height() * 0.02))
+        if not (self.mantener_zoom and self._zoom_usuario and mismo_tamano):
+            self._fit_to_window()
         self.update()
 
     def _fit_to_window(self):
@@ -244,6 +267,7 @@ class BboxCanvas(QWidget):
         if self._panning and self._pan_start is not None:
             delta = pos - self._pan_start
             self._offset = self._pan_offset_start + delta
+            self._zoom_usuario = True
             self.update()
         elif self._drawing:
             self._draw_end = self._w2i(pos)
@@ -261,8 +285,13 @@ class BboxCanvas(QWidget):
                 y1 = min(self._draw_start.y(), self._draw_end.y())
                 x2 = max(self._draw_start.x(), self._draw_end.x())
                 y2 = max(self._draw_start.y(), self._draw_end.y())
-                # Ignorar cajas demasiado pequeñas (ruido de clic)
-                if (x2 - x1) >= 5 and (y2 - y1) >= 5:
+                lado = min(x2 - x1, y2 - y1)
+                if lado < self.LADO_MINIMO_PX:
+                    # Antes se descartaba en silencio: el operador creía haber
+                    # marcado la partícula y la marca desaparecía sin aviso.
+                    if lado > 0.3:
+                        self.box_rechazada.emit(lado)
+                else:
                     cx, cy, w, h = self._img_rect_to_norm(x1, y1, x2 - x1, y2 - y1)
                     # Clamp a [0,1]
                     cx = max(0.0, min(1.0, cx))
@@ -289,6 +318,13 @@ class BboxCanvas(QWidget):
             pos.x() - img_pt.x() * self._scale,
             pos.y() - img_pt.y() * self._scale,
         )
+        self._zoom_usuario = True
+        self.update()
+
+    def reencuadrar(self):
+        """Vuelve a ajustar la imagen a la ventana y olvida el zoom manual."""
+        self._zoom_usuario = False
+        self._fit_to_window()
         self.update()
 
     # ── Teclado ───────────────────────────────────────────────
@@ -308,6 +344,13 @@ class BboxCanvas(QWidget):
             if cls < len(self.state.class_names):
                 self.state.set_active_class(cls)
 
+        elif key == Qt.Key_Space:
+            # Declara revisada y avanza: es el gesto para las placas vacías,
+            # que son la mayoría, y deja constancia de que sí se miraron.
+            self.state.mark_reviewed()
+            self.state.next_image()
+        elif key == Qt.Key_F:
+            self.reencuadrar()
         elif key == Qt.Key_Z and mod & Qt.ControlModifier:
             self.state.undo()
         elif key == Qt.Key_Y and mod & Qt.ControlModifier:

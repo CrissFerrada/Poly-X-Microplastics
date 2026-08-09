@@ -199,11 +199,67 @@ Abre **Launcher** → selecciona módulo.
 - `runs/detect/trainN/results.csv` — Métricas por época
 - `runs/detect/trainN/confusion_matrix.png` — Matriz confusión
 
-### 🏷 Etiquetador (Module 3, en construcción)
-Anotación YOLO con pre-anotación automática.
+### 🏷 Etiquetador (Module 3, funcional)
+Anotación YOLO manual con pre-anotación automática opcional.
 
-### 📐 Visor (Module 4, en construcción)
-Inspección interactiva de una imagen con calibración μm/píxel.
+**Verificado con 552 recortes** (agosto 2026). Arranque 0.25 s, interfaz
+responde en 0.06 s.
+
+**Seguimiento del avance.** La lista distingue tres estados, y se recupera del
+disco al abrir la carpeta, así que el conteo puede repartirse en varias sesiones:
+
+| Marca | Significado |
+|---|---|
+| `✓ nombre (n)` | revisada, con n partículas |
+| `· nombre (0)` | revisada, sin partículas — **es un dato** |
+| `○ nombre` | todavía sin revisar |
+
+Un `.txt` **solo** se escribe al marcar la imagen como revisada o al dibujar una
+caja. Pasar de largo no crea archivo: registrar como "revisada con cero" una
+imagen apenas ojeada falsearía el censo.
+
+**Atajos:** `Espacio` marca revisada y avanza · `Tab` salta a la siguiente sin
+revisar · `F` reencuadra · `1-9` clase activa · `←/→` navegar · `Supr` borra la
+caja seleccionada · `Ctrl+Z/Y` deshacer/rehacer · rueda zoom · botón medio pan.
+
+**Lado mínimo de caja: 2 px** (`BboxCanvas.LADO_MINIMO_PX`). Estaba en 5 px y
+descartaba **en silencio** marcas legítimas: las partículas más pequeñas del
+estudio miden ~8 px de lado. Ahora, si una caja se rechaza, se avisa en la barra
+de estado.
+
+El zoom se conserva entre imágenes (casilla en el panel derecho), con tolerancia
+de tamaño: los recortes de una rejilla difieren en 1 px por redondeo y exigir
+igualdad exacta hacía perder el zoom en cada cambio.
+
+### 📐 Visor (Module 4, funcional)
+Inspección de una imagen con calibración μm/píxel, detección y exportación.
+
+**Calibración interactiva.** Dos modos: **línea** (2 clics + longitud real) y
+**círculo** (3 clics sobre un borde circular + diámetro real). El diálogo del
+círculo viene con 100000 μm por defecto, que es la placa Petri del estudio.
+
+> Estuvo inutilizable hasta agosto 2026: `QInputDialog.getDouble()` se llamaba
+> con `min=`/`max=`, que PySide6 no acepta como palabras clave, y lanzaba
+> `AttributeError` al completar los puntos. La matemática siempre estuvo bien;
+> el diálogo reventaba antes de llegar a ella. **Los argumentos deben ir
+> posicionales:** `(parent, title, label, value, minValue, maxValue, decimals)`.
+
+**Detección.** `imgsz` configurable (320–8192, por defecto 2080) y GPU si está
+disponible. Antes forzaba `device="cpu"` e `imgsz` por defecto 640: con
+partículas de ~12 px en fotos de 4096 px, a 640 colapsan a ~2 px y **no se
+detecta nada**. Si la GPU se queda sin memoria, se explica cómo bajar `imgsz` en
+vez de mostrar la excepción cruda.
+
+**Cargar etiquetas (.txt).** Muestra las anotaciones YOLO que acompañan a la
+imagen, con las tallas ya convertidas a μm. Sirve para revisar el conteo manual
+sobre la placa completa sin volver al Etiquetador.
+
+**Exportación** a `visor_<imagen>_<ts>/`: PNG anotado, `detecciones.csv`
+(una fila por partícula, con diam_px, diam_um y area_um2) y `resumen.json`.
+
+> Lectura y escritura de imágenes con `cv2.imdecode`/`imencode` sobre
+> `np.fromfile`, no `imread`/`imwrite`: en Windows estos fallan con rutas que
+> llevan acentos y devuelven `None` sin avisar.
 
 ---
 
@@ -374,8 +430,8 @@ Para regenerar:
 
 - ✅ Detector: Funcional, reporte HTML
 - ✅ Entrenador: Funcional, curvas en vivo
-- 🏗 Etiquetador: En construcción
-- 🏗 Visor: En construcción
+- ✅ Etiquetador: Funcional, verificado con 552 recortes (ago 2026)
+- ✅ Visor: Funcional, calibración reparada y verificada (ago 2026)
 - 📋 Validación de dataset (duplicados, outliers)
 - 🤖 Recomendaciones automáticas de parámetros
 
