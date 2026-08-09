@@ -30,7 +30,12 @@
 - **Histograma de distribución de tamaños** por clase (PET/PP/LDPE) — visible cuando hay calibración activa
 - **Exportar CSV** directo desde la página de resultados
 - **Drag & Drop** de modelos `.pt` e imágenes/carpetas
-- Reporte HTML autocontenido (todas las imágenes en **base64**, calidad paper) con **galería comparativa Predicción vs Ground Truth (lado a lado)**
+- **Resolución de inferencia** ajustable con perfiles (Rápido 1280 · Equilibrado
+  2560 · Máxima detección 4096) y un botón que mide el máximo que aguanta tu GPU
+- Reporte HTML autocontenido (imágenes incrustadas en **base64**, calidad paper)
+  con **galería comparativa Predicción vs Ground Truth (lado a lado)**. Las
+  imágenes de galería se recodifican y se limita su número para que el archivo
+  siga siendo abrible en un navegador; las métricas cubren todas las imágenes
 - **Exportación a PDF** del reporte (un clic), listo para enviar por correo
 
 ### 🎯 Entrenador
@@ -46,22 +51,48 @@
 - Canvas interactivo: **arrastrar** para dibujar cajas YOLO normalizadas
 - Clic derecho para asignar clase; teclas `1`–`9` para cambiar clase activa
 - **Undo/Redo** (Ctrl+Z / Ctrl+Y) por imagen
-- **Pre-anotación automática** con modelo `.pt` (imagen actual o todas)
-- **Auto-guardado silencioso** cada 60 segundos
-- **Thumbnails** en la lista lateral de imágenes
-- Guarda `.txt` YOLO junto a la imagen (o en `labels/` si está en `images/`)
-- Genera `classes.txt` automáticamente para el Trainer
+- **Seguimiento del avance**, pensado para campañas de cientos de imágenes
+  repartidas en varias sesiones. El estado se recupera del disco al abrir la
+  carpeta y la lista distingue tres casos:
+
+  | Marca | Significado |
+  |---|---|
+  | `✓ nombre (n)` | revisada, con n objetos |
+  | `· nombre (0)` | revisada, sin objetos — **es un dato** |
+  | `○ nombre` | todavía sin revisar |
+
+  Un `.txt` solo se escribe al marcar la imagen como revisada o al dibujar una
+  caja: pasar de largo no crea archivo, porque registrar como «revisada con
+  cero» una imagen apenas ojeada falsearía un conteo censal.
+- `Espacio` marca revisada y avanza · `Tab` salta a la siguiente sin revisar ·
+  `F` reencuadra · `←/→` navega · `Supr` borra la caja seleccionada
+- **El zoom se conserva** entre imágenes (casilla en el panel derecho)
+- **Lado mínimo de caja: 2 px.** Al rechazar una caja se avisa en la barra de
+  estado, en vez de descartarla en silencio
+- **Pre-anotación automática** con modelo `.pt`, con `conf` e `imgsz` ajustables
+  y GPU si está disponible
+- **Auto-guardado silencioso** cada 60 segundos; miniaturas generadas en segundo
+  plano para que la ventana responda de inmediato
+- Guarda `.txt` YOLO junto a la imagen (o en `labels/` si está en `images/`) y
+  genera `classes.txt` en la raíz y en cada subcarpeta
 
 ### 📐 Visor
 - Abre una imagen individual o navega una carpeta con `← →`
 - **Calibración interactiva μm/píxel** en 2 modos:
   - 📏 **Línea** (2 clics): marca una referencia conocida, ingresa su tamaño real
   - ⭕ **Círculo** (3 clics): marca 3 puntos del borde, ingresa el diámetro real
+    (útil con placas Petri, cuyo diámetro es conocido)
 - Barra inferior muestra `📐 0.4880 μm/px (línea)` en tiempo real
-- Detección con modelo `.pt` cargado (Ctrl+D)
+- Detección con modelo `.pt` cargado, con **resolución de inferencia
+  configurable** (320–8192) y GPU si está disponible. Con objetos diminutos en
+  fotos de alta resolución el `imgsz` es determinante: a valores bajos las
+  partículas caen por debajo del *stride* de la red y no se detecta nada
+- **Cargar etiquetas `.txt`**: muestra anotaciones ya existentes sobre la imagen,
+  con sus tallas convertidas a μm. Sirve para revisar un conteo manual sin
+  volver al Etiquetador
 - Tabla de resultados filtrable por clase con Ø(px) y Ø(μm)
 - **Drag & Drop** de imagen o modelo `.pt` directo al canvas
-- Exporta: imagen anotada en alta resolución + `detecciones.csv` + `resumen.json`
+- Exporta: imagen anotada + `detecciones.csv` + `resumen.json`
 
 ---
 

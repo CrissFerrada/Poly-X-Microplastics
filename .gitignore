@@ -59,6 +59,9 @@ reporte_*.html
 Thumbs.db
 .DS_Store
 desktop.ini
+# Copias en conflicto que crea OneDrive al sincronizar desde dos equipos
+*-NeWsOmen.*
+*[Cc]opia en conflicto*
 
 # Logs y temporales
 *.log
@@ -77,12 +80,14 @@ _diag_train_vis/
 _tmp_*.yaml
 PolyX_dataset.zip
 
-# ── Datos de investigacion sin publicar ─────────────────────────────
-# ESTE REPOSITORIO ES PUBLICO. Las fotos de los testigos del rio Loa son
-# material inedito de un paper en preparacion: publicarlas aqui adelantaria
-# resultados propios y ajenos. No agregar sin decision explicita del autor.
+# ── Material de investigacion sin publicar ──────────────────────────
+# ESTE REPOSITORIO ES PUBLICO y documenta SOLO el programa. Todo lo que forme
+# parte de un paper en preparacion se queda fuera: publicarlo aqui adelantaria
+# resultados propios y ajenos.
 fotos sed testigos/
 PolyX_recortes/
+# paper/ = pipeline de analisis, borrador de Metodos y hallazgos del estudio
+paper/
 
 # Pesos entrenados (500 MB) y carpetas de trabajo pesadas
 Wheigts/
