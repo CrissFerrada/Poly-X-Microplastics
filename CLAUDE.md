@@ -130,15 +130,35 @@ WARN = "#9a6700"         # Naranjo (warning)
 ERR = "#cf222e"          # Rojo (error)
 VIO = "#6639ba"          # Púrpura
 
-# Colores polímero (Nile Red bajo UV 254 nm)
+# Colores con que se dibujan las cajas de cada clase en pantalla.
+# OJO: son colores de interfaz, NO describen la emisión real del Nile Red.
 CLASS_COLOR_HEX = {
-    "PET": "#e3342f",    # Rojo
-    "PP": "#ff8c00",     # Naranjo
-    "LDPE": "#ffd700",   # Amarillo
+    "PET": "#e3342f",    # se dibuja rojo
+    "PP": "#ff8c00",     # se dibuja naranjo
+    "LDPE": "#ffd700",   # se dibuja amarillo
 }
 ```
 
 **Fuente:** Segoe UI (Windows-native)
+
+### Fluorescencia real de cada polímero
+
+No confundir con los colores de interfaz de arriba. Medido sobre el interior de
+las cajas del dataset de entrenamiento (media RGB, n=30 por clase):
+
+| Clase | R | G | B | Aspecto |
+|---|---|---|---|---|
+| PET | 116 | 58 | 65 | rojo–salmón |
+| PP | 122 | **125** | 32 | **amarillo verdoso, apagado** |
+| LDPE | 181 | 162 | 57 | amarillo franco, brillante |
+
+**PP y LDPE comparten tono y se separan por brillo** (R 122 frente a 181), más el
+matiz verdoso del PP. Es la confusión dominante al anotar y explica que el recall
+por clase se hunda ahí: PET 0.98 · PP 0.70 · LDPE 0.54.
+
+La documentación decía que PP era «naranjo», lo que no corresponde a la emisión
+observada. Corregido en agosto de 2026 a partir de la medición y de la
+observación del autor.
 
 ---
 

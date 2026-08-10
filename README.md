@@ -98,11 +98,26 @@
 
 ## Polímeros detectados
 
-| Clase | Color (Nile Red, UV 254 nm) | ID |
-|---|---|---|
-| **PET** | 🔴 Rojo | 0 |
-| **PP** | 🟠 Naranja | 1 |
-| **LDPE** | 🟡 Amarillo | 2 |
+| ID | Clase | Fluorescencia observada (Nile Red, UV) | Color en la interfaz |
+|---|---|---|---|
+| 0 | **PET** | Rojo–salmón | 🔴 `#e3342f` |
+| 1 | **PP** | **Amarillo verdoso, apagado** | 🟠 `#ff8c00` |
+| 2 | **LDPE** | Amarillo franco y **más brillante** | 🟡 `#ffd700` |
+
+Los colores de la derecha son solo los de las cajas en pantalla; no describen la
+emisión real. Medido sobre el interior de las cajas del dataset de entrenamiento
+(media RGB, n=30 por clase):
+
+| Clase | R | G | B |
+|---|---|---|---|
+| PET | 116 | 58 | 65 |
+| PP | 122 | **125** | 32 |
+| LDPE | 181 | 162 | 57 |
+
+**PP y LDPE no se distinguen por tono sino por brillo**: ambos son amarillentos,
+pero en PP el verde iguala o supera al rojo y la emisión es bastante más apagada.
+Es la confusión más habitual al anotar, y la razón de que el recall por clase caiga
+en esas dos.
 
 ---
 
