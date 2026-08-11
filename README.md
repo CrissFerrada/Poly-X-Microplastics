@@ -151,6 +151,18 @@ El instalador:
 4. Instala el resto de dependencias y verifica que todo importa.
 5. Te ofrece **crear un acceso directo "Poly-X" en el Escritorio** y **te dice cómo iniciarlo**.
 
+### Abrir sin consola
+
+Doble clic en **`Poly-X.vbs`** (raíz del proyecto): abre el Launcher directamente,
+sin ventana negra. Resuelve su propia ubicación, así que funciona desde cualquier
+carpeta — basta descargar el repositorio y hacer doble clic, sin editar rutas.
+
+Para tenerlo a mano, clic derecho sobre `Poly-X.vbs` → *Enviar a* → *Escritorio
+(crear acceso directo)*, y asígnale el icono `assets\polyx.ico`.
+
+`iniciar_polyx.bat` hace lo mismo pero mostrando la consola, útil para ver
+mensajes de error si algo falla al arrancar.
+
 > **Importante:** los modelos entrenados (`*.pt`) **no** se incluyen en la descarga de GitHub
 > por su tamaño. Copia tu archivo `.pt` dentro de la carpeta `models\` para usar el Detector y el Visor.
 
