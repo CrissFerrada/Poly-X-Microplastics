@@ -1,5 +1,7 @@
 # Poly-X — Suite de detección de microplásticos
 
+***Español** · [English](README.en.md)*
+
 > **Detección automatizada y clasificación de microplásticos (PET, PP, LDPE)  
 > por fluorescencia Nile Red bajo luz UV (254 nm) con modelos YOLO v8/v11.**
 

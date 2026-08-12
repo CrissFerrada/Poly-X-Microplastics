@@ -12,10 +12,12 @@ from PySide6.QtCore import Qt, QSize, QTimer, QRectF, QPointF, QRect
 from PySide6.QtGui import QPainter, QColor, QBrush, QPen, QLinearGradient, QFont, QIcon
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QPushButton, QFrame, QScrollArea, QSpacerItem, QSizePolicy
+    QGridLayout, QPushButton, QFrame, QScrollArea, QSpacerItem, QSizePolicy,
+    QComboBox, QMessageBox
 )
 
 from .core import theme as T
+from .core.i18n import tr, idioma, set_idioma, IDIOMAS
 from .core.widgets import LogoBadge, HLine
 from . import __version__
 
@@ -171,7 +173,7 @@ class ModuleCard(QFrame):
         lay.setSpacing(8)
 
         top = QHBoxLayout()
-        tag = QLabel(f"MÓDULO 0{number}")
+        tag = QLabel(f'{tr("MÓDULO")} 0{number}')
         tag.setStyleSheet(
             f"color: white; background: {accent}; padding: 3px 8px; "
             f"border-radius: 4px; font-size: 8.5pt; font-weight: 700; "
@@ -181,7 +183,7 @@ class ModuleCard(QFrame):
         tag.setAlignment(Qt.AlignCenter)
         top.addWidget(tag, 0, Qt.AlignLeft | Qt.AlignVCenter)
         top.addStretch(1)
-        btn_open = QPushButton("Abrir  →")
+        btn_open = QPushButton(tr("Abrir  →"))
         btn_open.setObjectName("primary")
         btn_open.setCursor(Qt.PointingHandCursor)
         btn_open.setStyleSheet(
@@ -225,7 +227,7 @@ class ModuleCard(QFrame):
 class LauncherWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Poly-X · Suite de microplásticos")
+        self.setWindowTitle(tr("Poly-X · Suite de microplásticos"))
         self.resize(1180, 820)
         self.setStyleSheet(T.GLOBAL_QSS + f"QMainWindow {{ background: {T.BG}; }}")
 
@@ -244,6 +246,20 @@ class LauncherWindow(QMainWindow):
         tb.setSpacing(12)
         tb.addWidget(LogoBadge("POLY-X", "Microplastics analytics suite"))
         tb.addStretch(1)
+
+        # Selector de idioma. Los modulos se lanzan como procesos aparte y leen
+        # el idioma al arrancar, asi que basta con guardarlo: los que se abran
+        # despues salen ya traducidos, sin reiniciar el launcher.
+        self.combo_idioma = QComboBox()
+        for cod, nombre in IDIOMAS.items():
+            self.combo_idioma.addItem(nombre, cod)
+        self.combo_idioma.setCurrentIndex(
+            max(0, self.combo_idioma.findData(idioma())))
+        self.combo_idioma.setToolTip(tr("Idioma"))
+        self.combo_idioma.setFixedWidth(110)
+        self.combo_idioma.currentIndexChanged.connect(self._cambiar_idioma)
+        tb.addWidget(self.combo_idioma)
+
         version_lbl = QLabel(f"v{__version__}")
         version_lbl.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
         tb.addWidget(version_lbl)
@@ -267,7 +283,7 @@ class LauncherWindow(QMainWindow):
 
         left = QVBoxLayout()
         left.setSpacing(10)
-        kicker = QLabel("● PLATAFORMA DE ANÁLISIS")
+        kicker = QLabel(tr("● PLATAFORMA DE ANÁLISIS"))
         kicker.setStyleSheet(
             f"color: {T.ACCENT_D}; font-size: 9pt; font-weight: 700; "
             f"letter-spacing: 1.8px; border: none;"
@@ -287,22 +303,22 @@ class LauncherWindow(QMainWindow):
         title_row.addStretch(1)
         left.addLayout(title_row)
 
-        subtitle = QLabel("Plataforma de detección y clasificación de microplásticos")
+        subtitle = QLabel(tr("Plataforma de detección y clasificación de microplásticos"))
         subtitle.setStyleSheet(
             f"color: {T.INK2}; font-size: 13pt; font-weight: 500; border: none;"
         )
         left.addWidget(subtitle)
 
         descr = QLabel(
-            "Detección automatizada de PET, PP y LDPE por fluorescencia Nile Red (254 nm) "
-            "e inteligencia artificial. Entrenamiento, etiquetado, detección y reporte en un mismo flujo."
+            tr("Detección automatizada de PET, PP y LDPE por fluorescencia Nile Red (254 nm) "
+               "e inteligencia artificial. Entrenamiento, etiquetado, detección y reporte en un mismo flujo.")
         )
         descr.setWordWrap(True)
         descr.setStyleSheet(f"color: {T.INK3}; font-size: 10.5pt; border: none;")
         left.addWidget(descr)
 
         # Crédito de autoría (justo bajo el descriptor)
-        author = QLabel("✍  Diseñado y desarrollado por <b>Cristofher Ferrada</b> · Doctorado en Química, 2026")
+        author = QLabel(tr("✍  Diseñado y desarrollado por <b>Cristofher Ferrada</b> · Doctorado en Química, 2026"))
         author.setTextFormat(Qt.RichText)
         author.setStyleSheet(
             f"color: {T.ACCENT_D}; font-size: 9.5pt; border: none; "
@@ -314,10 +330,10 @@ class LauncherWindow(QMainWindow):
         # 4 chips
         chips = QHBoxLayout()
         chips.setSpacing(12)
-        chips.addWidget(StatChip("3", "Polímeros", "PET · PP · LDPE", T.ACCENT))
-        chips.addWidget(StatChip("254", "nm", "fluorescencia Nile Red", T.OK))
+        chips.addWidget(StatChip("3", tr("Polímeros"), "PET · PP · LDPE", T.ACCENT))
+        chips.addWidget(StatChip("254", "nm", tr("fluorescencia Nile Red"), T.OK))
         chips.addWidget(StatChip("YOLO", "v8 / v11", "deep learning", T.VIO))
-        chips.addWidget(StatChip("μm", "medición", "calibración por píxel", T.WARN))
+        chips.addWidget(StatChip("μm", tr("medición"), tr("calibración por píxel"), T.WARN))
         left.addLayout(chips)
 
         hero.addLayout(left, 3)
@@ -325,7 +341,7 @@ class LauncherWindow(QMainWindow):
         body.addLayout(hero)
 
         # ── Sección 'MÓDULOS' ──
-        mod_kicker = QLabel("MÓDULOS")
+        mod_kicker = QLabel(tr("MÓDULOS"))
         mod_kicker.setStyleSheet(
             f"color: {T.INK2}; font-size: 9pt; font-weight: 700; "
             f"letter-spacing: 1.8px; border: none;"
@@ -335,24 +351,24 @@ class LauncherWindow(QMainWindow):
         grid = QGridLayout()
         grid.setSpacing(16)
         grid.addWidget(ModuleCard(
-            1, "🔬", "Detector",
-            "Analiza imágenes con un modelo .pt entrenado. Genera salidas anotadas, "
-            "CSV con centroides y diámetros, métricas globales y reporte HTML paper-quality.",
+            1, "🔬", tr("Detector"),
+            tr("Analiza imágenes con un modelo .pt entrenado. Genera salidas anotadas, "
+               "CSV con centroides y diámetros, métricas globales y reporte HTML paper-quality."),
             T.ACCENT, self.open_detector), 0, 0)
         grid.addWidget(ModuleCard(
-            2, "🎯", "Entrenador",
-            "Entrena modelos YOLO v8 / v11. Curvas en vivo, recomendaciones automáticas "
-            "de calidad y comparación con runs anteriores.",
+            2, "🎯", tr("Entrenador"),
+            tr("Entrena modelos YOLO v8 / v11. Curvas en vivo, recomendaciones automáticas "
+               "de calidad y comparación con runs anteriores."),
             T.OK, self.open_trainer), 0, 1)
         grid.addWidget(ModuleCard(
-            3, "🏷", "Etiquetador",
-            "Anota imágenes en formato YOLO. Soporta pre-anotación con un modelo "
-            "existente y atajos de teclado, ahorra ~80 % del tiempo manual.",
+            3, "🏷", tr("Etiquetador"),
+            tr("Anota imágenes en formato YOLO. Soporta pre-anotación con un modelo "
+               "existente y atajos de teclado, ahorra ~80 % del tiempo manual."),
             T.WARN, self.open_labeler), 1, 0)
         grid.addWidget(ModuleCard(
-            4, "📐", "Visor",
-            "Inspección de una imagen a la vez con calibración interactiva μm/píxel "
-            "(línea o círculo) y medición precisa por partícula.",
+            4, "📐", tr("Visor"),
+            tr("Inspección de una imagen a la vez con calibración interactiva μm/píxel "
+               "(línea o círculo) y medición precisa por partícula."),
             T.VIO, self.open_viewer), 1, 1)
         body.addLayout(grid)
 
@@ -360,7 +376,7 @@ class LauncherWindow(QMainWindow):
         body.addStretch(1)
         body.addWidget(HLine())
         foot = QHBoxLayout()
-        st = QLabel("● Listo")
+        st = QLabel(tr("● Listo"))
         st.setStyleSheet(f"color: {T.OK}; font-size: 9.5pt; font-weight: 600;")
         foot.addWidget(st)
         foot.addSpacing(20)
@@ -368,13 +384,28 @@ class LauncherWindow(QMainWindow):
         copyr.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
         foot.addWidget(copyr)
         foot.addStretch(1)
-        leeme_btn = QPushButton("📄 LÉAME")
+        leeme_btn = QPushButton(tr("📄 LÉAME"))
         leeme_btn.clicked.connect(self.open_leeme)
         foot.addWidget(leeme_btn)
-        manual_btn = QPushButton("📖 Manual de usuario")
+        manual_btn = QPushButton(tr("📖 Manual de usuario"))
         manual_btn.clicked.connect(self.open_manual)
         foot.addWidget(manual_btn)
         body.addLayout(foot)
+
+    def _cambiar_idioma(self, _idx: int):
+        codigo = self.combo_idioma.currentData()
+        if not codigo or codigo == idioma():
+            return
+        set_idioma(codigo)
+        # Los widgets ya construidos no se rehacen: reconstruir cada ventana
+        # viva seria mas fragil que reabrir el launcher, que tarda 2 s.
+        QMessageBox.information(
+            self, tr("Idioma"),
+            "El idioma se aplicará al reabrir Poly-X. Los módulos que abras "
+            "desde ahora ya salen en el idioma nuevo."
+            if codigo == "es" else
+            "The language will be applied when you reopen Poly-X. Modules you "
+            "open from now on already use the new language.")
 
     # ── Lanzadores ──────────────────────────────────────────────
     def open_detector(self): self._launch_module("polyx.detector")
