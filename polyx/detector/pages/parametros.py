@@ -135,6 +135,69 @@ class ParametrosPage(DetectorPage):
         l1.addLayout(g)
         self.body.addWidget(c1)
 
+        # ── Troceado automático ──
+        c5, l5 = self.card("Troceado automático (fotos grandes)", "🧩")
+        l5.addWidget(_hint(
+            "Una foto de placa completa entra a la red reescalada a imgsz: a 4096 px "
+            "reducidos a 2080, cada partícula encoge a la mitad y desaparece bajo el "
+            "stride de la red. Troceando, cada tile entra a resolución nativa y las "
+            "cajas vuelven a coordenadas de la foto completa, fusionadas con NMS "
+            "global — no hay que cortar nada a mano ni sumar los conteos después."
+        ))
+        g5 = QGridLayout()
+        g5.setHorizontalSpacing(24); g5.setVerticalSpacing(10)
+
+        g5.addWidget(QLabel("Cuándo trocear:"), 0, 0)
+        self.combo_troceo = QComboBox()
+        self.combo_troceo.addItems(["auto", "siempre", "nunca"])
+        self.combo_troceo.setCurrentText(state.params.troceo)
+        self.combo_troceo.currentTextChanged.connect(self._on_change)
+        g5.addWidget(self.combo_troceo, 0, 1)
+        g5.addWidget(_hint("«auto» decide sola mirando el lado mayor de cada foto."), 0, 2)
+
+        g5.addWidget(QLabel("Umbral (lado mayor, px):"), 1, 0)
+        self.sb_umbral = QSpinBox()
+        self.sb_umbral.setRange(512, 20000); self.sb_umbral.setSingleStep(128)
+        self.sb_umbral.setValue(state.params.troceo_umbral_px)
+        self.sb_umbral.valueChanged.connect(self._on_change)
+        g5.addWidget(self.sb_umbral, 1, 1)
+        g5.addWidget(_hint(
+            "Por encima de esto se trocea. 2000 deja pasar enteros los recortes del "
+            "estudio (1630 px) y trocea las placas completas (~4096 px)."
+        ), 1, 2)
+
+        g5.addWidget(QLabel("Lado del tile (px):"), 2, 0)
+        self.sb_tile = QSpinBox()
+        self.sb_tile.setRange(0, 8192); self.sb_tile.setSingleStep(64)
+        self.sb_tile.setValue(state.params.troceo_tile)
+        self.sb_tile.valueChanged.connect(self._on_change)
+        g5.addWidget(self.sb_tile, 2, 1)
+        g5.addWidget(_hint(
+            "0 = automático, min(umbral, imgsz). Conviene que coincida con el tamaño "
+            "de los recortes con que se entrenó el modelo: si el modelo vio "
+            "partículas a una escala y el tile las presenta a otra, el recall cae."
+        ), 2, 2)
+
+        g5.addWidget(QLabel("Solape entre tiles:"), 3, 0)
+        self.sb_overlap = QDoubleSpinBox()
+        self.sb_overlap.setRange(0.0, 0.9); self.sb_overlap.setSingleStep(0.05)
+        self.sb_overlap.setDecimals(2)
+        self.sb_overlap.setValue(state.params.troceo_overlap)
+        self.sb_overlap.valueChanged.connect(self._on_change)
+        g5.addWidget(self.sb_overlap, 3, 1)
+        g5.addWidget(_hint(
+            "0.25 = cada tile pisa un cuarto del vecino. El solape es lo que evita "
+            "perder o duplicar la partícula que cae justo en la costura."
+        ), 3, 2)
+
+        l5.addLayout(g5)
+        self.lbl_plan = QLabel("")
+        self.lbl_plan.setWordWrap(True)
+        self.lbl_plan.setStyleSheet(f"color: {T.INK2}; font-size: 9.5pt; border: none;")
+        l5.addWidget(self.lbl_plan)
+        self.body.addWidget(c5)
+        self._refrescar_plan()
+
         # ── Análisis de errores ──
         c2, l2 = self.card("Análisis de errores (si hay GT)", "🎯")
         g2 = QGridLayout()
@@ -266,4 +329,48 @@ class ParametrosPage(DetectorPage):
         p.um_per_px = float(self.sb_umpx.value())
         p.size_min_um = float(self.sb_min.value())
         p.size_max_um = float(self.sb_max.value())
+        p.troceo = self.combo_troceo.currentText()
+        p.troceo_umbral_px = int(self.sb_umbral.value())
+        p.troceo_tile = int(self.sb_tile.value())
+        p.troceo_overlap = float(self.sb_overlap.value())
+        self._refrescar_plan()
         self.state.params_changed.emit()
+
+    def _refrescar_plan(self):
+        """Muestra qué hará el troceado con las imágenes ya seleccionadas.
+
+        Ver la decisión antes de lanzar el lote evita la sorpresa de descubrir a
+        las dos horas que se infirió todo de una pieza.
+        """
+        from ...core.yolo_wrap import tamano_imagen, politica_troceado
+        p = self.state.params
+        if not self.state.images:
+            self.lbl_plan.setText("Selecciona imágenes para ver qué se trocearía.")
+            return
+        wh = tamano_imagen(self.state.images[0])
+        if wh is None:
+            self.lbl_plan.setText("No se pudo leer el tamaño de la primera imagen.")
+            return
+        if p.troceo == "nunca":
+            self.lbl_plan.setText(
+                f"Primera imagen {wh[0]}×{wh[1]} px → un solo pase a imgsz {p.imgsz} "
+                f"(troceado desactivado)."
+            )
+            return
+        plan = politica_troceado(
+            wh[0], wh[1], p.imgsz,
+            umbral_px=0 if p.troceo == "siempre" else p.troceo_umbral_px,
+            tile=p.troceo_tile, overlap=p.troceo_overlap)
+        if plan is None:
+            self.lbl_plan.setText(
+                f"Primera imagen {wh[0]}×{wh[1]} px → un solo pase: no llega al "
+                f"umbral de {p.troceo_umbral_px} px."
+            )
+        else:
+            escala = p.imgsz / plan["tile"]
+            self.lbl_plan.setText(
+                f"Primera imagen {wh[0]}×{wh[1]} px → {plan['n_tiles']} tiles de "
+                f"{plan['tile']} px con {int(plan['overlap'] * 100)}% de solape, cada "
+                f"uno a imgsz {p.imgsz} ({escala:.2f}× la resolución nativa del tile). "
+                f"Tarda ~{plan['n_tiles']}× más que un pase único."
+            )

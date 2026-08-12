@@ -348,12 +348,22 @@ class VisorWindow(QMainWindow):
             self._set_status(f"● Detectando (imgsz {imgsz}, {device})…", T.ACCENT)
             QApplication.setOverrideCursor(Qt.WaitCursor)
             QApplication.processEvents()
-            dets = self.state.model.predict(
-                str(img), conf=self.spin_conf.value(), imgsz=imgsz, device=device
+            # Troceado automático: el Visor se usa sobre la placa completa, que es
+            # justo el caso donde un pase único hace desaparecer las partículas.
+            plan: dict = {}
+            dets = self.state.model.predict_auto(
+                str(img), conf=self.spin_conf.value(), imgsz=imgsz, device=device,
+                troceo="auto", umbral_px=2000, registro=plan,
             )
             self.state.detections = dets
             self.state.detections_changed.emit(dets)
-            self._set_status(f"● {len(dets)} detecciones (imgsz {imgsz})", T.OK)
+            if plan.get("troceado"):
+                p = plan["plan"]
+                self._set_status(
+                    f"● {len(dets)} detecciones (troceada en {p['n_tiles']} tiles "
+                    f"de {p['tile']} px, imgsz {imgsz})", T.OK)
+            else:
+                self._set_status(f"● {len(dets)} detecciones (imgsz {imgsz})", T.OK)
         except Exception as e:
             # Sin VRAM suficiente el fallo es habitual al subir imgsz: se dice
             # qué hacer en vez de mostrar la excepción cruda.

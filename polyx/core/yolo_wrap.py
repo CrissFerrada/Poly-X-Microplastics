@@ -224,6 +224,94 @@ class YoloModel:
                     ))
         return _nms(dets, iou_thr=iou, agnostic=agnostic_nms)
 
+    def predict_auto(self, image_path: str | Path, conf: float = 0.25,
+                     iou: float = 0.45, imgsz: int = 1280, device: str = "0",
+                     troceo: str = "auto", umbral_px: int = 2000, tile: int = 0,
+                     overlap: float = 0.25, batch: int = 8,
+                     agnostic_nms: bool = True,
+                     registro: Optional[Dict] = None) -> List[Detection]:
+        """Infiere troceando o no segun el tamano de la foto, sin intervencion.
+
+        ``troceo``: ``"auto"`` decide por el lado mayor contra ``umbral_px``;
+        ``"siempre"`` fuerza el troceado; ``"nunca"`` fuerza el pase unico.
+
+        Si se pasa ``registro``, se rellena con la decision tomada para poder
+        declararla en el informe: contar 500 particulas con troceado o sin el no
+        es el mismo metodo, y el numero no significa lo mismo.
+        """
+        wh = tamano_imagen(image_path)
+        plan = None
+        if troceo == "nunca" or wh is None:
+            plan = None
+        elif troceo == "siempre":
+            plan = politica_troceado(wh[0], wh[1], imgsz,
+                                     umbral_px=0, tile=tile, overlap=overlap)
+        else:
+            plan = politica_troceado(wh[0], wh[1], imgsz,
+                                     umbral_px=umbral_px, tile=tile, overlap=overlap)
+
+        if registro is not None:
+            registro.clear()
+            registro.update({"ancho": wh[0] if wh else 0, "alto": wh[1] if wh else 0,
+                             "troceado": plan is not None, "plan": plan})
+
+        if plan is None:
+            return self.predict(image_path, conf=conf, iou=iou, imgsz=imgsz,
+                                device=device)
+        return self.predict_sliced(image_path, conf=conf, iou=iou,
+                                   tile=plan["tile"], overlap=plan["overlap"],
+                                   device=device, agnostic_nms=agnostic_nms,
+                                   imgsz=imgsz, batch=batch)
+
+
+def tamano_imagen(image_path: str | Path) -> Optional[Tuple[int, int]]:
+    """(ancho, alto) leyendo solo la cabecera, sin decodificar la imagen entera.
+
+    Se consulta antes de cada inferencia, asi que decodificar una foto de 3260 px
+    solo para medirla costaria mas que la propia decision.
+    """
+    try:
+        from PIL import Image
+        with Image.open(str(image_path)) as im:
+            return int(im.size[0]), int(im.size[1])
+    except Exception:
+        # Rutas con acentos o formatos que Pillow no abre: cae al camino de cv2,
+        # que ya se usa en todo el resto del proyecto por esa misma razon.
+        try:
+            img = cv2.imdecode(np.fromfile(str(image_path), dtype=np.uint8),
+                               cv2.IMREAD_COLOR)
+            if img is None:
+                return None
+            return int(img.shape[1]), int(img.shape[0])
+        except Exception:
+            return None
+
+
+def politica_troceado(ancho: int, alto: int, imgsz: int, umbral_px: int = 2000,
+                      tile: int = 0, overlap: float = 0.25) -> Optional[Dict]:
+    """Decide si la foto se trocea y con que geometria, mirando solo su tamano.
+
+    ``None`` significa un unico pase sobre la imagen completa.
+
+    El umbral no se compara contra el area sino contra el **lado mayor**, porque
+    lo que hace desaparecer una particula es el reescalado a ``imgsz``: una foto
+    de 3260 px entrando a 2080 encoge cada particula a 0.64x, y por debajo del
+    stride de la red deja de existir. Trocear evita ese reescalado.
+
+    Con ``tile=0`` el lado del tile sale de ``min(umbral_px, imgsz)``: asi el
+    recorte entra a la red sin reducirse, que es justamente el objetivo.
+    """
+    lado = max(int(ancho), int(alto))
+    if lado <= int(umbral_px):
+        return None
+    t = int(tile) if int(tile) > 0 else min(int(umbral_px), int(imgsz) or int(umbral_px))
+    t = max(256, min(t, lado))
+    overlap = min(max(float(overlap), 0.0), 0.9)
+    step = max(1, int(round(t * (1.0 - overlap))))
+    n = len(_tile_starts(int(ancho), t, step)) * len(_tile_starts(int(alto), t, step))
+    return {"tile": t, "overlap": overlap, "n_tiles": n,
+            "lado": lado, "umbral_px": int(umbral_px)}
+
 
 def _tile_starts(total: int, tile: int, step: int) -> List[int]:
     """Posiciones de inicio de los tiles a lo largo de un eje (último pegado al borde)."""

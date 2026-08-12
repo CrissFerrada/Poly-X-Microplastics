@@ -105,13 +105,30 @@ class DetectorRunner(QThread):
                     # mi_idx es el orden dentro de active_models()
                     # necesitamos el índice real del slot dentro de model_slots
                     real_idx = state.model_slots.index(slot)
-                    preds = slot.loaded.predict(
+                    plan_troceo: dict = {}
+                    preds = slot.loaded.predict_auto(
                         str(img_path),
                         conf=params.conf,
                         iou=params.iou_nms,
                         imgsz=params.imgsz,
                         device=params.device,
+                        troceo=params.troceo,
+                        umbral_px=params.troceo_umbral_px,
+                        tile=params.troceo_tile,
+                        overlap=params.troceo_overlap,
+                        registro=plan_troceo,
                     )
+                    # Se guarda la decision, no se registra de paso: el informe
+                    # tiene que poder declarar si esa foto se conto troceada.
+                    if plan_troceo.get("troceado"):
+                        p = plan_troceo["plan"]
+                        troceo_desc = (
+                            f"{plan_troceo['ancho']}×{plan_troceo['alto']} px → "
+                            f"{p['n_tiles']} tiles de {p['tile']} px, "
+                            f"{int(p['overlap'] * 100)}% solape"
+                        )
+                    else:
+                        troceo_desc = ""
 
                     # Calcular tamaño de las predicciones (el GT ya se calculó arriba)
                     for d in preds:
@@ -187,6 +204,7 @@ class DetectorRunner(QThread):
                         annotated_png=annotated_bytes,
                         pred_png=pred_bytes,
                         gt_png=gt_bytes,
+                        troceo=troceo_desc,
                     )
                     state.results.setdefault(real_idx, []).append(res)
                     self.image_done.emit(real_idx, res)

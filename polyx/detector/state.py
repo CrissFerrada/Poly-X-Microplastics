@@ -34,6 +34,15 @@ class InferenceParams:
     um_per_px: float = 0.0          # 0 = no hay calibración
     size_min_um: float = 0.0        # 0 = sin filtro inferior
     size_max_um: float = 0.0        # 0 = sin filtro superior
+    # ── Troceado automático ──
+    # "auto" trocea sola la foto cuyo lado mayor pase de troceo_umbral_px, infiere
+    # cada tile a resolución nativa y fusiona con NMS global. El umbral va a 2000
+    # para que los recortes del estudio (1630 px de lado) entren de una pieza y
+    # las placas completas (~3260) se troceen.
+    troceo: str = "auto"            # "auto" | "siempre" | "nunca"
+    troceo_umbral_px: int = 2000
+    troceo_tile: int = 0            # 0 = derivar de min(umbral, imgsz)
+    troceo_overlap: float = 0.25    # solape entre tiles; el NMS quita el duplicado
 
 
 @dataclass
@@ -56,6 +65,8 @@ class ImageResult:
     gt_png: Optional[bytes] = None
     # veredicto del usuario tras revisión visual: None / "buena" / "mala"
     verdict: Optional[str] = None
+    # geometría del troceado si la foto se partió; "" = se infirió de una pieza
+    troceo: str = ""
 
 
 # ────────────────────────────────────────────────────────────────────

@@ -392,7 +392,7 @@ class LabelerWindow(QMainWindow):
             if r != QMessageBox.Yes:
                 return
         try:
-            dets = self._pre_model.predict(str(img), **self._params_preanotacion())
+            dets = self._pre_model.predict_auto(str(img), **self._params_preanotacion())
             boxes = self._dets_to_boxes(dets, img)
             self.state.set_current_boxes(boxes)
             self._set_status(f"● Pre-anotadas {len(boxes)} cajas", T.OK)
@@ -423,7 +423,7 @@ class LabelerWindow(QMainWindow):
             if existing:
                 continue
             try:
-                dets = self._pre_model.predict(str(img_path), **self._params_preanotacion())
+                dets = self._pre_model.predict_auto(str(img_path), **self._params_preanotacion())
                 boxes = self._dets_to_boxes(dets, img_path)
                 self.state._annotations[key] = boxes
                 self.state._save_labels_for(img_path, boxes)
@@ -446,9 +446,14 @@ class LabelerWindow(QMainWindow):
             device = "0" if torch.cuda.is_available() else "cpu"
         except Exception:
             device = "cpu"
+        # Troceado automatico: una placa completa (~3260 px) se parte en tiles
+        # solapados y las cajas vuelven a coordenadas de la placa. Los recortes
+        # del estudio (1630 px de lado) quedan por debajo del umbral y se
+        # infieren de una pieza, asi que aqui no cambia nada.
         return dict(conf=float(self.sb_pre_conf.value()),
                     imgsz=int(self.sb_pre_imgsz.value()),
-                    device=device)
+                    device=device,
+                    troceo="auto", umbral_px=2000, overlap=0.25)
 
     def _dets_to_boxes(self, dets, img_path: Path):
         from .state import BBox
