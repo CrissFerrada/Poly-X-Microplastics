@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 from ._base import TrainerPage
 from ...core import theme as T
 from ...core.widgets import KPICard
+from ...core.i18n import tr
 
 
 class _EvalWorker(QThread):
@@ -44,26 +45,26 @@ class _EvalWorker(QThread):
 
 class EvaluarPage(TrainerPage):
     PAGE_ICON = "🧪"
-    PAGE_TITLE = "Evaluar"
+    PAGE_TITLE = tr("Evaluar")
     PAGE_DESCRIPTION = (
-        "Valida cualquier modelo .pt sobre un dataset YOLO (data.yaml). Útil para "
-        "comprobar la calidad de un best.pt sobre un test set distinto al de entrenamiento."
+        tr("Valida cualquier modelo .pt sobre un dataset YOLO (data.yaml). Útil para "
+        "comprobar la calidad de un best.pt sobre un test set distinto al de entrenamiento.")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
         self.worker: _EvalWorker | None = None
 
-        c1, l1 = self.card("Configuración", "🔧")
+        c1, l1 = self.card(tr("Configuración"), "🔧")
         row1 = QHBoxLayout(); row1.setSpacing(8)
-        row1.addWidget(QLabel("Modelo .pt:"))
+        row1.addWidget(QLabel(tr("Modelo .pt:")))
         self.ed_w = QLineEdit(); row1.addWidget(self.ed_w, 1)
         b1 = QPushButton("…"); b1.setFixedWidth(36); b1.clicked.connect(self._browse_w)
         row1.addWidget(b1)
         l1.addLayout(row1)
 
         row2 = QHBoxLayout(); row2.setSpacing(8)
-        row2.addWidget(QLabel("data.yaml:"))
+        row2.addWidget(QLabel(tr("data.yaml:")))
         self.ed_y = QLineEdit()
         if state.dataset.yaml_path:
             self.ed_y.setText(str(state.dataset.yaml_path))
@@ -73,16 +74,16 @@ class EvaluarPage(TrainerPage):
         l1.addLayout(row2)
 
         row3 = QHBoxLayout(); row3.setSpacing(20)
-        row3.addWidget(QLabel("imgsz:"))
+        row3.addWidget(QLabel(tr("imgsz:")))
         self.ed_imgsz = QLineEdit(str(state.params.imgsz)); self.ed_imgsz.setMaximumWidth(80)
         row3.addWidget(self.ed_imgsz)
-        row3.addWidget(QLabel("device:"))
+        row3.addWidget(QLabel(tr("device:")))
         self.ed_dev = QLineEdit(state.params.device); self.ed_dev.setMaximumWidth(80)
         row3.addWidget(self.ed_dev)
         row3.addStretch(1)
         l1.addLayout(row3)
 
-        btn = QPushButton("▶  Iniciar validación")
+        btn = QPushButton(tr("▶  Iniciar validación"))
         btn.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -93,7 +94,7 @@ class EvaluarPage(TrainerPage):
         self.body.addWidget(c1)
 
         # Resultados
-        c2, l2 = self.card("Resultados", "📊")
+        c2, l2 = self.card(tr("Resultados"), "📊")
         g = QGridLayout(); g.setSpacing(12)
         self.kpi_map50 = KPICard("mAP@50", T.ACCENT)
         self.kpi_map95 = KPICard("mAP@50-95", T.VIO)
@@ -125,16 +126,16 @@ class EvaluarPage(TrainerPage):
     def _run(self):
         w = self.ed_w.text().strip(); y = self.ed_y.text().strip()
         if not w or not Path(w).exists():
-            QMessageBox.warning(self, "Falta modelo", "Selecciona un .pt válido."); return
+            QMessageBox.warning(self, tr("Falta modelo"), tr("Selecciona un .pt válido.")); return
         if not y or not Path(y).exists():
-            QMessageBox.warning(self, "Falta dataset", "Selecciona un data.yaml válido."); return
+            QMessageBox.warning(self, tr("Falta dataset"), tr("Selecciona un data.yaml válido.")); return
         try: imgsz = int(self.ed_imgsz.text())
         except ValueError: imgsz = 640
         self.log.clear()
         self.worker = _EvalWorker(w, y, imgsz, self.ed_dev.text().strip() or "0")
         self.worker.log_line.connect(self.log.appendPlainText)
         self.worker.metrics_ready.connect(self._on_metrics)
-        self.worker.failed.connect(lambda m: QMessageBox.critical(self, "Falló", m))
+        self.worker.failed.connect(lambda m: QMessageBox.critical(self, tr("Falló"), m))
         self.worker.start()
 
     def _on_metrics(self, d: dict):

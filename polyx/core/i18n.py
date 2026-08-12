@@ -27,6 +27,8 @@ import os
 from pathlib import Path
 from typing import Callable
 
+from .traducciones_en import EN as _EN, NO_TRADUCIR
+
 IDIOMAS = {"es": "Espanol", "en": "English"}
 _ARCHIVO = Path.home() / ".polyx_idioma.json"
 
@@ -144,7 +146,15 @@ TRADUCCIONES: dict[str, str] = {
         "Sets imgsz to the highest the card can take (without exceeding the "
         "dataset's native resolution), then raises batch with what is left, and "
         "finally tunes AMP, workers and cache. In that order.",
+    "automático": "automatic",
 }
+
+# El grueso del diccionario vive en traducciones_en.py: aqui quedan las entradas
+# que acompanan al codigo escrito en este modulo y las de uso transversal.
+TRADUCCIONES.update(_EN)
+# Lo que se deja igual a proposito se registra como identidad, no como ausencia:
+# asi el auditor distingue "no hace falta traducir" de "falta traducir".
+TRADUCCIONES.update({s: s for s in NO_TRADUCIR})
 
 
 def _detectar_idioma_sistema() -> str:

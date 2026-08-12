@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from ._base import DetectorPage
 from ...core import theme as T
 from ..runner import DetectorRunner
+from ...core.i18n import tr
 
 
 class _PreviewSlot(QFrame):
@@ -29,7 +30,7 @@ class _PreviewSlot(QFrame):
         self.lbl_title.setStyleSheet(
             f"color: {T.INK2}; font-weight: 600; font-size: 10pt; border: none;"
         )
-        self.preview = QLabel("(esperando imagen)")
+        self.preview = QLabel(tr("(esperando imagen)"))
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setStyleSheet(
             f"background: {T.BG_SOFT}; color: {T.MUTED}; border-radius: 6px; "
@@ -56,10 +57,10 @@ class _PreviewSlot(QFrame):
 
 class EjecutarPage(DetectorPage):
     STEP_N = 5
-    STEP_TITLE = "Ejecutar"
+    STEP_TITLE = tr("Ejecutar")
     STEP_DESCRIPTION = (
-        "Inicia la inferencia. Verás progreso en vivo, previews de imágenes anotadas "
-        "y podrás cancelar en cualquier momento."
+        tr("Inicia la inferencia. Verás progreso en vivo, previews de imágenes anotadas "
+        "y podrás cancelar en cualquier momento.")
     )
 
     def __init__(self, state, parent=None):
@@ -67,10 +68,10 @@ class EjecutarPage(DetectorPage):
         self.runner: DetectorRunner | None = None
 
         # ── Control ──
-        c1, l1 = self.card("Control", "▶")
+        c1, l1 = self.card(tr("Control"), "▶")
         row = QHBoxLayout()
         row.setSpacing(8)
-        self.btn_start = QPushButton("▶  Iniciar detección")
+        self.btn_start = QPushButton(tr("▶  Iniciar detección"))
         self.btn_start.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -79,7 +80,7 @@ class EjecutarPage(DetectorPage):
         self.btn_start.clicked.connect(self._start)
         row.addWidget(self.btn_start)
 
-        self.btn_stop = QPushButton("■  Detener")
+        self.btn_stop = QPushButton(tr("■  Detener"))
         self.btn_stop.setStyleSheet(
             f"background: {T.ERR}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -88,7 +89,7 @@ class EjecutarPage(DetectorPage):
         self.btn_stop.clicked.connect(self._stop)
         row.addWidget(self.btn_stop)
 
-        self.btn_review = QPushButton("👁  Revisar en pantalla grande")
+        self.btn_review = QPushButton(tr("👁  Revisar en pantalla grande"))
         self.btn_review.setStyleSheet(
             f"background: {T.OK}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -98,7 +99,7 @@ class EjecutarPage(DetectorPage):
         self.btn_review.clicked.connect(self._open_review)
         row.addWidget(self.btn_review)
 
-        self.btn_open = QPushButton("📂  Abrir carpeta de resultados")
+        self.btn_open = QPushButton(tr("📂  Abrir carpeta de resultados"))
         self.btn_open.clicked.connect(self._open_results)
         row.addWidget(self.btn_open)
         row.addStretch(1)
@@ -106,20 +107,20 @@ class EjecutarPage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Progreso ──
-        c2, l2 = self.card("Progreso", "⏳")
+        c2, l2 = self.card(tr("Progreso"), "⏳")
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.progress.setFormat("%p%  —  %v / %m")
         l2.addWidget(self.progress)
-        self.lbl_progress_info = QLabel("Sin ejecución todavía.")
+        self.lbl_progress_info = QLabel(tr("Sin ejecución todavía."))
         self.lbl_progress_info.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
         l2.addWidget(self.lbl_progress_info)
         self.body.addWidget(c2)
 
         # ── Preview ──
-        c3, l3 = self.card("Preview en vivo", "👁")
-        sub = QLabel("Última imagen procesada por cada modelo:")
+        c3, l3 = self.card(tr("Preview en vivo"), "👁")
+        sub = QLabel(tr("Última imagen procesada por cada modelo:"))
         sub.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
         l3.addWidget(sub)
 
@@ -141,10 +142,10 @@ class EjecutarPage(DetectorPage):
             return
         active = self.state.active_models()
         if not active:
-            QMessageBox.warning(self, "Faltan modelos", "Carga al menos un modelo .pt en la pestaña Modelos.")
+            QMessageBox.warning(self, tr("Faltan modelos"), tr("Carga al menos un modelo .pt en la pestaña Modelos."))
             return
         if not self.state.images:
-            QMessageBox.warning(self, "Sin imágenes", "Selecciona imágenes en la pestaña Imágenes.")
+            QMessageBox.warning(self, tr("Sin imágenes"), tr("Selecciona imágenes en la pestaña Imágenes."))
             return
         # Actualizar título de cada preview con alias del modelo
         for i, slot in enumerate(active):
@@ -168,19 +169,19 @@ class EjecutarPage(DetectorPage):
     def _stop(self):
         if not self.state.is_running(): return
         self.state.request_abort()
-        self.lbl_progress_info.setText("Deteniendo…")
+        self.lbl_progress_info.setText(tr("Deteniendo…"))
 
     def _open_results(self):
         d = self.state.run_dir
         if d and d.exists():
             os.startfile(str(d))
         else:
-            QMessageBox.information(self, "Sin resultados", "Aún no se ha ejecutado ninguna corrida.")
+            QMessageBox.information(self, tr("Sin resultados"), tr("Aún no se ha ejecutado ninguna corrida."))
 
     def _open_review(self):
         if not any(self.state.results.values()):
-            QMessageBox.information(self, "Sin resultados",
-                                    "Ejecuta una detección primero.")
+            QMessageBox.information(self, tr("Sin resultados"),
+                                    tr("Ejecuta una detección primero."))
             return
         from ..review_dialog import ReviewDialog
         dlg = ReviewDialog(self.state, self)
@@ -212,7 +213,7 @@ class EjecutarPage(DetectorPage):
         self.btn_stop.setEnabled(False)
         self.btn_review.setEnabled(True)
         self.lbl_progress_info.setText(
-            "Listo. Pulsa «Revisar en pantalla grande» para inspeccionar y corregir.")
+            tr("Listo. Pulsa «Revisar en pantalla grande» para inspeccionar y corregir."))
         self.state.run_finished.emit()
 
     def _on_aborted(self):
@@ -221,7 +222,7 @@ class EjecutarPage(DetectorPage):
         self.btn_stop.setEnabled(False)
         if any(self.state.results.values()):
             self.btn_review.setEnabled(True)
-        self.lbl_progress_info.setText("Detenido por el usuario.")
+        self.lbl_progress_info.setText(tr("Detenido por el usuario."))
         self.state.run_aborted.emit()
 
     def _on_failed(self, msg: str):
@@ -229,4 +230,4 @@ class EjecutarPage(DetectorPage):
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.lbl_progress_info.setText(f"Error: {msg}")
-        QMessageBox.critical(self, "Falló la ejecución", msg)
+        QMessageBox.critical(self, tr("Falló la ejecución"), msg)

@@ -13,6 +13,7 @@ from ._base import TrainerPage
 from ...core import theme as T
 from ...core.widgets import KPICard
 from ..runner import TrainerRunner
+from ...core.i18n import tr
 
 
 class _HwProbeWorker(QThread):
@@ -48,7 +49,7 @@ class _LiveCurves(QFrame):
         self.setStyleSheet(f"QFrame {{ background: {T.BG}; border: 1px solid {T.RULE}; border-radius: 8px; }}")
         self._lay = QVBoxLayout(self); self._lay.setContentsMargins(8, 8, 8, 8)
         self._placeholder = QLabel(
-            "Las curvas aparecerán aquí en cuanto el entrenamiento avance la primera época."
+            tr("Las curvas aparecerán aquí en cuanto el entrenamiento avance la primera época.")
         )
         self._placeholder.setAlignment(Qt.AlignCenter)
         self._placeholder.setStyleSheet(
@@ -102,10 +103,10 @@ class _LiveCurves(QFrame):
 
 class EntrenarPage(TrainerPage):
     PAGE_ICON = "▶"
-    PAGE_TITLE = "Entrenar"
+    PAGE_TITLE = tr("Entrenar")
     PAGE_DESCRIPTION = (
-        "Inicia el entrenamiento del modelo con los parámetros configurados. Verás "
-        "curvas en vivo, métricas y log. Puedes detenerlo en cualquier momento."
+        tr("Inicia el entrenamiento del modelo con los parámetros configurados. Verás "
+        "curvas en vivo, métricas y log. Puedes detenerlo en cualquier momento.")
     )
 
     def __init__(self, state, parent=None):
@@ -119,12 +120,12 @@ class EntrenarPage(TrainerPage):
             f"border-radius: 6px; }}"
         )
         hwl = QHBoxLayout(hw_frame); hwl.setContentsMargins(14, 8, 14, 8); hwl.setSpacing(12)
-        self.lbl_hw = QLabel("⌛  Detectando hardware…")
+        self.lbl_hw = QLabel(tr("⌛  Detectando hardware…"))
         self.lbl_hw.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none;")
         self.lbl_hw.setTextFormat(Qt.RichText)
         hwl.addWidget(self.lbl_hw, 1)
         btn_recheck = QPushButton("🔄")
-        btn_recheck.setFixedWidth(36); btn_recheck.setToolTip("Re-detectar")
+        btn_recheck.setFixedWidth(36); btn_recheck.setToolTip(tr("Re-detectar"))
         btn_recheck.clicked.connect(self._refresh_hw)
         hwl.addWidget(btn_recheck)
         self.body.addWidget(hw_frame)
@@ -133,9 +134,9 @@ class EntrenarPage(TrainerPage):
         QTimer.singleShot(150, self._refresh_hw)
 
         # ── Control ──
-        c1, l1 = self.card("Control", "🎮")
+        c1, l1 = self.card(tr("Control"), "🎮")
         row = QHBoxLayout(); row.setSpacing(8)
-        self.btn_start = QPushButton("▶  Iniciar entrenamiento")
+        self.btn_start = QPushButton(tr("▶  Iniciar entrenamiento"))
         self.btn_start.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 9px 18px; font-weight: 600;"
@@ -144,7 +145,7 @@ class EntrenarPage(TrainerPage):
         self.btn_start.clicked.connect(self._start)
         row.addWidget(self.btn_start)
 
-        self.btn_stop = QPushButton("■  Detener")
+        self.btn_stop = QPushButton(tr("■  Detener"))
         self.btn_stop.setStyleSheet(
             f"background: {T.ERR}; color: white; border: none; "
             f"border-radius: 6px; padding: 9px 18px; font-weight: 600;"
@@ -153,7 +154,7 @@ class EntrenarPage(TrainerPage):
         self.btn_stop.clicked.connect(self._stop)
         row.addWidget(self.btn_stop)
 
-        self.btn_open = QPushButton("📂  Abrir carpeta de resultados")
+        self.btn_open = QPushButton(tr("📂  Abrir carpeta de resultados"))
         self.btn_open.clicked.connect(self._open_results)
         row.addWidget(self.btn_open)
         row.addStretch(1)
@@ -161,7 +162,7 @@ class EntrenarPage(TrainerPage):
 
         # Progreso de épocas
         self.progress = QProgressBar(); self.progress.setRange(0, 1); self.progress.setValue(0)
-        self.progress.setFormat("%v / %m épocas")
+        self.progress.setFormat(tr("%v / %m épocas"))
         l1.addWidget(self.progress)
         self.body.addWidget(c1)
 
@@ -197,13 +198,13 @@ class EntrenarPage(TrainerPage):
         watch = QFrame()
         watch.setStyleSheet(f"QFrame {{ background: {T.BG_SOFT}; border: 1px solid {T.RULE}; border-radius: 8px; }}")
         wl = QVBoxLayout(watch); wl.setContentsMargins(16, 12, 16, 14)
-        title = QLabel("🎯  ¿Qué mirar?")
+        title = QLabel(tr("🎯  ¿Qué mirar?"))
         title.setStyleSheet(f"color: {T.INK}; font-weight: 600; font-size: 11pt; border: none;")
         wl.addWidget(title)
         tips = QLabel(
-            "• <b>mAP@50</b> debe SUBIR y estabilizarse cerca del 80–95 % para un buen modelo.<br>"
+            tr("• <b>mAP@50</b> debe SUBIR y estabilizarse cerca del 80–95 % para un buen modelo.<br>"
             "• <b>Box loss</b> debe BAJAR de forma sostenida. Si oscila o sube, baja el lr0.<br>"
-            "• Si <b>Sin mejora</b> llega a <b>Patience</b>, el entrenamiento se detendrá solo."
+            "• Si <b>Sin mejora</b> llega a <b>Patience</b>, el entrenamiento se detendrá solo.")
         )
         tips.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none; line-height: 1.6;")
         tips.setTextFormat(Qt.RichText); tips.setWordWrap(True)
@@ -239,7 +240,7 @@ class EntrenarPage(TrainerPage):
     def _refresh_hw(self):
         if self._hw_worker is not None and self._hw_worker.isRunning():
             return
-        self.lbl_hw.setText("⌛  Detectando hardware…")
+        self.lbl_hw.setText(tr("⌛  Detectando hardware…"))
         self._hw_worker = _HwProbeWorker()
         self._hw_worker.done.connect(self._on_hw_probe)
         self._hw_worker.start()
@@ -271,7 +272,7 @@ class EntrenarPage(TrainerPage):
         if self.state.is_running():
             return
         if not self.state.dataset.yaml_path:
-            QMessageBox.warning(self, "Falta dataset", "Carga data.yaml en la pestaña Dataset.")
+            QMessageBox.warning(self, tr("Falta dataset"), tr("Carga data.yaml en la pestaña Dataset."))
             return
         # Reset
         self.state.history.clear()
@@ -312,7 +313,7 @@ class EntrenarPage(TrainerPage):
             if root.exists():
                 os.startfile(str(root))
             else:
-                QMessageBox.information(self, "Sin resultados", "Aún no se han generado runs.")
+                QMessageBox.information(self, tr("Sin resultados"), tr("Aún no se han generado runs."))
 
     # ── Slots ────────────────────────────────────────────────
     def _on_epoch(self, em):
@@ -342,4 +343,4 @@ class EntrenarPage(TrainerPage):
     def _on_failed(self, msg: str):
         self.state.set_running(False)
         self.btn_start.setEnabled(True); self.btn_stop.setEnabled(False)
-        QMessageBox.critical(self, "Falló el entrenamiento", msg)
+        QMessageBox.critical(self, tr("Falló el entrenamiento"), msg)

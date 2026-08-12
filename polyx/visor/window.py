@@ -19,6 +19,7 @@ from ..core import theme as T
 from ..core.widgets import LogoBadge, HLine
 from .state import VisorState
 from .canvas import VisorCanvas
+from ..core.i18n import tr
 
 
 def _hay_gpu() -> bool:
@@ -33,7 +34,7 @@ def _hay_gpu() -> bool:
 class VisorWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Poly-X · Visor")
+        self.setWindowTitle(tr("Poly-X · Visor"))
         self.resize(1420, 900)
         self.setStyleSheet(T.GLOBAL_QSS + f"QMainWindow {{ background: {T.BG_SOFT}; }}")
 
@@ -56,7 +57,7 @@ class VisorWindow(QMainWindow):
         cw_lay.addWidget(self.canvas, 1)
 
         # Barra inferior de estado/calibración
-        self.status_bar = QLabel("  Sin imagen  —  Sin calibración")
+        self.status_bar = QLabel(tr("  Sin imagen  —  Sin calibración"))
         self.status_bar.setFixedHeight(28)
         self.status_bar.setStyleSheet(
             f"background: {T.BG}; border-top: 1px solid {T.RULE}; "
@@ -95,20 +96,20 @@ class VisorWindow(QMainWindow):
         rv.addSpacing(4)
 
         # ── Abrir imagen / carpeta ──
-        lbl_open = QLabel("Imagen")
+        lbl_open = QLabel(tr("Imagen"))
         lbl_open.setStyleSheet(f"font-weight: 600; font-size: 10pt;")
         rv.addWidget(lbl_open)
 
         row_open = QHBoxLayout()
-        btn_img = QPushButton("📷  Imagen")
-        btn_fol = QPushButton("📁  Carpeta")
+        btn_img = QPushButton(tr("📷  Imagen"))
+        btn_fol = QPushButton(tr("📁  Carpeta"))
         btn_img.clicked.connect(self._open_image)
         btn_fol.clicked.connect(self._open_folder)
         row_open.addWidget(btn_img)
         row_open.addWidget(btn_fol)
         rv.addLayout(row_open)
 
-        self.lbl_img_name = QLabel("Sin imagen")
+        self.lbl_img_name = QLabel(tr("Sin imagen"))
         self.lbl_img_name.setWordWrap(True)
         self.lbl_img_name.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
         rv.addWidget(self.lbl_img_name)
@@ -136,11 +137,11 @@ class VisorWindow(QMainWindow):
         rv.addWidget(HLine())
 
         # ── Modelo ──
-        lbl_mod = QLabel("Modelo")
+        lbl_mod = QLabel(tr("Modelo"))
         lbl_mod.setStyleSheet(f"font-weight: 600; font-size: 10pt;")
         rv.addWidget(lbl_mod)
 
-        self.lbl_model = QLabel("Sin modelo")
+        self.lbl_model = QLabel(tr("Sin modelo"))
         self.lbl_model.setWordWrap(True)
         self.lbl_model.setStyleSheet(
             f"color: {T.INK3}; font-size: 9pt; background: {T.BG_SOFT}; "
@@ -148,11 +149,11 @@ class VisorWindow(QMainWindow):
         )
         rv.addWidget(self.lbl_model)
 
-        btn_load_model = QPushButton("📂  Cargar modelo…")
+        btn_load_model = QPushButton(tr("📂  Cargar modelo…"))
         btn_load_model.clicked.connect(self._load_model)
         rv.addWidget(btn_load_model)
 
-        rv.addWidget(QLabel("Confianza mínima:"))
+        rv.addWidget(QLabel(tr("Confianza mínima:")))
         self.spin_conf = QDoubleSpinBox()
         self.spin_conf.setRange(0.01, 0.99)
         self.spin_conf.setSingleStep(0.05)
@@ -163,32 +164,32 @@ class VisorWindow(QMainWindow):
         # Resolución de inferencia: decisiva con partículas diminutas. A 640 px
         # una partícula de 12 px en una foto de 4096 colapsa a ~2 px y no se
         # detecta nada. Debe poder subirse.
-        rv.addWidget(QLabel("Resolución de inferencia (px):"))
+        rv.addWidget(QLabel(tr("Resolución de inferencia (px):")))
         self.spin_imgsz = QSpinBox()
         self.spin_imgsz.setRange(320, 8192)
         self.spin_imgsz.setSingleStep(32)
         self.spin_imgsz.setValue(2080)
         self.spin_imgsz.setToolTip(
-            "Lado mayor al que se redimensiona la imagen para inferir.\n"
+            tr("Lado mayor al que se redimensiona la imagen para inferir.\n"
             "Más alto = partículas más grandes para la red, pero más memoria.\n"
-            "Se redondea al múltiplo de 32 más cercano."
+            "Se redondea al múltiplo de 32 más cercano.")
         )
         rv.addWidget(self.spin_imgsz)
 
-        self.chk_gpu = QCheckBox("Usar GPU si está disponible")
+        self.chk_gpu = QCheckBox(tr("Usar GPU si está disponible"))
         self.chk_gpu.setChecked(True)
         rv.addWidget(self.chk_gpu)
 
-        self.btn_detect = QPushButton("▶  Detectar")
+        self.btn_detect = QPushButton(tr("▶  Detectar"))
         self.btn_detect.setObjectName("primary")
         self.btn_detect.clicked.connect(self._detect)
         rv.addWidget(self.btn_detect)
 
-        self.btn_cargar_txt = QPushButton("📄  Cargar etiquetas (.txt)")
+        self.btn_cargar_txt = QPushButton(tr("📄  Cargar etiquetas (.txt)"))
         self.btn_cargar_txt.setToolTip(
-            "Muestra las anotaciones YOLO que acompañan a la imagen.\n"
+            tr("Muestra las anotaciones YOLO que acompañan a la imagen.\n"
             "Sirve para revisar el conteo manual sobre la placa, con las\n"
-            "tallas ya convertidas a µm por la calibración."
+            "tallas ya convertidas a µm por la calibración.")
         )
         self.btn_cargar_txt.clicked.connect(self._cargar_etiquetas)
         rv.addWidget(self.btn_cargar_txt)
@@ -196,13 +197,13 @@ class VisorWindow(QMainWindow):
         rv.addWidget(HLine())
 
         # ── Calibración ──
-        lbl_calib = QLabel("Calibración μm/píxel")
+        lbl_calib = QLabel(tr("Calibración μm/píxel"))
         lbl_calib.setStyleSheet(f"font-weight: 600; font-size: 10pt;")
         rv.addWidget(lbl_calib)
 
         row_calib = QHBoxLayout()
-        self.btn_linea = QPushButton("📏  Línea")
-        self.btn_circ  = QPushButton("⭕  Círculo")
+        self.btn_linea = QPushButton(tr("📏  Línea"))
+        self.btn_circ  = QPushButton(tr("⭕  Círculo"))
         self.btn_linea.setCheckable(True)
         self.btn_circ.setCheckable(True)
         self.btn_linea.clicked.connect(lambda: self._start_calib("linea"))
@@ -212,13 +213,13 @@ class VisorWindow(QMainWindow):
         rv.addLayout(row_calib)
 
         self.lbl_calib_hint = QLabel(
-            "Haz clic en la imagen para marcar\npuntos de referencia."
+            tr("Haz clic en la imagen para marcar\npuntos de referencia.")
         )
         self.lbl_calib_hint.setStyleSheet(f"color: {T.INK3}; font-size: 8.5pt;")
         self.lbl_calib_hint.setVisible(False)
         rv.addWidget(self.lbl_calib_hint)
 
-        btn_cancel_calib = QPushButton("✕  Cancelar calibración")
+        btn_cancel_calib = QPushButton(tr("✕  Cancelar calibración"))
         btn_cancel_calib.setStyleSheet(
             f"QPushButton {{ color: {T.WARN}; border-color: {T.WARN}; }}"
             f"QPushButton:hover {{ background: #fff8c5; }}"
@@ -228,24 +229,24 @@ class VisorWindow(QMainWindow):
         btn_cancel_calib.setVisible(False)
         rv.addWidget(btn_cancel_calib)
 
-        self.lbl_calib_result = QLabel("📐  Sin calibrar")
+        self.lbl_calib_result = QLabel(tr("📐  Sin calibrar"))
         self.lbl_calib_result.setStyleSheet(f"color: {T.INK2}; font-size: 9.5pt;")
         rv.addWidget(self.lbl_calib_result)
 
         rv.addWidget(HLine())
 
         # ── Resultados ──
-        lbl_res = QLabel("Resultados")
+        lbl_res = QLabel(tr("Resultados"))
         lbl_res.setStyleSheet(f"font-weight: 600; font-size: 10pt;")
         rv.addWidget(lbl_res)
 
-        rv.addWidget(QLabel("Filtrar por clase:"))
+        rv.addWidget(QLabel(tr("Filtrar por clase:")))
         self.combo_filter = QComboBox()
-        self.combo_filter.addItem("Todas las clases")
-        self.combo_filter.currentTextChanged.connect(self._on_filter_changed)
+        self.combo_filter.addItem(tr("Todas las clases"), None)
+        self.combo_filter.currentIndexChanged.connect(self._on_filter_changed)
         rv.addWidget(self.combo_filter)
 
-        self.lbl_det_count = QLabel("0 detecciones")
+        self.lbl_det_count = QLabel(tr("0 detecciones"))
         self.lbl_det_count.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
         rv.addWidget(self.lbl_det_count)
 
@@ -263,12 +264,12 @@ class VisorWindow(QMainWindow):
         rv.addWidget(HLine())
 
         # ── Guardar ──
-        btn_save = QPushButton("💾  Guardar info actual")
+        btn_save = QPushButton(tr("💾  Guardar info actual"))
         btn_save.setObjectName("primary")
         btn_save.clicked.connect(self._save)
         rv.addWidget(btn_save)
 
-        self.lbl_status = QLabel("● Listo")
+        self.lbl_status = QLabel(tr("● Listo"))
         self.lbl_status.setAlignment(Qt.AlignCenter)
         self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt;")
         rv.addWidget(self.lbl_status)
@@ -332,15 +333,15 @@ class VisorWindow(QMainWindow):
             self.lbl_model.setText(Path(path).name)
             self._set_status("● Modelo listo", T.OK)
         except Exception as e:
-            QMessageBox.warning(self, "Error al cargar modelo", str(e))
+            QMessageBox.warning(self, tr("Error al cargar modelo"), str(e))
 
     def _detect(self):
         if not self.state.model:
-            QMessageBox.warning(self, "Sin modelo", "Carga un modelo .pt primero.")
+            QMessageBox.warning(self, tr("Sin modelo"), tr("Carga un modelo .pt primero."))
             return
         img = self.state.current_image
         if img is None:
-            QMessageBox.warning(self, "Sin imagen", "Abre una imagen primero.")
+            QMessageBox.warning(self, tr("Sin imagen"), tr("Abre una imagen primero."))
             return
         imgsz = int(round(self.spin_imgsz.value() / 32)) * 32   # múltiplo de stride
         device = "0" if (self.chk_gpu.isChecked() and _hay_gpu()) else "cpu"
@@ -371,7 +372,7 @@ class VisorWindow(QMainWindow):
             if "out of memory" in msg.lower():
                 msg = (f"Sin memoria de GPU a imgsz {imgsz}.\n\n"
                        f"Baja la resolución de inferencia o desmarca «Usar GPU».")
-            QMessageBox.warning(self, "Error en detección", msg)
+            QMessageBox.warning(self, tr("Error en detección"), msg)
             self._set_status("● Error en detección", T.ERR)
         finally:
             QApplication.restoreOverrideCursor()
@@ -384,12 +385,12 @@ class VisorWindow(QMainWindow):
         """
         img = self.state.current_image
         if img is None:
-            QMessageBox.warning(self, "Sin imagen", "Abre una imagen primero.")
+            QMessageBox.warning(self, tr("Sin imagen"), tr("Abre una imagen primero."))
             return
         txt = img.with_suffix(".txt")
         if not txt.exists():
             QMessageBox.information(
-                self, "Sin etiquetas",
+                self, tr("Sin etiquetas"),
                 f"No hay archivo de etiquetas junto a la imagen:\n{txt.name}")
             return
 
@@ -399,7 +400,7 @@ class VisorWindow(QMainWindow):
 
         arr = cv2.imdecode(np.fromfile(str(img), dtype=np.uint8), cv2.IMREAD_COLOR)
         if arr is None:
-            QMessageBox.warning(self, "Error", "No se pudo leer la imagen.")
+            QMessageBox.warning(self, tr("Error"), tr("No se pudo leer la imagen."))
             return
         alto, ancho = arr.shape[:2]
 
@@ -467,19 +468,21 @@ class VisorWindow(QMainWindow):
 
     def _update_filter_combo(self, dets: list):
         self.combo_filter.blockSignals(True)
-        prev = self.combo_filter.currentText()
+        prev = self.combo_filter.currentData()
         self.combo_filter.clear()
-        self.combo_filter.addItem("Todas las clases")
-        names = sorted({d.class_name for d in dets})
-        self.combo_filter.addItems(names)
-        idx = self.combo_filter.findText(prev)
+        self.combo_filter.addItem(tr("Todas las clases"), None)
+        for _n in sorted({d.class_name for d in dets}):
+            self.combo_filter.addItem(_n, _n)
+        idx = self.combo_filter.findData(prev)
         if idx >= 0:
             self.combo_filter.setCurrentIndex(idx)
         self.combo_filter.blockSignals(False)
 
-    def _on_filter_changed(self, text: str):
-        cls = None if text == "Todas las clases" else text
-        self.canvas.set_filter_class(cls)
+    def _on_filter_changed(self, _idx: int):
+        # El nombre de clase va en userData: si fuera el texto visible, traducir
+        # «Todas las clases» dejaria el filtro comparando contra una cadena que
+        # ya no existe y no volveria a mostrar nada.
+        self.canvas.set_filter_class(self.combo_filter.currentData())
 
     # ── Calibración ───────────────────────────────────────────
     def _start_calib(self, mode: str):
@@ -490,11 +493,11 @@ class VisorWindow(QMainWindow):
         self.btn_cancel_calib.setVisible(True)
         if mode == "linea":
             self.lbl_calib_hint.setText(
-                "Haz clic en 2 puntos sobre\nuna referencia conocida."
+                tr("Haz clic en 2 puntos sobre\nuna referencia conocida.")
             )
         else:
             self.lbl_calib_hint.setText(
-                "Haz clic en 3 puntos del borde\nde un objeto circular conocido."
+                tr("Haz clic en 3 puntos del borde\nde un objeto circular conocido.")
             )
         self._set_status("● Modo calibración activo", T.WARN)
 
@@ -567,7 +570,7 @@ class VisorWindow(QMainWindow):
     def _save(self):
         img = self.state.current_image
         if img is None:
-            QMessageBox.warning(self, "Sin imagen", "No hay imagen abierta.")
+            QMessageBox.warning(self, tr("Sin imagen"), tr("No hay imagen abierta."))
             return
 
         # Elegir carpeta destino
@@ -584,10 +587,10 @@ class VisorWindow(QMainWindow):
             self._save_csv(save_dir)
             self._save_json(img, save_dir)
             self._set_status(f"● Guardado en {save_dir.name}", T.OK)
-            QMessageBox.information(self, "Guardado",
+            QMessageBox.information(self, tr("Guardado"),
                 f"Archivos guardados en:\n{save_dir}")
         except Exception as e:
-            QMessageBox.warning(self, "Error al guardar", str(e))
+            QMessageBox.warning(self, tr("Error al guardar"), str(e))
             self._set_status("● Error al guardar", T.ERR)
 
     def _save_annotated_image(self, img: Path, save_dir: Path):

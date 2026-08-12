@@ -27,9 +27,9 @@ module records what it did, not just its result.
 | 5 | 📐 **Viewer** | ✅ Working | Single-image inspection with interactive µm/pixel calibration |
 
 The interface is available in **Spanish and English** (selector in the Launcher's
-top bar, or the `POLYX_IDIOMA=en` environment variable). Translation coverage is
-reported by `python auditar_traduccion.py`; at the time of writing the Launcher is
-fully translated and the four modules are in progress.
+top bar, or the `POLYX_IDIOMA=en` environment variable), and the choice is
+remembered between sessions. `python auditar_traduccion.py` reports coverage: all
+308 interface strings across the Launcher and the four modules are translated.
 
 ---
 

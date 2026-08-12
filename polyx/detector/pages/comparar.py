@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from ._base import DetectorPage
 from ...core import theme as T
 from ...core.metrics import LABEL_TP, LABEL_FP, LABEL_FN
+from ...core.i18n import tr
 
 
 def _safe_div(a, b): return a / b if b else 0.0
@@ -16,16 +17,16 @@ def _safe_div(a, b): return a / b if b else 0.0
 
 class CompararPage(DetectorPage):
     STEP_N = 8
-    STEP_TITLE = "Comparar"
+    STEP_TITLE = tr("Comparar")
     STEP_DESCRIPTION = (
-        "Si cargaste más de un modelo, aquí ves tabla resumen con todas las métricas "
-        "lado a lado y cuántas detecciones hizo cada uno por imagen."
+        tr("Si cargaste más de un modelo, aquí ves tabla resumen con todas las métricas "
+        "lado a lado y cuántas detecciones hizo cada uno por imagen.")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
-        c1, l1 = self.card("Resumen por modelo", "📊")
+        c1, l1 = self.card(tr("Resumen por modelo"), "📊")
         self.tbl_summary = QTableWidget(0, 8)
         self.tbl_summary.setHorizontalHeaderLabels(
             ["Modelo", "Imágenes", "Detecciones", "Conf media",
@@ -39,7 +40,7 @@ class CompararPage(DetectorPage):
         l1.addWidget(self.tbl_summary)
         self.body.addWidget(c1)
 
-        c2, l2 = self.card("Detecciones por imagen", "🖼")
+        c2, l2 = self.card(tr("Detecciones por imagen"), "🖼")
         self.tbl_per_image = QTableWidget(0, 1)
         self.tbl_per_image.setMinimumHeight(280)
         self.tbl_per_image.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)

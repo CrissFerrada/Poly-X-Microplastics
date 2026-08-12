@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 from ._base import TrainerPage
 from ...core import theme as T
 from ..state import PRESETS
+from ...core.i18n import tr
 
 
 SIZE_DESCRIPTIONS = [
@@ -24,20 +25,20 @@ SIZE_DESCRIPTIONS = [
 
 class ModeloPage(TrainerPage):
     PAGE_ICON = "🎯"
-    PAGE_TITLE = "Seleccionar modelo"
+    PAGE_TITLE = tr("Seleccionar modelo")
     PAGE_DESCRIPTION = (
-        "Elige el preset según el caso, o personaliza familia y tamaño. El preset "
-        "'Balanceado' es el recomendado para la mayoría de proyectos."
+        tr("Elige el preset según el caso, o personaliza familia y tamaño. El preset "
+        "'Balanceado' es el recomendado para la mayoría de proyectos.")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
         # ── Preset rápido ──
-        c1, l1 = self.card("Preset rápido", "⚡")
+        c1, l1 = self.card(tr("Preset rápido"), "⚡")
         info = QLabel(
-            "Aplica un conjunto de parámetros probados con un clic. Cambiarlo después "
-            "en 'Parámetros' marca como Personalizado."
+            tr("Aplica un conjunto de parámetros probados con un clic. Cambiarlo después "
+            "en 'Parámetros' marca como Personalizado.")
         )
         info.setWordWrap(True)
         info.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
@@ -45,7 +46,7 @@ class ModeloPage(TrainerPage):
 
         row = QHBoxLayout()
         row.setSpacing(8)
-        row.addWidget(QLabel("Preset:"))
+        row.addWidget(QLabel(tr("Preset:")))
         self.combo_preset = QComboBox()
         self.combo_preset.addItems(list(PRESETS.keys()))
         self.combo_preset.setCurrentText(self.state.model.preset_name)
@@ -57,17 +58,17 @@ class ModeloPage(TrainerPage):
         self.body.addWidget(c1)
 
         # ── Familia y tamaño ──
-        c2, l2 = self.card("Familia y tamaño", "🧠")
+        c2, l2 = self.card(tr("Familia y tamaño"), "🧠")
         row2 = QHBoxLayout()
         row2.setSpacing(20)
-        row2.addWidget(QLabel("Familia:"))
+        row2.addWidget(QLabel(tr("Familia:")))
         self.combo_family = QComboBox()
         self.combo_family.addItems(["YOLOv8", "YOLOv11"])
         self.combo_family.setCurrentText("YOLOv11" if self.state.model.family == "v11" else "YOLOv8")
         self.combo_family.currentTextChanged.connect(self._on_family)
         row2.addWidget(self.combo_family)
 
-        row2.addWidget(QLabel("Tamaño:"))
+        row2.addWidget(QLabel(tr("Tamaño:")))
         self.combo_size = QComboBox()
         for code, _, _, _ in SIZE_DESCRIPTIONS:
             self.combo_size.addItem(code)
@@ -92,10 +93,10 @@ class ModeloPage(TrainerPage):
         self.body.addWidget(c2)
 
         # ── Pesos personalizados ──
-        c3, l3 = self.card("Pesos personalizados (opcional)", "📦")
+        c3, l3 = self.card(tr("Pesos personalizados (opcional)"), "📦")
         info3 = QLabel(
-            "Si tienes un .pt ya entrenado y quieres seguir desde ahí, selecciónalo. "
-            "Deja vacío para usar el modelo base de la familia/tamaño elegidos."
+            tr("Si tienes un .pt ya entrenado y quieres seguir desde ahí, selecciónalo. "
+            "Deja vacío para usar el modelo base de la familia/tamaño elegidos.")
         )
         info3.setWordWrap(True)
         info3.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
@@ -104,7 +105,7 @@ class ModeloPage(TrainerPage):
         row3 = QHBoxLayout()
         row3.setSpacing(8)
         self.ed_custom = QLineEdit()
-        self.ed_custom.setPlaceholderText("Ruta a un .pt para continuar el entrenamiento…")
+        self.ed_custom.setPlaceholderText(tr("Ruta a un .pt para continuar el entrenamiento…"))
         self.ed_custom.editingFinished.connect(self._on_custom)
         row3.addWidget(self.ed_custom, 1)
         btn = QPushButton("…")

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 
 from ._base import TrainerPage
 from ...core import theme as T
+from ...core.i18n import tr
 
 
 FORMATS = [
@@ -47,19 +48,19 @@ class _ExportWorker(QThread):
 
 class ExportarPage(TrainerPage):
     PAGE_ICON = "📤"
-    PAGE_TITLE = "Exportar modelo"
+    PAGE_TITLE = tr("Exportar modelo")
     PAGE_DESCRIPTION = (
-        "Convierte el modelo entrenado a otros formatos para producción: ONNX (portable), "
-        "TensorRT (NVIDIA rápido), TFLite (móvil), CoreML (Apple), etc."
+        tr("Convierte el modelo entrenado a otros formatos para producción: ONNX (portable), "
+        "TensorRT (NVIDIA rápido), TFLite (móvil), CoreML (Apple), etc.")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
         self.worker: _ExportWorker | None = None
 
-        c1, l1 = self.card("Modelo a exportar", "📦")
+        c1, l1 = self.card(tr("Modelo a exportar"), "📦")
         row = QHBoxLayout()
-        row.addWidget(QLabel("Pesos .pt:"))
+        row.addWidget(QLabel(tr("Pesos .pt:")))
         self.ed_w = QLineEdit()
         # autollenar con best.pt del último run
         if state.run_dir:
@@ -71,19 +72,19 @@ class ExportarPage(TrainerPage):
         l1.addLayout(row)
         self.body.addWidget(c1)
 
-        c2, l2 = self.card("Formato y opciones", "⚙️")
+        c2, l2 = self.card(tr("Formato y opciones"), "⚙️")
         g = QGridLayout(); g.setHorizontalSpacing(20); g.setVerticalSpacing(10)
-        g.addWidget(QLabel("Formato:"), 0, 0)
+        g.addWidget(QLabel(tr("Formato:")), 0, 0)
         self.combo = QComboBox()
         for name, code, desc in FORMATS:
             self.combo.addItem(f"{name}  ({code})", code)
         self.combo.currentIndexChanged.connect(self._update_desc)
         g.addWidget(self.combo, 0, 1)
 
-        g.addWidget(QLabel("imgsz:"), 1, 0)
+        g.addWidget(QLabel(tr("imgsz:")), 1, 0)
         self.ed_imgsz = QLineEdit(str(state.params.imgsz)); self.ed_imgsz.setMaximumWidth(100)
         g.addWidget(self.ed_imgsz, 1, 1)
-        self.cb_half = QCheckBox("FP16 (half precision)"); self.cb_half.setChecked(True)
+        self.cb_half = QCheckBox(tr("FP16 (half precision)")); self.cb_half.setChecked(True)
         g.addWidget(self.cb_half, 2, 1)
         l2.addLayout(g)
 
@@ -92,7 +93,7 @@ class ExportarPage(TrainerPage):
         self.lbl_desc.setWordWrap(True)
         l2.addWidget(self.lbl_desc)
 
-        btn = QPushButton("📤  Exportar")
+        btn = QPushButton(tr("📤  Exportar"))
         btn.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -125,7 +126,7 @@ class ExportarPage(TrainerPage):
     def _run(self):
         w = self.ed_w.text().strip()
         if not w or not Path(w).exists():
-            QMessageBox.warning(self, "Falta modelo", "Selecciona un .pt válido."); return
+            QMessageBox.warning(self, tr("Falta modelo"), tr("Selecciona un .pt válido.")); return
         try: imgsz = int(self.ed_imgsz.text())
         except ValueError: imgsz = 640
         fmt = self.combo.currentData()
@@ -134,7 +135,7 @@ class ExportarPage(TrainerPage):
         self.worker.log_line.connect(self.log.appendPlainText)
         self.worker.finished_ok.connect(lambda p: (
             self.log.appendPlainText(f"[OK] Exportado: {p}"),
-            QMessageBox.information(self, "Exportación lista", f"Archivo generado:\n{p}")
+            QMessageBox.information(self, tr("Exportación lista"), f"Archivo generado:\n{p}")
         ))
-        self.worker.failed.connect(lambda m: QMessageBox.critical(self, "Falló", m))
+        self.worker.failed.connect(lambda m: QMessageBox.critical(self, tr("Falló"), m))
         self.worker.start()

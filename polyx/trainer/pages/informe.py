@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from ._base import TrainerPage
 from ...core import theme as T
+from ...core.i18n import tr
 
 
 def _runs_root() -> Path:
@@ -185,32 +186,32 @@ class _ReportWorker(QThread):
 
 class InformePage(TrainerPage):
     PAGE_ICON = "📄"
-    PAGE_TITLE = "Informe del entrenamiento"
+    PAGE_TITLE = tr("Informe del entrenamiento")
     PAGE_DESCRIPTION = (
-        "Genera un informe HTML autocontenido con las curvas y métricas del run "
-        "elegido. Listo para convertir a PDF (Ctrl+P en el navegador)."
+        tr("Genera un informe HTML autocontenido con las curvas y métricas del run "
+        "elegido. Listo para convertir a PDF (Ctrl+P en el navegador).")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
         self.worker: _ReportWorker | None = None
 
-        c1, l1 = self.card("Selección de run", "📂")
+        c1, l1 = self.card(tr("Selección de run"), "📂")
         row = QHBoxLayout(); row.setSpacing(8)
-        row.addWidget(QLabel("Run:"))
+        row.addWidget(QLabel(tr("Run:")))
         self.combo = QComboBox(); self.combo.setMinimumWidth(360)
         row.addWidget(self.combo, 1)
         btn = QPushButton("🔄"); btn.setFixedWidth(36); btn.clicked.connect(self._refresh)
         row.addWidget(btn)
         l1.addLayout(row)
-        self.chk_refs = QCheckBox("Incluir referencias bibliográficas")
+        self.chk_refs = QCheckBox(tr("Incluir referencias bibliográficas"))
         self.chk_refs.setChecked(True)
         l1.addWidget(self.chk_refs)
         self.body.addWidget(c1)
 
-        c2, l2 = self.card("Generar", "📄")
+        c2, l2 = self.card(tr("Generar"), "📄")
         rr = QHBoxLayout(); rr.setSpacing(8)
-        b1 = QPushButton("📄  Generar reporte HTML")
+        b1 = QPushButton(tr("📄  Generar reporte HTML"))
         b1.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -218,7 +219,7 @@ class InformePage(TrainerPage):
         b1.setCursor(Qt.PointingHandCursor)
         b1.clicked.connect(self._generate)
         rr.addWidget(b1)
-        b2 = QPushButton("💾  Guardar como…")
+        b2 = QPushButton(tr("💾  Guardar como…"))
         b2.clicked.connect(self._save_as)
         rr.addWidget(b2)
         rr.addStretch(1)
@@ -250,14 +251,14 @@ class InformePage(TrainerPage):
     def _generate(self):
         run = self._current_run()
         if not run:
-            QMessageBox.warning(self, "Sin run", "No hay runs disponibles."); return
+            QMessageBox.warning(self, tr("Sin run"), tr("No hay runs disponibles.")); return
         out = run / "reporte_entrenamiento.html"
         self._run_worker(run, out)
 
     def _save_as(self):
         run = self._current_run()
         if not run:
-            QMessageBox.warning(self, "Sin run", "No hay runs disponibles."); return
+            QMessageBox.warning(self, tr("Sin run"), tr("No hay runs disponibles.")); return
         f, _ = QFileDialog.getSaveFileName(
             self, "Guardar reporte", str(run / "reporte_entrenamiento.html"), "HTML (*.html)"
         )
@@ -265,7 +266,7 @@ class InformePage(TrainerPage):
             self._run_worker(run, Path(f))
 
     def _run_worker(self, run: Path, out: Path):
-        self.lbl_status.setText("Generando informe…")
+        self.lbl_status.setText(tr("Generando informe…"))
         self.worker = _ReportWorker(run, out, self.chk_refs.isChecked())
         self.worker.finished_ok.connect(self._on_ok)
         self.worker.failed.connect(self._on_fail)
@@ -277,5 +278,5 @@ class InformePage(TrainerPage):
         except Exception: pass
 
     def _on_fail(self, msg: str):
-        self.lbl_status.setText("✗ Error")
-        QMessageBox.critical(self, "Falló", msg)
+        self.lbl_status.setText(tr("✗ Error"))
+        QMessageBox.critical(self, tr("Falló"), msg)

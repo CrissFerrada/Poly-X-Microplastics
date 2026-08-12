@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 from ._base import DetectorPage
 from ...core import theme as T
 from ...core.yolo_wrap import Detection, read_yolo_txt, find_gt_for_image
+from ...core.i18n import tr
 
 DEFAULT_CLASSES = ["PET", "PP", "LDPE"]
 
@@ -522,37 +523,37 @@ class AnnotCanvas(QGraphicsView):
 # ────────────────────────────────────────────────────────────────────
 class GTManualPage(DetectorPage):
     STEP_N = 3
-    STEP_TITLE = "GT manual"
+    STEP_TITLE = tr("GT manual")
     STEP_DESCRIPTION = (
-        "Anotador completo de Ground Truth. Click izquierdo para dibujar, click sobre una "
+        tr("Anotador completo de Ground Truth. Click izquierdo para dibujar, click sobre una "
         "caja para seleccionar, arrastra los handles para redimensionar, Espacio o botón "
         "medio para pan, rueda para zoom. Teclas 1..9: clase activa · Supr: borrar · "
-        "Ctrl+Z/Y: undo/redo · ←/→: imagen anterior/siguiente (autoguarda)."
+        "Ctrl+Z/Y: undo/redo · ←/→: imagen anterior/siguiente (autoguarda).")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
         # ── Tarjeta principal ──
-        c1, l1 = self.card("Anotación", "✏️")
+        c1, l1 = self.card(tr("Anotación"), "✏️")
 
         # Barra superior: nombre + clase activa + zoom
         top = QHBoxLayout()
         top.setSpacing(8)
-        self.lbl_image_name = QLabel("(sin imagen seleccionada)")
+        self.lbl_image_name = QLabel(tr("(sin imagen seleccionada)"))
         self.lbl_image_name.setStyleSheet(
             f"color: {T.INK2}; font-weight: 600; font-size: 11pt; border: none;"
         )
         top.addWidget(self.lbl_image_name, 1)
 
-        top.addWidget(QLabel("Clase:"))
+        top.addWidget(QLabel(tr("Clase:")))
         self.combo_class = QComboBox()
         self.combo_class.addItems(DEFAULT_CLASSES)
         self.combo_class.currentIndexChanged.connect(self._on_class_combo)
         self.combo_class.setMinimumWidth(120)
         top.addWidget(self.combo_class)
 
-        btn_fit = QPushButton("Ajustar (F)")
+        btn_fit = QPushButton(tr("Ajustar (F)"))
         btn_fit.clicked.connect(lambda: self.canvas.zoom_fit())
         top.addWidget(btn_fit)
         btn_100 = QPushButton("100 %")
@@ -567,7 +568,7 @@ class GTManualPage(DetectorPage):
         # Lista de imágenes (compacta)
         left_col = QVBoxLayout()
         left_col.setSpacing(6)
-        lbl_files = QLabel("Imágenes")
+        lbl_files = QLabel(tr("Imágenes"))
         lbl_files.setStyleSheet(f"color: {T.INK2}; font-weight: 600; border: none;")
         left_col.addWidget(lbl_files)
         self.list = QListWidget()
@@ -587,7 +588,7 @@ class GTManualPage(DetectorPage):
         right_col.addWidget(self.canvas, 1)
 
         # Mini-status del canvas
-        self.lbl_canvas_status = QLabel("Listo. Click y arrastra para dibujar.")
+        self.lbl_canvas_status = QLabel(tr("Listo. Click y arrastra para dibujar."))
         self.lbl_canvas_status.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
         right_col.addWidget(self.lbl_canvas_status)
 
@@ -597,7 +598,7 @@ class GTManualPage(DetectorPage):
         # Botonera inferior
         btns = QHBoxLayout()
         btns.setSpacing(8)
-        b_save = QPushButton("💾  Guardar GT (.txt YOLO)")
+        b_save = QPushButton(tr("💾  Guardar GT (.txt YOLO)"))
         b_save.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -606,29 +607,29 @@ class GTManualPage(DetectorPage):
         b_save.clicked.connect(self._save_current)
         btns.addWidget(b_save)
 
-        b_prev = QPushButton("←  Anterior")
+        b_prev = QPushButton(tr("←  Anterior"))
         b_prev.clicked.connect(self._go_prev)
         btns.addWidget(b_prev)
-        b_next = QPushButton("Siguiente  →")
+        b_next = QPushButton(tr("Siguiente  →"))
         b_next.clicked.connect(self._go_next)
         btns.addWidget(b_next)
 
-        b_undo = QPushButton("↶  Deshacer")
+        b_undo = QPushButton(tr("↶  Deshacer"))
         b_undo.clicked.connect(lambda: self.canvas.undo())
         btns.addWidget(b_undo)
-        b_redo = QPushButton("↷  Rehacer")
+        b_redo = QPushButton(tr("↷  Rehacer"))
         b_redo.clicked.connect(lambda: self.canvas.redo())
         btns.addWidget(b_redo)
 
-        b_del = QPushButton("🗑  Borrar selección")
+        b_del = QPushButton(tr("🗑  Borrar selección"))
         b_del.clicked.connect(lambda: self.canvas.delete_selected())
         btns.addWidget(b_del)
-        b_clear = QPushButton("Limpiar todo")
+        b_clear = QPushButton(tr("Limpiar todo"))
         b_clear.clicked.connect(self._clear_with_confirm)
         btns.addWidget(b_clear)
         btns.addStretch(1)
 
-        self.lbl_count = QLabel("0 cajas")
+        self.lbl_count = QLabel(tr("0 cajas"))
         self.lbl_count.setStyleSheet(f"color: {T.INK3}; border: none;")
         btns.addWidget(self.lbl_count)
         l1.addLayout(btns)
@@ -713,7 +714,7 @@ class GTManualPage(DetectorPage):
         if not self.canvas.boxes:
             return
         r = QMessageBox.question(
-            self, "Limpiar todo",
+            self, tr("Limpiar todo"),
             f"¿Borrar las {len(self.canvas.boxes)} cajas de esta imagen?\n"
             "(se puede deshacer con Ctrl+Z)",
             QMessageBox.Yes | QMessageBox.No,
@@ -765,17 +766,17 @@ class GTManualPage(DetectorPage):
                 self.lbl_canvas_status.setText(f"Auto-guardado.")
         except Exception as e:
             if not silent:
-                QMessageBox.warning(self, "Error guardando", str(e))
+                QMessageBox.warning(self, tr("Error guardando"), str(e))
 
     def _save_current(self):
         it = self.list.currentItem()
         if not it:
-            QMessageBox.information(self, "GT manual", "Selecciona primero una imagen.")
+            QMessageBox.information(self, tr("GT manual"), tr("Selecciona primero una imagen."))
             return
         path = Path(it.data(Qt.UserRole))
         dets = self.canvas.detections()
         if not dets:
-            QMessageBox.information(self, "GT manual", "No hay cajas para guardar.")
+            QMessageBox.information(self, tr("GT manual"), tr("No hay cajas para guardar."))
             return
         out_path = self._save_to_txt(path, dets)
         self.lbl_canvas_status.setText(f"✓ Guardado en: {out_path}")

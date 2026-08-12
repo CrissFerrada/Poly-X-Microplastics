@@ -16,6 +16,7 @@ from ..core import theme as T
 from ..core.widgets import LogoBadge, HLine
 from .state import LabelerState
 from .canvas import BboxCanvas
+from ..core.i18n import tr
 
 
 _PRESETS: dict[str, list[str]] = {
@@ -32,7 +33,7 @@ _CLS_COLORS = ["#e3342f", "#ff8c00", "#ffd700", "#00b4d8",
 class LabelerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Poly-X · Etiquetador")
+        self.setWindowTitle(tr("Poly-X · Etiquetador"))
         self.resize(1400, 880)
         self.setStyleSheet(T.GLOBAL_QSS + f"QMainWindow {{ background: {T.BG_SOFT}; }}")
 
@@ -80,13 +81,13 @@ class LabelerWindow(QMainWindow):
         lv.addWidget(LogoBadge("POLY-X", "Etiquetador"))
         lv.addSpacing(6)
 
-        btn_open = QPushButton("📂  Abrir carpeta…")
+        btn_open = QPushButton(tr("📂  Abrir carpeta…"))
         btn_open.setObjectName("primary")
         btn_open.setCursor(Qt.PointingHandCursor)
         btn_open.clicked.connect(self._open_folder)
         lv.addWidget(btn_open)
 
-        self.lbl_count = QLabel("Sin imágenes")
+        self.lbl_count = QLabel(tr("Sin imágenes"))
         self.lbl_count.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
         lv.addWidget(self.lbl_count)
 
@@ -106,8 +107,8 @@ class LabelerWindow(QMainWindow):
 
         nav = QHBoxLayout()
         nav.setSpacing(6)
-        btn_prev = QPushButton("← Anterior")
-        btn_next = QPushButton("Siguiente →")
+        btn_prev = QPushButton(tr("← Anterior"))
+        btn_next = QPushButton(tr("Siguiente →"))
         for b in (btn_prev, btn_next):
             b.setFixedHeight(28)
         btn_prev.clicked.connect(self.state.prev_image)
@@ -137,8 +138,8 @@ class LabelerWindow(QMainWindow):
         self.lbl_progreso.setStyleSheet(f"color: {T.INK2}; font-size: 8.5pt;")
         lv.addWidget(self.lbl_progreso)
 
-        btn_pend = QPushButton("⏭  Siguiente sin revisar")
-        btn_pend.setToolTip("Salta a la próxima imagen que aún no has revisado (Tab)")
+        btn_pend = QPushButton(tr("⏭  Siguiente sin revisar"))
+        btn_pend.setToolTip(tr("Salta a la próxima imagen que aún no has revisado (Tab)"))
         btn_pend.clicked.connect(self._ir_siguiente_pendiente)
         lv.addWidget(btn_pend)
 
@@ -156,14 +157,14 @@ class LabelerWindow(QMainWindow):
         rv.setSpacing(9)
 
         # Preset
-        rv.addWidget(QLabel("Preset de clases:"))
+        rv.addWidget(QLabel(tr("Preset de clases:")))
         self.combo_preset = QComboBox()
         self.combo_preset.addItems(_PRESETS.keys())
         self.combo_preset.currentTextChanged.connect(self._apply_preset)
         rv.addWidget(self.combo_preset)
 
         rv.addWidget(HLine())
-        rv.addWidget(QLabel("Clases activas:"))
+        rv.addWidget(QLabel(tr("Clases activas:")))
 
         self.class_frame = QFrame()
         self.class_frame.setStyleSheet("QFrame { border: none; background: transparent; }")
@@ -173,7 +174,7 @@ class LabelerWindow(QMainWindow):
         self._class_btns: list[QPushButton] = []
         rv.addWidget(self.class_frame)
 
-        btn_add = QPushButton("+ Agregar clase")
+        btn_add = QPushButton(tr("+ Agregar clase"))
         btn_add.setStyleSheet(
             f"QPushButton {{ background: transparent; color: {T.ACCENT}; "
             f"border: 1px dashed {T.ACCENT}; border-radius: 4px; padding: 4px; }}"
@@ -185,7 +186,7 @@ class LabelerWindow(QMainWindow):
         rv.addWidget(HLine())
 
         # Estadísticas de la imagen actual
-        lbl_stat = QLabel("Anotaciones (imagen actual):")
+        lbl_stat = QLabel(tr("Anotaciones (imagen actual):"))
         lbl_stat.setStyleSheet(f"color: {T.INK2}; font-weight: 600;")
         rv.addWidget(lbl_stat)
         self.lbl_box_info = QLabel("—")
@@ -196,12 +197,12 @@ class LabelerWindow(QMainWindow):
         rv.addWidget(HLine())
 
         # Pre-anotación
-        lbl_pre = QLabel("Pre-anotación automática")
+        lbl_pre = QLabel(tr("Pre-anotación automática"))
         lbl_pre.setStyleSheet(f"font-weight: 600; font-size: 10pt;")
         rv.addWidget(lbl_pre)
 
-        rv.addWidget(QLabel("Modelo .pt:"))
-        self.lbl_model = QLabel("Sin modelo")
+        rv.addWidget(QLabel(tr("Modelo .pt:")))
+        self.lbl_model = QLabel(tr("Sin modelo"))
         self.lbl_model.setWordWrap(True)
         self.lbl_model.setStyleSheet(
             f"color: {T.INK3}; font-size: 9pt; background: {T.BG_SOFT}; "
@@ -209,48 +210,48 @@ class LabelerWindow(QMainWindow):
         )
         rv.addWidget(self.lbl_model)
 
-        btn_load_model = QPushButton("📂  Cargar modelo…")
+        btn_load_model = QPushButton(tr("📂  Cargar modelo…"))
         btn_load_model.clicked.connect(self._load_model)
         rv.addWidget(btn_load_model)
 
         fila_pre = QHBoxLayout()
         fila_pre.setSpacing(6)
-        fila_pre.addWidget(QLabel("conf:"))
+        fila_pre.addWidget(QLabel(tr("conf:")))
         self.sb_pre_conf = QDoubleSpinBox()
         self.sb_pre_conf.setRange(0.01, 0.99)
         self.sb_pre_conf.setSingleStep(0.05)
         self.sb_pre_conf.setDecimals(2)
         self.sb_pre_conf.setValue(0.10)
         fila_pre.addWidget(self.sb_pre_conf)
-        fila_pre.addWidget(QLabel("imgsz:"))
+        fila_pre.addWidget(QLabel(tr("imgsz:")))
         self.sb_pre_imgsz = QSpinBox()
         self.sb_pre_imgsz.setRange(320, 8192)
         self.sb_pre_imgsz.setSingleStep(64)
         self.sb_pre_imgsz.setValue(2080)
         self.sb_pre_imgsz.setToolTip(
-            "Resolución de inferencia. Con partículas diminutas en fotos grandes,\n"
-            "un valor bajo no propone nada."
+            tr("Resolución de inferencia. Con partículas diminutas en fotos grandes,\n"
+            "un valor bajo no propone nada.")
         )
         fila_pre.addWidget(self.sb_pre_imgsz)
         rv.addLayout(fila_pre)
 
-        btn_pre_one = QPushButton("🤖  Pre-anotar imagen actual")
+        btn_pre_one = QPushButton(tr("🤖  Pre-anotar imagen actual"))
         btn_pre_one.clicked.connect(self._preannotar_current)
         rv.addWidget(btn_pre_one)
 
-        btn_pre_all = QPushButton("🤖  Pre-anotar TODAS")
+        btn_pre_all = QPushButton(tr("🤖  Pre-anotar TODAS"))
         btn_pre_all.setObjectName("primary")
         btn_pre_all.clicked.connect(self._preannotar_all)
         rv.addWidget(btn_pre_all)
 
         rv.addWidget(HLine())
 
-        self.chk_zoom = QCheckBox("Mantener zoom entre imágenes")
+        self.chk_zoom = QCheckBox(tr("Mantener zoom entre imágenes"))
         self.chk_zoom.setChecked(True)
         self.chk_zoom.setToolTip(
-            "Conserva el nivel de acercamiento al cambiar de recorte.\n"
+            tr("Conserva el nivel de acercamiento al cambiar de recorte.\n"
             "Con cientos de recortes, reencuadrar cada vez cuesta mucho tiempo.\n"
-            "F reencuadra manualmente."
+            "F reencuadra manualmente.")
         )
         self.chk_zoom.toggled.connect(
             lambda v: setattr(self.canvas, "mantener_zoom", v))
@@ -258,20 +259,20 @@ class LabelerWindow(QMainWindow):
 
         rv.addStretch(1)
 
-        btn_rev = QPushButton("✓  Revisada, siguiente   (Espacio)")
+        btn_rev = QPushButton(tr("✓  Revisada, siguiente   (Espacio)"))
         btn_rev.setToolTip(
-            "Deja constancia de que miraste esta imagen aunque no tenga partículas.\n"
-            "Sin esto, una placa vacía revisada es indistinguible de una sin mirar."
+            tr("Deja constancia de que miraste esta imagen aunque no tenga partículas.\n"
+            "Sin esto, una placa vacía revisada es indistinguible de una sin mirar.")
         )
         btn_rev.clicked.connect(self._marcar_revisada)
         rv.addWidget(btn_rev)
 
-        btn_save = QPushButton("💾  Guardar (.txt)")
+        btn_save = QPushButton(tr("💾  Guardar (.txt)"))
         btn_save.setObjectName("primary")
         btn_save.clicked.connect(self._save)
         rv.addWidget(btn_save)
 
-        self.lbl_status = QLabel("● Listo")
+        self.lbl_status = QLabel(tr("● Listo"))
         self.lbl_status.setAlignment(Qt.AlignCenter)
         self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt;")
         rv.addWidget(self.lbl_status)
@@ -375,19 +376,19 @@ class LabelerWindow(QMainWindow):
             self.lbl_model.setText(Path(path).name)
             self._set_status("● Modelo cargado", T.OK)
         except Exception as e:
-            QMessageBox.warning(self, "Error al cargar modelo", str(e))
+            QMessageBox.warning(self, tr("Error al cargar modelo"), str(e))
 
     def _preannotar_current(self):
         if not self._pre_model:
-            QMessageBox.warning(self, "Sin modelo", "Carga un modelo .pt primero.")
+            QMessageBox.warning(self, tr("Sin modelo"), tr("Carga un modelo .pt primero."))
             return
         img = self.state.current_image
         if img is None:
             return
         if self.state.current_boxes:
             r = QMessageBox.question(
-                self, "Sobrescribir",
-                "Esta imagen ya tiene anotaciones. ¿Sobrescribir con el modelo?"
+                self, tr("Sobrescribir"),
+                tr("Esta imagen ya tiene anotaciones. ¿Sobrescribir con el modelo?")
             )
             if r != QMessageBox.Yes:
                 return
@@ -397,18 +398,18 @@ class LabelerWindow(QMainWindow):
             self.state.set_current_boxes(boxes)
             self._set_status(f"● Pre-anotadas {len(boxes)} cajas", T.OK)
         except Exception as e:
-            QMessageBox.warning(self, "Error en pre-anotación", str(e))
+            QMessageBox.warning(self, tr("Error en pre-anotación"), str(e))
 
     def _preannotar_all(self):
         if not self._pre_model:
-            QMessageBox.warning(self, "Sin modelo", "Carga un modelo .pt primero.")
+            QMessageBox.warning(self, tr("Sin modelo"), tr("Carga un modelo .pt primero."))
             return
         if not self.state.images:
             return
 
         total = len(self.state.images)
         pd = QProgressDialog("Pre-anotando imágenes…", "Cancelar", 0, total, self)
-        pd.setWindowTitle("Pre-anotando")
+        pd.setWindowTitle(tr("Pre-anotando"))
         pd.setMinimumDuration(0)
         pd.setValue(0)
 
@@ -540,8 +541,8 @@ class LabelerWindow(QMainWindow):
     def _ir_siguiente_pendiente(self):
         i = self.state.next_unreviewed()
         if i < 0:
-            QMessageBox.information(self, "Conteo completo",
-                                    "No quedan imágenes sin revisar.")
+            QMessageBox.information(self, tr("Conteo completo"),
+                                    tr("No quedan imágenes sin revisar."))
             return
         self.state.goto(i)
 
@@ -571,7 +572,7 @@ class LabelerWindow(QMainWindow):
             lines = [f"{n} caja(s)"] + [f"  {k}: {v}" for k, v in cls_counts.items()]
             self.lbl_box_info.setText("\n".join(lines))
         else:
-            self.lbl_box_info.setText("Sin anotaciones")
+            self.lbl_box_info.setText(tr("Sin anotaciones"))
 
         # Actualizar indicador de estado en la lista (sin perder el icono)
         idx = self.state.current_idx

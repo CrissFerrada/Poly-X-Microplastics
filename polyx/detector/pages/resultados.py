@@ -17,21 +17,22 @@ from ._base import DetectorPage
 from ...core import theme as T
 from ...core.widgets import KPICard
 from ...core.metrics import LABEL_TP, LABEL_FP, LABEL_FN, LABEL_MISCLS, match_image
+from ...core.i18n import tr
 
 
 class ResultadosPage(DetectorPage):
     STEP_N = 6
-    STEP_TITLE = "Resultados"
+    STEP_TITLE = tr("Resultados")
     STEP_DESCRIPTION = (
-        "Resumen cuantitativo del análisis. Para gráficos completos y galería por imagen, "
-        "genera el reporte HTML en la pestaña Reporte."
+        tr("Resumen cuantitativo del análisis. Para gráficos completos y galería por imagen, "
+        "genera el reporte HTML en la pestaña Reporte.")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
         # ── KPIs ──
-        c1, l1 = self.card("Métricas generales", "📊")
+        c1, l1 = self.card(tr("Métricas generales"), "📊")
         grid = QGridLayout()
         grid.setSpacing(12)
         self.kpi_imgs   = KPICard("Imágenes", T.ACCENT)
@@ -54,11 +55,11 @@ class ResultadosPage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Métricas detalladas ──
-        c2, l2 = self.card("Métricas detalladas (modelo principal)", "📋")
+        c2, l2 = self.card(tr("Métricas detalladas (modelo principal)"), "📋")
         row = QHBoxLayout()
         row.setSpacing(20)
-        self.lbl_prec = QLabel("Precisión:  —")
-        self.lbl_rec  = QLabel("Recall:  —")
+        self.lbl_prec = QLabel(tr("Precisión:  —"))
+        self.lbl_rec  = QLabel(tr("Recall:  —"))
         self.lbl_mis  = QLabel(f"{LABEL_MISCLS}:  —")
         for l in (self.lbl_prec, self.lbl_rec, self.lbl_mis):
             l.setStyleSheet(f"color: {T.INK2}; font-size: 10.5pt; font-weight: 500; border: none;")
@@ -75,10 +76,10 @@ class ResultadosPage(DetectorPage):
 
         # ── Histograma de tamaños (solo con calibración) ──
         self.c_hist, l_hist = self.card(
-            "Distribución de tamaños (μm) — solo con calibración activa", "📐"
+            tr("Distribución de tamaños (μm) — solo con calibración activa"), "📐"
         )
         self._hist_placeholder = QLabel(
-            "Configura μm/px en Parámetros para ver la distribución de tamaños."
+            tr("Configura μm/px en Parámetros para ver la distribución de tamaños.")
         )
         self._hist_placeholder.setAlignment(Qt.AlignCenter)
         self._hist_placeholder.setStyleSheet(
@@ -89,9 +90,9 @@ class ResultadosPage(DetectorPage):
         self.body.addWidget(self.c_hist)
 
         # ── Exportar CSV ──
-        c_csv, l_csv = self.card("Exportar datos", "💾")
+        c_csv, l_csv = self.card(tr("Exportar datos"), "💾")
         row_csv = QHBoxLayout()
-        btn_csv = QPushButton("📄  Exportar CSV de detecciones")
+        btn_csv = QPushButton(tr("📄  Exportar CSV de detecciones"))
         btn_csv.clicked.connect(self._export_csv)
         row_csv.addWidget(btn_csv)
         row_csv.addStretch(1)
@@ -99,7 +100,7 @@ class ResultadosPage(DetectorPage):
         self.body.addWidget(c_csv)
 
         # ── Tabla por imagen ──
-        c3, l3 = self.card("Por imagen", "🖼")
+        c3, l3 = self.card(tr("Por imagen"), "🖼")
         self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels(
             ["Modelo", "Imagen", "Pred", "GT", LABEL_TP, LABEL_FP, LABEL_FN, "Conf media"]
@@ -293,7 +294,7 @@ class ResultadosPage(DetectorPage):
                             ])
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Error", f"No se pudo guardar: {e}")
+            QMessageBox.warning(self, tr("Error"), f"No se pudo guardar: {e}")
 
     def _open_row(self, row: int, col: int):
         if row < 0 or self.state.run_dir is None: return

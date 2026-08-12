@@ -12,20 +12,21 @@ from PySide6.QtWidgets import (
 from ..core import theme as T
 from ..core.widgets import LogoBadge
 from .state import DetectorState
+from ..core.i18n import tr
 
 
 # ────────────────────────────────────────────────────────────────────
 SIDEBAR_ITEMS = [
     # (icono, etiqueta)
-    ("🎯", "Modelos"),
-    ("🖼", "Imágenes"),
-    ("✏️", "GT manual"),
-    ("⚙️", "Parámetros"),
-    ("▶", "Ejecutar"),
-    ("📊", "Resultados"),
-    ("⚠", "Errores"),
-    ("🧪", "Comparar"),
-    ("📄", "Reporte"),
+    ("🎯", tr("Modelos")),
+    ("🖼", tr("Imágenes")),
+    ("✏️", tr("GT manual")),
+    ("⚙️", tr("Parámetros")),
+    ("▶", tr("Ejecutar")),
+    ("📊", tr("Resultados")),
+    ("⚠", tr("Errores")),
+    ("🧪", tr("Comparar")),
+    ("📄", tr("Reporte")),
 ]
 
 
@@ -67,7 +68,7 @@ class SidebarButton(QPushButton):
 class DetectorWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Poly-X · Detector")
+        self.setWindowTitle(tr("Poly-X · Detector"))
         self.resize(1280, 820)
         self.setStyleSheet(T.GLOBAL_QSS + f"QMainWindow {{ background: {T.BG_SOFT}; }}")
 
@@ -109,12 +110,12 @@ class DetectorWindow(QMainWindow):
         sb.addStretch(1)
 
         # Pie del sidebar: estado del run
-        self.lbl_status = QLabel("● Listo")
+        self.lbl_status = QLabel(tr("● Listo"))
         self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt; padding: 4px 8px;")
         sb.addWidget(self.lbl_status)
 
         # Crédito de autoría
-        author = QLabel("Diseñado por\nCristofher Ferrada\n2026")
+        author = QLabel(tr("Diseñado por\nCristofher Ferrada\n2026"))
         author.setAlignment(Qt.AlignCenter)
         author.setStyleSheet(
             f"color: {T.INK3}; font-size: 8.5pt; padding: 8px; "

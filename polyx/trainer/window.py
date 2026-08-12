@@ -10,18 +10,19 @@ from PySide6.QtWidgets import (
 from ..core import theme as T
 from ..core.widgets import LogoBadge
 from .state import TrainerState
+from ..core.i18n import tr
 
 
 SIDEBAR_ITEMS = [
-    ("🎯", "Modelo"),
-    ("📂", "Dataset"),
-    ("⚙️", "Parámetros"),
-    ("🎨", "Augmentación"),
-    ("▶", "Entrenar"),
-    ("🧪", "Evaluar"),
-    ("📊", "Comparar"),
-    ("📤", "Exportar"),
-    ("📄", "Informe"),
+    ("🎯", tr("Modelo")),
+    ("📂", tr("Dataset")),
+    ("⚙️", tr("Parámetros")),
+    ("🎨", tr("Augmentación")),
+    ("▶", tr("Entrenar")),
+    ("🧪", tr("Evaluar")),
+    ("📊", tr("Comparar")),
+    ("📤", tr("Exportar")),
+    ("📄", tr("Informe")),
 ]
 
 
@@ -47,7 +48,7 @@ class SidebarButton(QPushButton):
 class TrainerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Poly-X · Entrenador")
+        self.setWindowTitle(tr("Poly-X · Entrenador"))
         self.resize(1320, 840)
         self.setStyleSheet(T.GLOBAL_QSS + f"QMainWindow {{ background: {T.BG_SOFT}; }}")
 
@@ -86,12 +87,12 @@ class TrainerWindow(QMainWindow):
             self.sidebar_buttons.append(b)
         sb.addStretch(1)
 
-        self.lbl_status = QLabel("● Listo")
+        self.lbl_status = QLabel(tr("● Listo"))
         self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt; padding: 4px 8px;")
         sb.addWidget(self.lbl_status)
 
         # Crédito de autoría
-        author = QLabel("Diseñado por\nCristofher Ferrada\n2026")
+        author = QLabel(tr("Diseñado por\nCristofher Ferrada\n2026"))
         author.setAlignment(Qt.AlignCenter)
         author.setStyleSheet(
             f"color: {T.INK3}; font-size: 8.5pt; padding: 8px; "

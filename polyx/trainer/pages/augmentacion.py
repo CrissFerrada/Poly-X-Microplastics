@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 from ._base import TrainerPage
 from ...core import theme as T
 from ..state import AUG_LEVELS
+from ...core.i18n import tr
 
 
 def _slider_row(label: str, value: float, max_val: float, on_change) -> tuple[QHBoxLayout, QSlider, QLabel]:
@@ -36,19 +37,19 @@ def _slider_row(label: str, value: float, max_val: float, on_change) -> tuple[QH
 
 class AugmentacionPage(TrainerPage):
     PAGE_ICON = "🎨"
-    PAGE_TITLE = "Augmentación de datos"
+    PAGE_TITLE = tr("Augmentación de datos")
     PAGE_DESCRIPTION = (
-        "Aumenta artificialmente la variedad del dataset. Útil para datasets pequeños "
-        "(< 500 imágenes). Demasiado aug = el modelo no converge; muy poco = sobreajuste."
+        tr("Aumenta artificialmente la variedad del dataset. Útil para datasets pequeños "
+        "(< 500 imágenes). Demasiado aug = el modelo no converge; muy poco = sobreajuste.")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
         # ── Preset ──
-        c1, l1 = self.card("Nivel de augmentación", "🎚")
+        c1, l1 = self.card(tr("Nivel de augmentación"), "🎚")
         row = QHBoxLayout(); row.setSpacing(8)
-        row.addWidget(QLabel("Nivel:"))
+        row.addWidget(QLabel(tr("Nivel:")))
         self.combo = QComboBox()
         self.combo.addItems(list(AUG_LEVELS.keys()))
         self.combo.setCurrentText(state.aug.level)
@@ -58,10 +59,10 @@ class AugmentacionPage(TrainerPage):
         l1.addLayout(row)
 
         legend = QLabel(
-            "<b>Ninguno</b>: sin transformaciones. &nbsp; "
+            tr("<b>Ninguno</b>: sin transformaciones. &nbsp; "
             "<b>Suave</b>: solo flips y jitter HSV. &nbsp; "
             "<b>Medio</b> (recomendado): + mosaic, mixup ligero. &nbsp; "
-            "<b>Fuerte</b>: + copy-paste agresivo."
+            "<b>Fuerte</b>: + copy-paste agresivo.")
         )
         legend.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         legend.setWordWrap(True); legend.setTextFormat(Qt.RichText)
@@ -69,7 +70,7 @@ class AugmentacionPage(TrainerPage):
         self.body.addWidget(c1)
 
         # ── Sliders manuales ──
-        c2, l2 = self.card("Sliders manuales (avanzado)", "🎛")
+        c2, l2 = self.card(tr("Sliders manuales (avanzado)"), "🎛")
 
         sets = [
             ("HSV-H (hue):",      "hsv_h",      0.1),
@@ -91,12 +92,12 @@ class AugmentacionPage(TrainerPage):
         self.body.addWidget(c2)
 
         # Hints
-        c3, l3 = self.card("Recomendaciones", "💡")
+        c3, l3 = self.card(tr("Recomendaciones"), "💡")
         tips = QLabel(
-            "• <b>Dataset pequeño (< 500 imgs)</b>: usa Fuerte. Más variedad sintética compensa pocos ejemplos.<br>"
+            tr("• <b>Dataset pequeño (< 500 imgs)</b>: usa Fuerte. Más variedad sintética compensa pocos ejemplos.<br>"
             "• <b>Microplásticos PET/PP/LDPE</b>: <b>NO</b> uses HSV-H alto: los colores son la pista principal.<br>"
             "• <b>Copy-paste</b> funciona muy bien si el fondo es uniforme (como un filtro).<br>"
-            "• Si el modelo no converge (mAP no sube), baja el nivel a Suave o Ninguno."
+            "• Si el modelo no converge (mAP no sube), baja el nivel a Suave o Ninguno.")
         )
         tips.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none; line-height: 1.6;")
         tips.setTextFormat(Qt.RichText); tips.setWordWrap(True)

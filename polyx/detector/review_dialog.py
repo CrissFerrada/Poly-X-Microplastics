@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from ..core import theme as T
 from ..core.yolo_wrap import Detection
 from .pages.gt_manual import AnnotCanvas, DEFAULT_CLASSES
+from ..core.i18n import tr
 
 
 class ReviewDialog(QDialog):
@@ -30,7 +31,7 @@ class ReviewDialog(QDialog):
     def __init__(self, state, parent=None):
         super().__init__(parent)
         self.state = state
-        self.setWindowTitle("Revisión de detecciones — Poly-X")
+        self.setWindowTitle(tr("Revisión de detecciones — Poly-X"))
         self.setModal(False)
         self._current_idx = -1
         self._results: List = []     # ImageResult del modelo activo
@@ -42,20 +43,20 @@ class ReviewDialog(QDialog):
         # ── Barra superior ──
         top = QHBoxLayout()
         top.setSpacing(10)
-        top.addWidget(QLabel("Modelo:"))
+        top.addWidget(QLabel(tr("Modelo:")))
         self.combo_model = QComboBox()
         self.combo_model.setMinimumWidth(160)
         self.combo_model.currentIndexChanged.connect(self._on_model_change)
         top.addWidget(self.combo_model)
 
-        top.addWidget(QLabel("Clase (para nuevas cajas):"))
+        top.addWidget(QLabel(tr("Clase (para nuevas cajas):")))
         self.combo_class = QComboBox()
         self.combo_class.addItems(DEFAULT_CLASSES)
         self.combo_class.currentIndexChanged.connect(
             lambda i: self.canvas.set_active_class(i))
         top.addWidget(self.combo_class)
 
-        btn_fit = QPushButton("Ajustar (F)")
+        btn_fit = QPushButton(tr("Ajustar (F)"))
         btn_fit.clicked.connect(lambda: self.canvas.zoom_fit())
         top.addWidget(btn_fit)
         btn_100 = QPushButton("100 %")
@@ -74,7 +75,7 @@ class ReviewDialog(QDialog):
 
         left = QVBoxLayout()
         left.setSpacing(6)
-        lbl_files = QLabel("Imágenes")
+        lbl_files = QLabel(tr("Imágenes"))
         lbl_files.setStyleSheet(f"color: {T.INK2}; font-weight: 600; border: none;")
         left.addWidget(lbl_files)
         self.list = QListWidget()
@@ -92,8 +93,8 @@ class ReviewDialog(QDialog):
         root.addLayout(body, 1)
 
         # ── Estado del canvas ──
-        self.lbl_status = QLabel("Click y arrastra para dibujar · rueda: zoom · "
-                                 "Espacio+arrastre: mover · Supr: borrar caja.")
+        self.lbl_status = QLabel(tr("Click y arrastra para dibujar · rueda: zoom · "
+                                 "Espacio+arrastre: mover · Supr: borrar caja."))
         self.lbl_status.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
         self.canvas.status_changed.connect(self.lbl_status.setText)
         root.addWidget(self.lbl_status)
@@ -101,22 +102,22 @@ class ReviewDialog(QDialog):
         # ── Botonera ──
         btns = QHBoxLayout()
         btns.setSpacing(8)
-        b_prev = QPushButton("←  Anterior")
+        b_prev = QPushButton(tr("←  Anterior"))
         b_prev.clicked.connect(self._go_prev)
         btns.addWidget(b_prev)
-        b_next = QPushButton("Siguiente  →")
+        b_next = QPushButton(tr("Siguiente  →"))
         b_next.clicked.connect(self._go_next)
         btns.addWidget(b_next)
 
         btns.addSpacing(20)
-        self.btn_good = QPushButton("✓  Buena")
+        self.btn_good = QPushButton(tr("✓  Buena"))
         self.btn_good.setStyleSheet(
             f"background: {T.OK}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 18px; font-weight: 700;")
         self.btn_good.setCursor(Qt.PointingHandCursor)
         self.btn_good.clicked.connect(lambda: self._set_verdict("buena"))
         btns.addWidget(self.btn_good)
-        self.btn_bad = QPushButton("✗  Mala")
+        self.btn_bad = QPushButton(tr("✗  Mala"))
         self.btn_bad.setStyleSheet(
             f"background: {T.ERR}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 18px; font-weight: 700;")
@@ -125,14 +126,14 @@ class ReviewDialog(QDialog):
         btns.addWidget(self.btn_bad)
 
         btns.addStretch(1)
-        b_dataset = QPushButton("📤  Enviar al dataset de reentrenamiento")
+        b_dataset = QPushButton(tr("📤  Enviar al dataset de reentrenamiento"))
         b_dataset.setToolTip(
-            "Copia esta imagen y sus cajas corregidas a dataset_correcciones/ "
-            "para mejorar el modelo con fine-tuning (active learning).")
+            tr("Copia esta imagen y sus cajas corregidas a dataset_correcciones/ "
+            "para mejorar el modelo con fine-tuning (active learning)."))
         b_dataset.setCursor(Qt.PointingHandCursor)
         b_dataset.clicked.connect(self._send_to_dataset)
         btns.addWidget(b_dataset)
-        b_save = QPushButton("💾  Guardar correcciones (.txt YOLO)")
+        b_save = QPushButton(tr("💾  Guardar correcciones (.txt YOLO)"))
         b_save.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;")
@@ -265,7 +266,7 @@ class ReviewDialog(QDialog):
         img = QImage(str(path))
         W, H = img.width(), img.height()
         if W == 0 or H == 0:
-            QMessageBox.warning(self, "Error", "No se pudo leer la imagen.")
+            QMessageBox.warning(self, tr("Error"), tr("No se pudo leer la imagen."))
             return None
         return path, dets, W, H
 
@@ -292,8 +293,8 @@ class ReviewDialog(QDialog):
         path, dets, W, H = cur
         if not dets:
             QMessageBox.information(
-                self, "Dataset",
-                "No hay cajas en esta imagen. Corrige o dibuja antes de enviarla.")
+                self, tr("Dataset"),
+                tr("No hay cajas en esta imagen. Corrige o dibuja antes de enviarla."))
             return
         root = Path(__file__).resolve().parents[2] / "dataset_correcciones"
         (root / "images").mkdir(parents=True, exist_ok=True)

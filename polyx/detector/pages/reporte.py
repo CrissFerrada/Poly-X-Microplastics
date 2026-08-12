@@ -13,47 +13,48 @@ from ._base import DetectorPage
 from ...core import theme as T
 from ...core import pdf_export
 from ...core.report_html import generate_report
+from ...core.i18n import tr
 
 
 class ReportePage(DetectorPage):
     STEP_N = 9
-    STEP_TITLE = "Reporte paper-quality"
+    STEP_TITLE = tr("Reporte paper-quality")
     STEP_DESCRIPTION = (
-        "Genera un informe HTML autocontenido (todas las imágenes embebidas en base64, "
+        tr("Genera un informe HTML autocontenido (todas las imágenes embebidas en base64, "
         "así no se rompen al enviarlo a otra persona) con métodos, métricas, gráficos, "
         "galería comparativa y análisis de errores. Puedes exportarlo directamente a PDF "
-        "para enviarlo."
+        "para enviarlo.")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
         # ── Tarjeta: Generar informe ──
-        c1, l1 = self.card("Generar informe", "📄")
+        c1, l1 = self.card(tr("Generar informe"), "📄")
         info = QLabel(
-            "Después de ejecutar al menos una detección, presiona <b>Generar reporte HTML</b> "
+            tr("Después de ejecutar al menos una detección, presiona <b>Generar reporte HTML</b> "
             "(se crea <code>reporte_paper.html</code> dentro de la carpeta del run y se abre "
             "en tu navegador) o <b>Exportar a PDF</b> para obtener un archivo listo para enviar. "
-            "Todas las imágenes van embebidas en base64, por lo que el archivo es autocontenido."
+            "Todas las imágenes van embebidas en base64, por lo que el archivo es autocontenido.")
         )
         info.setWordWrap(True)
         info.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         l1.addWidget(info)
 
         # Opciones
-        self.chk_refs = QCheckBox("Incluir referencias bibliográficas del autor en el reporte")
+        self.chk_refs = QCheckBox(tr("Incluir referencias bibliográficas del autor en el reporte"))
         self.chk_refs.setChecked(True)
         self.chk_refs.setStyleSheet(f"color: {T.INK2}; border: none;")
         l1.addWidget(self.chk_refs)
 
-        self.chk_gallery = QCheckBox("Incluir galería comparativa (Predicción vs Ground Truth)")
+        self.chk_gallery = QCheckBox(tr("Incluir galería comparativa (Predicción vs Ground Truth)"))
         self.chk_gallery.setChecked(True)
         self.chk_gallery.setStyleSheet(f"color: {T.INK2}; border: none;")
         l1.addWidget(self.chk_gallery)
 
         row = QHBoxLayout()
         row.setSpacing(8)
-        self.btn_gen = QPushButton("📄  Generar reporte HTML")
+        self.btn_gen = QPushButton(tr("📄  Generar reporte HTML"))
         self.btn_gen.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -62,13 +63,13 @@ class ReportePage(DetectorPage):
         self.btn_gen.clicked.connect(self._generate)
         row.addWidget(self.btn_gen)
 
-        self.btn_pdf = QPushButton("📑  Exportar a PDF")
+        self.btn_pdf = QPushButton(tr("📑  Exportar a PDF"))
         self.btn_pdf.setStyleSheet(
             f"background: {T.OK}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
         )
         self.btn_pdf.setCursor(Qt.PointingHandCursor)
-        self.btn_pdf.setToolTip("Genera el reporte y lo guarda como PDF listo para enviar.")
+        self.btn_pdf.setToolTip(tr("Genera el reporte y lo guarda como PDF listo para enviar."))
         self.btn_pdf.clicked.connect(self._export_pdf)
         row.addWidget(self.btn_pdf)
 
@@ -82,7 +83,7 @@ class ReportePage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Contenido del reporte ──
-        c2, l2 = self.card("Contenido del reporte", "📋")
+        c2, l2 = self.card(tr("Contenido del reporte"), "📋")
         contents = QLabel(
             "<ol>"
             "<li><b>Resumen (abstract)</b> con detecciones, conf. media y tamaño medio.</li>"
@@ -114,9 +115,9 @@ class ReportePage(DetectorPage):
         """Avisa si todavía no hay detecciones ejecutadas."""
         if not self.state.results:
             QMessageBox.warning(
-                self, "Sin resultados",
-                "Aún no has ejecutado ninguna detección.\n"
-                "Ve a la pestaña Ejecutar e inicia el análisis primero."
+                self, tr("Sin resultados"),
+                tr("Aún no has ejecutado ninguna detección.\n"
+                "Ve a la pestaña Ejecutar e inicia el análisis primero.")
             )
             return False
         return True
@@ -144,7 +145,7 @@ class ReportePage(DetectorPage):
 
         out_path = out_dir / "reporte_paper.html"
         self.btn_gen.setEnabled(False)
-        self.lbl_status.setText("Generando reporte… (puede tardar unos segundos)")
+        self.lbl_status.setText(tr("Generando reporte… (puede tardar unos segundos)"))
         try:
             self._write_html(out_path)
             self.lbl_status.setText(f"✓ Reporte generado: {out_path}")
@@ -153,8 +154,8 @@ class ReportePage(DetectorPage):
             except Exception:
                 pass
         except Exception as e:
-            QMessageBox.critical(self, "Error generando reporte", f"{type(e).__name__}: {e}")
-            self.lbl_status.setText("✗ Falló la generación.")
+            QMessageBox.critical(self, tr("Error generando reporte"), f"{type(e).__name__}: {e}")
+            self.lbl_status.setText(tr("✗ Falló la generación."))
         finally:
             self.btn_gen.setEnabled(True)
 
@@ -164,10 +165,10 @@ class ReportePage(DetectorPage):
 
         if not pdf_export.is_available():
             QMessageBox.warning(
-                self, "PDF no disponible",
-                "Para exportar a PDF se necesita QtWebEngine (incluido en PySide6-Addons).\n\n"
+                self, tr("PDF no disponible"),
+                tr("Para exportar a PDF se necesita QtWebEngine (incluido en PySide6-Addons).\n\n"
                 "Alternativa: pulsa 'Generar reporte HTML' y, en el navegador, usa\n"
-                "Ctrl+P → 'Guardar como PDF'."
+                "Ctrl+P → 'Guardar como PDF'.")
             )
             return
 
@@ -185,7 +186,7 @@ class ReportePage(DetectorPage):
 
         self.btn_pdf.setEnabled(False)
         self.btn_gen.setEnabled(False)
-        self.lbl_status.setText("Generando PDF… (renderizando con el motor del navegador, unos segundos)")
+        self.lbl_status.setText(tr("Generando PDF… (renderizando con el motor del navegador, unos segundos)"))
         QApplication.processEvents()
         try:
             self._write_html(html_path)
@@ -197,15 +198,15 @@ class ReportePage(DetectorPage):
                 except Exception:
                     pass
             else:
-                self.lbl_status.setText("✗ No se pudo generar el PDF.")
+                self.lbl_status.setText(tr("✗ No se pudo generar el PDF."))
                 QMessageBox.warning(
-                    self, "No se pudo generar el PDF",
-                    "Falló el renderizado. Como alternativa, genera el HTML y usa\n"
-                    "Ctrl+P → 'Guardar como PDF' en tu navegador."
+                    self, tr("No se pudo generar el PDF"),
+                    tr("Falló el renderizado. Como alternativa, genera el HTML y usa\n"
+                    "Ctrl+P → 'Guardar como PDF' en tu navegador.")
                 )
         except Exception as e:
-            QMessageBox.critical(self, "Error generando PDF", f"{type(e).__name__}: {e}")
-            self.lbl_status.setText("✗ Falló la generación de PDF.")
+            QMessageBox.critical(self, tr("Error generando PDF"), f"{type(e).__name__}: {e}")
+            self.lbl_status.setText(tr("✗ Falló la generación de PDF."))
         finally:
             self.btn_pdf.setEnabled(True)
             self.btn_gen.setEnabled(True)

@@ -90,12 +90,18 @@ def recolectar(archivo: Path) -> tuple[set[str], set[str]]:
         if nombre not in CONSTRUCTORES and nombre not in METODOS:
             continue
         for arg in nodo.args:
-            es_tr = (isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name)
-                     and arg.func.id == "tr")
-            destino = envueltas if es_tr else crudas
-            for s in literales_de(arg):
-                if es_texto_ui(s):
-                    destino.add(s)
+            if (isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name)
+                    and arg.func.id == "tr"):
+                for s in literales_de(arg):
+                    if es_texto_ui(s):
+                        envueltas.add(s)
+            elif isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                # Solo el literal COMPLETO cuenta como unidad traducible. Los
+                # trozos sueltos de un f-string o de una concatenacion no lo son:
+                # contarlos inflaba el total con fragmentos como " px → " que no
+                # se traducen por separado sino como parte de su mensaje.
+                if es_texto_ui(arg.value):
+                    crudas.add(arg.value)
     return envueltas, crudas
 
 

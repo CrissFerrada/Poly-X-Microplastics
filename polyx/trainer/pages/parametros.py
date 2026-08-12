@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from ._base import TrainerPage
 from ...core import theme as T
 from ..hw import detect_gpu, recommend_max_imgsz, recommend_batch, estimate_vram_gb, humanize_gb
+from ...core.i18n import tr
 
 
 # Detección de GPU en background para no congelar la GUI al arrancar
@@ -40,47 +41,47 @@ def _hint(text: str) -> QLabel:
 
 class ParametrosPage(TrainerPage):
     PAGE_ICON = "⚙️"
-    PAGE_TITLE = "Parámetros de entrenamiento"
+    PAGE_TITLE = tr("Parámetros de entrenamiento")
     PAGE_DESCRIPTION = (
-        "Cada parámetro tiene un hint con su explicación. Los valores por defecto son "
-        "sensatos para microplásticos. Si tocas algo, el preset cambia a 'Personalizado'."
+        tr("Cada parámetro tiene un hint con su explicación. Los valores por defecto son "
+        "sensatos para microplásticos. Si tocas algo, el preset cambia a 'Personalizado'.")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
         # ── Configuración básica (incluye Maximizar imgsz) ──
-        c1, l1 = self.card("Configuración básica", "🧱")
+        c1, l1 = self.card(tr("Configuración básica"), "🧱")
         g = QGridLayout(); g.setHorizontalSpacing(20); g.setVerticalSpacing(10)
 
         # Imgsz: combobox con tamaños altos como valores principales
-        g.addWidget(QLabel("Tamaño imagen (imgsz):"), 0, 0)
+        g.addWidget(QLabel(tr("Tamaño imagen (imgsz):")), 0, 0)
         self.combo_imgsz = QComboBox(); self.combo_imgsz.setEditable(True)
         for v in IMGSZ_CHOICES: self.combo_imgsz.addItem(str(v))
         self.combo_imgsz.setCurrentText(str(state.params.imgsz))
         self.combo_imgsz.currentTextChanged.connect(self._on_change)
         g.addWidget(self.combo_imgsz, 0, 1)
-        g.addWidget(_hint("MÁS ALTO = mejor para partículas pequeñas. Recomendado: 1280+."), 0, 2)
+        g.addWidget(_hint(tr("MÁS ALTO = mejor para partículas pequeñas. Recomendado: 1280+.")), 0, 2)
 
         # Épocas
-        g.addWidget(QLabel("Épocas:"), 1, 0)
+        g.addWidget(QLabel(tr("Épocas:")), 1, 0)
         self.sb_epochs = QSpinBox(); self.sb_epochs.setRange(1, 2000); self.sb_epochs.setValue(state.params.epochs)
         self.sb_epochs.valueChanged.connect(self._on_change); g.addWidget(self.sb_epochs, 1, 1)
-        g.addWidget(_hint("150–300 típico. Early stopping detiene si no mejora (ver Patience)."), 1, 2)
+        g.addWidget(_hint(tr("150–300 típico. Early stopping detiene si no mejora (ver Patience).")), 1, 2)
 
         # Batch
-        g.addWidget(QLabel("Batch size:"), 2, 0)
+        g.addWidget(QLabel(tr("Batch size:")), 2, 0)
         self.sb_batch = QSpinBox(); self.sb_batch.setRange(1, 256); self.sb_batch.setValue(state.params.batch)
         self.sb_batch.valueChanged.connect(self._on_change); g.addWidget(self.sb_batch, 2, 1)
-        g.addWidget(_hint("Bajar si hay OOM. Subir si la GPU tiene RAM de sobra."), 2, 2)
+        g.addWidget(_hint(tr("Bajar si hay OOM. Subir si la GPU tiene RAM de sobra.")), 2, 2)
 
         # Cache
-        g.addWidget(QLabel("Cache:"), 3, 0)
+        g.addWidget(QLabel(tr("Cache:")), 3, 0)
         self.combo_cache = QComboBox(); self.combo_cache.addItems(["disk", "ram", "False"])
         self.combo_cache.setCurrentText(state.params.cache)
         self.combo_cache.currentTextChanged.connect(self._on_change)
         g.addWidget(self.combo_cache, 3, 1)
-        g.addWidget(_hint("'ram' es lo más rápido si cabe; 'disk' es seguro; 'False' para datasets gigantes."), 3, 2)
+        g.addWidget(_hint(tr("'ram' es lo más rápido si cabe; 'disk' es seguro; 'False' para datasets gigantes.")), 3, 2)
 
         l1.addLayout(g)
 
@@ -91,19 +92,19 @@ class ParametrosPage(TrainerPage):
         )
         gf = QVBoxLayout(gpu_frame); gf.setContentsMargins(14, 10, 14, 12); gf.setSpacing(8)
 
-        title = QLabel("🚀  Maximizar imgsz para mi GPU")
+        title = QLabel(tr("🚀  Maximizar imgsz para mi GPU"))
         title.setStyleSheet(f"color: {T.INK}; font-size: 11pt; font-weight: 600; border: none;")
         gf.addWidget(title)
-        self.lbl_gpu = QLabel("Detectando GPU…")
+        self.lbl_gpu = QLabel(tr("Detectando GPU…"))
         self.lbl_gpu.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none;")
         gf.addWidget(self.lbl_gpu)
 
         btn_row = QHBoxLayout(); btn_row.setSpacing(8)
-        self.btn_detect = QPushButton("🔄  Detectar GPU / VRAM")
+        self.btn_detect = QPushButton(tr("🔄  Detectar GPU / VRAM"))
         self.btn_detect.clicked.connect(self._detect_gpu)
         btn_row.addWidget(self.btn_detect)
 
-        self.btn_maximize = QPushButton("⚡  Sugerir imgsz MÁXIMO")
+        self.btn_maximize = QPushButton(tr("⚡  Sugerir imgsz MÁXIMO"))
         self.btn_maximize.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 7px 14px; font-weight: 600;"
@@ -112,7 +113,7 @@ class ParametrosPage(TrainerPage):
         self.btn_maximize.clicked.connect(self._maximize_imgsz)
         btn_row.addWidget(self.btn_maximize)
 
-        self.btn_suggest_batch = QPushButton("Sugerir batch para mi GPU")
+        self.btn_suggest_batch = QPushButton(tr("Sugerir batch para mi GPU"))
         self.btn_suggest_batch.clicked.connect(self._suggest_batch)
         btn_row.addWidget(self.btn_suggest_batch)
         btn_row.addStretch(1)
@@ -120,21 +121,21 @@ class ParametrosPage(TrainerPage):
 
         # Un solo botón que aplica el orden de prioridades completo, en vez de
         # dejar que el usuario adivine si primero sube imgsz o primero batch.
-        self.btn_optimizar = QPushButton("🎯  Optimizar todo (imgsz → batch → velocidad)")
+        self.btn_optimizar = QPushButton(tr("🎯  Optimizar todo (imgsz → batch → velocidad)"))
         self.btn_optimizar.setStyleSheet(
             f"background: {T.OK}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 14px; font-weight: 600;"
         )
         self.btn_optimizar.setCursor(Qt.PointingHandCursor)
         self.btn_optimizar.setToolTip(
-            "Fija imgsz al máximo que aguanta la tarjeta (sin pasar de la resolución "
+            tr("Fija imgsz al máximo que aguanta la tarjeta (sin pasar de la resolución "
             "nativa del dataset), después sube el batch con lo que sobre, y al final "
-            "ajusta AMP, workers y cache. En ese orden."
+            "ajusta AMP, workers y cache. En ese orden.")
         )
         self.btn_optimizar.clicked.connect(self._optimizar_todo)
         gf.addWidget(self.btn_optimizar)
 
-        self.lbl_est = QLabel("Estimación de VRAM: —")
+        self.lbl_est = QLabel(tr("Estimación de VRAM: —"))
         self.lbl_est.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
         gf.addWidget(self.lbl_est)
 
@@ -142,68 +143,68 @@ class ParametrosPage(TrainerPage):
         self.body.addWidget(c1)
 
         # ── Optimizador y LR ──
-        c2, l2 = self.card("Optimizador y learning rate", "📈")
+        c2, l2 = self.card(tr("Optimizador y learning rate"), "📈")
         g2 = QGridLayout(); g2.setHorizontalSpacing(20); g2.setVerticalSpacing(10)
-        g2.addWidget(QLabel("Learning rate (lr0):"), 0, 0)
+        g2.addWidget(QLabel(tr("Learning rate (lr0):")), 0, 0)
         self.sb_lr0 = QDoubleSpinBox(); self.sb_lr0.setRange(0.0001, 0.1)
         self.sb_lr0.setDecimals(4); self.sb_lr0.setSingleStep(0.001); self.sb_lr0.setValue(state.params.lr0)
         self.sb_lr0.valueChanged.connect(self._on_change); g2.addWidget(self.sb_lr0, 0, 1)
-        g2.addWidget(QLabel("Weight decay:"), 0, 2)
+        g2.addWidget(QLabel(tr("Weight decay:")), 0, 2)
         self.sb_wd = QDoubleSpinBox(); self.sb_wd.setRange(0.0, 0.01); self.sb_wd.setDecimals(5)
         self.sb_wd.setSingleStep(0.0001); self.sb_wd.setValue(state.params.weight_decay)
         self.sb_wd.valueChanged.connect(self._on_change); g2.addWidget(self.sb_wd, 0, 3)
 
-        g2.addWidget(QLabel("Momentum:"), 1, 0)
+        g2.addWidget(QLabel(tr("Momentum:")), 1, 0)
         self.sb_mom = QDoubleSpinBox(); self.sb_mom.setRange(0.5, 0.999); self.sb_mom.setDecimals(3)
         self.sb_mom.setSingleStep(0.01); self.sb_mom.setValue(state.params.momentum)
         self.sb_mom.valueChanged.connect(self._on_change); g2.addWidget(self.sb_mom, 1, 1)
-        g2.addWidget(QLabel("Warmup épocas:"), 1, 2)
+        g2.addWidget(QLabel(tr("Warmup épocas:")), 1, 2)
         self.sb_warm = QSpinBox(); self.sb_warm.setRange(0, 50); self.sb_warm.setValue(state.params.warmup_epochs)
         self.sb_warm.valueChanged.connect(self._on_change); g2.addWidget(self.sb_warm, 1, 3)
 
-        g2.addWidget(QLabel("Close mosaic:"), 2, 0)
+        g2.addWidget(QLabel(tr("Close mosaic:")), 2, 0)
         self.sb_close = QSpinBox(); self.sb_close.setRange(0, 100); self.sb_close.setValue(state.params.close_mosaic)
         self.sb_close.valueChanged.connect(self._on_change); g2.addWidget(self.sb_close, 2, 1)
-        g2.addWidget(QLabel("Label smoothing:"), 2, 2)
+        g2.addWidget(QLabel(tr("Label smoothing:")), 2, 2)
         self.sb_ls = QDoubleSpinBox(); self.sb_ls.setRange(0.0, 0.3); self.sb_ls.setDecimals(2)
         self.sb_ls.setSingleStep(0.01); self.sb_ls.setValue(state.params.label_smoothing)
         self.sb_ls.valueChanged.connect(self._on_change); g2.addWidget(self.sb_ls, 2, 3)
 
-        self.cb_cos = QCheckBox("Cosine LR (curva coseno)")
+        self.cb_cos = QCheckBox(tr("Cosine LR (curva coseno)"))
         self.cb_cos.setChecked(state.params.cos_lr); self.cb_cos.stateChanged.connect(self._on_change)
         g2.addWidget(self.cb_cos, 3, 0, 1, 2)
-        self.cb_amp = QCheckBox("AMP (Mixed Precision FP16)")
+        self.cb_amp = QCheckBox(tr("AMP (Mixed Precision FP16)"))
         self.cb_amp.setChecked(state.params.amp); self.cb_amp.stateChanged.connect(self._on_change)
         g2.addWidget(self.cb_amp, 3, 2, 1, 2)
         l2.addLayout(g2)
         self.body.addWidget(c2)
 
         # ── Early stopping ──
-        c3, l3 = self.card("Early stopping y checkpoints", "💾")
+        c3, l3 = self.card(tr("Early stopping y checkpoints"), "💾")
         g3 = QGridLayout(); g3.setHorizontalSpacing(20); g3.setVerticalSpacing(10)
-        g3.addWidget(QLabel("Patience:"), 0, 0)
+        g3.addWidget(QLabel(tr("Patience:")), 0, 0)
         self.sb_pat = QSpinBox(); self.sb_pat.setRange(0, 500); self.sb_pat.setValue(state.params.patience)
         self.sb_pat.valueChanged.connect(self._on_change); g3.addWidget(self.sb_pat, 0, 1)
-        g3.addWidget(_hint("Épocas sin mejora antes de detener. 50 = sensato."), 0, 2)
-        g3.addWidget(QLabel("Save period:"), 1, 0)
+        g3.addWidget(_hint(tr("Épocas sin mejora antes de detener. 50 = sensato.")), 0, 2)
+        g3.addWidget(QLabel(tr("Save period:")), 1, 0)
         self.sb_save = QSpinBox(); self.sb_save.setRange(1, 100); self.sb_save.setValue(state.params.save_period)
         self.sb_save.valueChanged.connect(self._on_change); g3.addWidget(self.sb_save, 1, 1)
-        g3.addWidget(_hint("Guardar checkpoint cada N épocas."), 1, 2)
+        g3.addWidget(_hint(tr("Guardar checkpoint cada N épocas.")), 1, 2)
         l3.addLayout(g3)
         self.body.addWidget(c3)
 
         # ── Hardware / IO ──
-        c4, l4 = self.card("Hardware e I/O", "🖥")
+        c4, l4 = self.card(tr("Hardware e I/O"), "🖥")
         g4 = QGridLayout(); g4.setHorizontalSpacing(20); g4.setVerticalSpacing(10)
-        g4.addWidget(QLabel("Device:"), 0, 0)
+        g4.addWidget(QLabel(tr("Device:")), 0, 0)
         self.ed_device = QLineEdit(state.params.device); self.ed_device.editingFinished.connect(self._on_change)
         g4.addWidget(self.ed_device, 0, 1)
-        g4.addWidget(_hint("'0' = primera GPU. 'cpu' = CPU (muy lento)."), 0, 2)
-        g4.addWidget(QLabel("Workers:"), 1, 0)
+        g4.addWidget(_hint(tr("'0' = primera GPU. 'cpu' = CPU (muy lento).")), 0, 2)
+        g4.addWidget(QLabel(tr("Workers:")), 1, 0)
         self.sb_workers = QSpinBox(); self.sb_workers.setRange(0, 32); self.sb_workers.setValue(state.params.workers)
         self.sb_workers.valueChanged.connect(self._on_change); g4.addWidget(self.sb_workers, 1, 1)
-        g4.addWidget(QLabel("Nombre del run:"), 2, 0)
-        self.ed_run = QLineEdit(state.params.run_name); self.ed_run.setPlaceholderText("vacío = auto-fecha")
+        g4.addWidget(QLabel(tr("Nombre del run:")), 2, 0)
+        self.ed_run = QLineEdit(state.params.run_name); self.ed_run.setPlaceholderText(tr("vacío = auto-fecha"))
         self.ed_run.editingFinished.connect(self._on_change); g4.addWidget(self.ed_run, 2, 1, 1, 2)
         l4.addLayout(g4)
         self.body.addWidget(c4)
@@ -325,8 +326,8 @@ class ParametrosPage(TrainerPage):
         info = getattr(self, "_last_gpu_info", None) or detect_gpu()
         if not info.available:
             QMessageBox.information(
-                self, "Sin GPU",
-                "No hay GPU NVIDIA disponible. En CPU recomendamos imgsz ≤ 640."
+                self, tr("Sin GPU"),
+                tr("No hay GPU NVIDIA disponible. En CPU recomendamos imgsz ≤ 640.")
             )
             self.combo_imgsz.setCurrentText("640")
             return
@@ -343,7 +344,7 @@ class ParametrosPage(TrainerPage):
     def _suggest_batch(self):
         info = getattr(self, "_last_gpu_info", None) or detect_gpu()
         if not info.available:
-            QMessageBox.information(self, "Sin GPU", "Sin GPU no aplica esta sugerencia.")
+            QMessageBox.information(self, tr("Sin GPU"), tr("Sin GPU no aplica esta sugerencia."))
             return
         try:
             imgsz = int(self.combo_imgsz.currentText())
@@ -396,7 +397,7 @@ class ParametrosPage(TrainerPage):
                        f"{humanize_gb(info.vram_total_gb)}) pero PyTorch no la puede "
                        f"usar.\n\n{info.detalle}\n\nHay que reinstalar PyTorch con "
                        f"CUDA; hasta entonces el entrenamiento va por CPU.")
-            QMessageBox.information(self, "Sin GPU utilizable", msg)
+            QMessageBox.information(self, tr("Sin GPU utilizable"), msg)
             return
 
         lado_nativo, dataset_gb = self._medir_dataset()
@@ -437,7 +438,7 @@ class ParametrosPage(TrainerPage):
         self.lbl_est.setText(texto)
         self.lbl_est.setTextFormat(Qt.RichText)
         if r.notas:
-            QMessageBox.information(self, "Configuración optimizada",
+            QMessageBox.information(self, tr("Configuración optimizada"),
                                     "\n\n".join(f"• {n}" for n in r.notas))
 
     def _update_estimate(self):
@@ -454,4 +455,4 @@ class ParametrosPage(TrainerPage):
                 f"AMP={'on' if self.cb_amp.isChecked() else 'off'})"
             )
         except Exception:
-            self.lbl_est.setText("Estimación de VRAM: —")
+            self.lbl_est.setText(tr("Estimación de VRAM: —"))

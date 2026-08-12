@@ -292,9 +292,9 @@ class LauncherWindow(QMainWindow):
 
         title_row = QHBoxLayout()
         title_row.setSpacing(10)
-        t1 = QLabel("Poly-X")
+        t1 = QLabel(tr("Poly-X"))
         t1.setStyleSheet(f"color: {T.INK}; font-size: 38pt; font-weight: 700; border: none;")
-        t2 = QLabel("analytics")
+        t2 = QLabel(tr("analytics"))
         t2.setStyleSheet(
             f"color: {T.ACCENT}; font-size: 38pt; font-weight: 300; border: none;"
         )
@@ -447,7 +447,7 @@ class LauncherWindow(QMainWindow):
 
     def _toast(self, msg: str):
         from PySide6.QtWidgets import QMessageBox
-        QMessageBox.information(self, "Poly-X", msg)
+        QMessageBox.information(self, tr("Poly-X"), msg)
 
 
 def main():

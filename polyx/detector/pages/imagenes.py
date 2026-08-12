@@ -13,15 +13,16 @@ from ._base import DetectorPage
 from ...core import theme as T
 from ...core.paths import IMAGE_EXTS
 from ...core.yolo_wrap import find_gt_for_image
+from ...core.i18n import tr
 
 
 class ImagenesPage(DetectorPage):
     STEP_N = 2
-    STEP_TITLE = "Imágenes"
+    STEP_TITLE = tr("Imágenes")
     STEP_DESCRIPTION = (
-        "Selecciona imágenes individuales o una carpeta. Si tienes etiquetas verdaderas en "
+        tr("Selecciona imágenes individuales o una carpeta. Si tienes etiquetas verdaderas en "
         "formato YOLO (.txt) en la misma carpeta o en una hermana 'labels/', se cargarán y "
-        "activarán el análisis de errores."
+        "activarán el análisis de errores.")
     )
 
     def __init__(self, state, parent=None):
@@ -29,14 +30,14 @@ class ImagenesPage(DetectorPage):
         self.setAcceptDrops(True)
 
         # ── Tarjeta Origen ──
-        c1, l1 = self.card("Origen", "📁")
+        c1, l1 = self.card(tr("Origen"), "📁")
         row = QHBoxLayout()
         row.setSpacing(8)
-        btn_files = QPushButton("📷  Seleccionar imágenes…")
+        btn_files = QPushButton(tr("📷  Seleccionar imágenes…"))
         btn_files.clicked.connect(self._pick_files)
-        btn_folder = QPushButton("📁  Seleccionar carpeta…")
+        btn_folder = QPushButton(tr("📁  Seleccionar carpeta…"))
         btn_folder.clicked.connect(self._pick_folder)
-        btn_clear = QPushButton("✕  Limpiar")
+        btn_clear = QPushButton(tr("✕  Limpiar"))
         btn_clear.clicked.connect(self._clear)
         row.addWidget(btn_files)
         row.addWidget(btn_folder)
@@ -47,10 +48,10 @@ class ImagenesPage(DetectorPage):
         # Carpeta GT opcional
         gt_row = QHBoxLayout()
         gt_row.setSpacing(8)
-        lbl_gt = QLabel("Carpeta GT (opcional):")
+        lbl_gt = QLabel(tr("Carpeta GT (opcional):"))
         lbl_gt.setStyleSheet(f"color: {T.INK2}; border: none;")
         self.ed_gt = QLineEdit()
-        self.ed_gt.setPlaceholderText("Ruta a la carpeta con .txt YOLO (si no, busca junto a la imagen)")
+        self.ed_gt.setPlaceholderText(tr("Ruta a la carpeta con .txt YOLO (si no, busca junto a la imagen)"))
         self.ed_gt.editingFinished.connect(self._gt_text_changed)
         btn_gt = QPushButton("…")
         btn_gt.setFixedWidth(36)
@@ -61,10 +62,10 @@ class ImagenesPage(DetectorPage):
         l1.addLayout(gt_row)
 
         hint = QLabel(
-            "Si dejas vacío, busca .txt junto a cada imagen y en /labels/ hermana. "
+            tr("Si dejas vacío, busca .txt junto a cada imagen y en /labels/ hermana. "
             "Si una imagen tiene GT, se incluirá en el análisis de errores "
             "(Verdaderos Positivos, Falsos Positivos y Falsos Negativos). "
-            "Si no, solo se reportan las detecciones del modelo."
+            "Si no, solo se reportan las detecciones del modelo.")
         )
         hint.setWordWrap(True)
         hint.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
@@ -72,8 +73,8 @@ class ImagenesPage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Tarjeta Imágenes cargadas ──
-        c2, l2 = self.card("Imágenes cargadas", "🖼")
-        self.lbl_count = QLabel("0 imágenes")
+        c2, l2 = self.card(tr("Imágenes cargadas"), "🖼")
+        self.lbl_count = QLabel(tr("0 imágenes"))
         self.lbl_count.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         l2.addWidget(self.lbl_count)
 

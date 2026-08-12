@@ -13,6 +13,7 @@ from ._base import DetectorPage
 from ...core import theme as T
 from ...core.paths import DEFAULT_MODEL
 from ...core.yolo_wrap import YoloModel
+from ...core.i18n import tr
 
 
 class _ModelSlotCard(QFrame):
@@ -47,7 +48,7 @@ class _ModelSlotCard(QFrame):
         # Alias
         row1 = QHBoxLayout()
         row1.setSpacing(8)
-        lbl1 = QLabel("Alias:")
+        lbl1 = QLabel(tr("Alias:"))
         lbl1.setStyleSheet(f"color: {T.INK2}; border: none; min-width: 40px;")
         self.ed_alias = QLineEdit(f"Modelo {idx + 1}")
         self.ed_alias.setMaximumWidth(220)
@@ -63,7 +64,7 @@ class _ModelSlotCard(QFrame):
         lbl2 = QLabel(".pt:")
         lbl2.setStyleSheet(f"color: {T.INK2}; border: none; min-width: 40px;")
         self.ed_path = QLineEdit("")
-        self.ed_path.setPlaceholderText("Ruta al archivo .pt del modelo entrenado…")
+        self.ed_path.setPlaceholderText(tr("Ruta al archivo .pt del modelo entrenado…"))
         self.ed_path.editingFinished.connect(self._emit_change)
         btn_browse = QPushButton("...")
         btn_browse.setFixedWidth(36)
@@ -130,10 +131,10 @@ class _ModelSlotCard(QFrame):
 
 class ModelosPage(DetectorPage):
     STEP_N = 1
-    STEP_TITLE = "Modelos"
+    STEP_TITLE = tr("Modelos")
     STEP_DESCRIPTION = (
-        "Carga hasta 3 modelos .pt entrenados para detectar microplásticos. "
-        "Si cargas más de uno, se compararán automáticamente en el reporte final."
+        tr("Carga hasta 3 modelos .pt entrenados para detectar microplásticos. "
+        "Si cargas más de uno, se compararán automáticamente en el reporte final.")
     )
 
     def __init__(self, state, parent=None):
@@ -147,9 +148,9 @@ class ModelosPage(DetectorPage):
             self.slot_cards.append(c)
 
         # Carga rápida
-        qf, qfl = self.card("Carga rápida", "⚡")
+        qf, qfl = self.card(tr("Carga rápida"), "⚡")
         info = QLabel(
-            "Si tienes el modelo entrenado por el autor, úsalo como Modelo 1 con un solo clic."
+            tr("Si tienes el modelo entrenado por el autor, úsalo como Modelo 1 con un solo clic.")
         )
         info.setWordWrap(True)
         info.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
@@ -157,7 +158,7 @@ class ModelosPage(DetectorPage):
 
         row = QHBoxLayout()
         row.setSpacing(8)
-        btn_default = QPushButton("Usar bestdetectormedium.pt")
+        btn_default = QPushButton(tr("Usar bestdetectormedium.pt"))
         btn_default.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -177,7 +178,7 @@ class ModelosPage(DetectorPage):
         if DEFAULT_MODEL.exists():
             self.lbl_default.setText(f"Encontrado en {DEFAULT_MODEL.name}")
         else:
-            self.lbl_default.setText("No encontrado en la raíz del proyecto.")
+            self.lbl_default.setText(tr("No encontrado en la raíz del proyecto."))
 
     # ──────────────────────────────────────────
     def _on_slot_changed(self, idx: int, alias: str, path_str: str):
@@ -202,13 +203,13 @@ class ModelosPage(DetectorPage):
     def _load_default(self):
         if not DEFAULT_MODEL.exists():
             QMessageBox.warning(
-                self, "No encontrado",
+                self, tr("No encontrado"),
                 f"No se encontró {DEFAULT_MODEL}.\n"
                 "Cópialo a la raíz del proyecto e intenta de nuevo."
             )
             return
         # Cargar en slot 1
         card = self.slot_cards[0]
-        card.ed_alias.setText("bestdetectormedium")
+        card.ed_alias.setText(tr("bestdetectormedium"))
         card.ed_path.setText(str(DEFAULT_MODEL))
         card._emit_change()

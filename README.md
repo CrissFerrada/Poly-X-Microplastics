@@ -123,6 +123,23 @@ en esas dos.
 
 ---
 
+## Idioma
+
+La interfaz está en **español e inglés**. El selector está en la barra superior
+del Launcher y la elección se recuerda entre sesiones. La primera vez se toma el
+idioma del sistema; `POLYX_IDIOMA=en` lo fuerza sin tocar la interfaz.
+
+Los módulos son procesos aparte y leen el idioma al abrirse, así que el cambio
+surte efecto en cuanto abras el siguiente módulo.
+
+Para ver qué falta por traducir:
+
+```bat
+.venv\Scripts\python.exe auditar_traduccion.py
+```
+
+---
+
 ## Requisitos
 
 | Componente | Versión |

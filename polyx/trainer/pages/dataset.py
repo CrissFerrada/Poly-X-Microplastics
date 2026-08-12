@@ -18,6 +18,7 @@ from ...core.paths import IMAGE_EXTS
 from ...core.dataset_audit import (
     audit_dataset, LEVEL_OK, LEVEL_WARN, LEVEL_ERROR,
 )
+from ...core.i18n import tr
 
 
 def _load_yaml(path: Path) -> dict:
@@ -110,26 +111,26 @@ class _PreviewTile(QLabel):
             f"background: {T.BG_SOFT}; border: 1px solid {T.RULE}; border-radius: 6px;"
         )
         self.setAlignment(Qt.AlignCenter)
-        self.setText("(vacío)")
+        self.setText(tr("(vacío)"))
 
 
 class DatasetPage(TrainerPage):
     PAGE_ICON = "📂"
-    PAGE_TITLE = "Dataset"
+    PAGE_TITLE = tr("Dataset")
     PAGE_DESCRIPTION = (
-        "Carga tu data.yaml. Validamos la estructura, contamos imágenes y mostramos una "
-        "vista previa con cajas. Si tu dataset no está dividido, usa Auto-split."
+        tr("Carga tu data.yaml. Validamos la estructura, contamos imágenes y mostramos una "
+        "vista previa con cajas. Si tu dataset no está dividido, usa Auto-split.")
     )
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
         # ── Origen ──
-        c1, l1 = self.card("data.yaml", "📑")
+        c1, l1 = self.card(tr("data.yaml"), "📑")
         row = QHBoxLayout()
         row.setSpacing(8)
         self.ed_yaml = QLineEdit()
-        self.ed_yaml.setPlaceholderText("Ruta a data.yaml…")
+        self.ed_yaml.setPlaceholderText(tr("Ruta a data.yaml…"))
         self.ed_yaml.editingFinished.connect(self._reload_yaml)
         row.addWidget(self.ed_yaml, 1)
         btn = QPushButton("…")
@@ -138,25 +139,25 @@ class DatasetPage(TrainerPage):
         row.addWidget(btn)
         l1.addLayout(row)
 
-        self.lbl_yaml_status = QLabel("Sin data.yaml cargado.")
+        self.lbl_yaml_status = QLabel(tr("Sin data.yaml cargado."))
         self.lbl_yaml_status.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         l1.addWidget(self.lbl_yaml_status)
         self.body.addWidget(c1)
 
         # ── Conteos ──
-        c2, l2 = self.card("Conteos por split", "📊")
+        c2, l2 = self.card(tr("Conteos por split"), "📊")
         grid = QGridLayout(); grid.setHorizontalSpacing(20); grid.setVerticalSpacing(8)
-        self.lbl_train = QLabel("Train: —"); grid.addWidget(self.lbl_train, 0, 0)
-        self.lbl_val   = QLabel("Val: —");   grid.addWidget(self.lbl_val,   0, 1)
-        self.lbl_test  = QLabel("Test: —");  grid.addWidget(self.lbl_test,  0, 2)
-        self.lbl_classes = QLabel("Clases: —"); grid.addWidget(self.lbl_classes, 1, 0, 1, 3)
+        self.lbl_train = QLabel(tr("Train: —")); grid.addWidget(self.lbl_train, 0, 0)
+        self.lbl_val   = QLabel(tr("Val: —"));   grid.addWidget(self.lbl_val,   0, 1)
+        self.lbl_test  = QLabel(tr("Test: —"));  grid.addWidget(self.lbl_test,  0, 2)
+        self.lbl_classes = QLabel(tr("Clases: —")); grid.addWidget(self.lbl_classes, 1, 0, 1, 3)
         for w in (self.lbl_train, self.lbl_val, self.lbl_test, self.lbl_classes):
             w.setStyleSheet(f"color: {T.INK2}; font-size: 11pt; border: none;")
         l2.addLayout(grid)
         self.body.addWidget(c2)
 
         # ── Vista previa ──
-        c3, l3 = self.card("Vista previa (6 imágenes random con cajas)", "👁")
+        c3, l3 = self.card(tr("Vista previa (6 imágenes random con cajas)"), "👁")
         prev_grid = QGridLayout(); prev_grid.setSpacing(10)
         self.tiles: list[_PreviewTile] = []
         for i in range(6):
@@ -164,16 +165,16 @@ class DatasetPage(TrainerPage):
             self.tiles.append(t)
             prev_grid.addWidget(t, i // 3, i % 3)
         l3.addLayout(prev_grid)
-        btn_refresh = QPushButton("🔄  Otras 6")
+        btn_refresh = QPushButton(tr("🔄  Otras 6"))
         btn_refresh.clicked.connect(self._refresh_preview)
         l3.addWidget(btn_refresh, 0, Qt.AlignLeft)
         self.body.addWidget(c3)
 
         # ── Auto-split ──
-        c4, l4 = self.card("Auto-split (si tu dataset no está dividido)", "🪚")
+        c4, l4 = self.card(tr("Auto-split (si tu dataset no está dividido)"), "🪚")
         info = QLabel(
-            "Toma una carpeta con images/ y labels/ y genera train/val/test automáticamente "
-            "con un nuevo data.yaml. No mueve archivos: usa listas .txt."
+            tr("Toma una carpeta con images/ y labels/ y genera train/val/test automáticamente "
+            "con un nuevo data.yaml. No mueve archivos: usa listas .txt.")
         )
         info.setWordWrap(True); info.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         l4.addWidget(info)
@@ -181,24 +182,24 @@ class DatasetPage(TrainerPage):
         srow = QHBoxLayout()
         srow.setSpacing(8)
         self.ed_split_src = QLineEdit()
-        self.ed_split_src.setPlaceholderText("Carpeta raíz con images/ y labels/…")
+        self.ed_split_src.setPlaceholderText(tr("Carpeta raíz con images/ y labels/…"))
         srow.addWidget(self.ed_split_src, 1)
         bbtn = QPushButton("…"); bbtn.setFixedWidth(36)
         bbtn.clicked.connect(self._browse_split_src); srow.addWidget(bbtn)
         l4.addLayout(srow)
 
         prow = QHBoxLayout(); prow.setSpacing(12)
-        prow.addWidget(QLabel("Train %:"))
+        prow.addWidget(QLabel(tr("Train %:")))
         self.sb_train = QSpinBox(); self.sb_train.setRange(50, 95); self.sb_train.setValue(80)
         prow.addWidget(self.sb_train)
-        prow.addWidget(QLabel("Val %:"))
+        prow.addWidget(QLabel(tr("Val %:")))
         self.sb_val = QSpinBox(); self.sb_val.setRange(5, 30); self.sb_val.setValue(15)
         prow.addWidget(self.sb_val)
-        prow.addWidget(QLabel("Test %:"))
+        prow.addWidget(QLabel(tr("Test %:")))
         self.sb_test = QSpinBox(); self.sb_test.setRange(0, 25); self.sb_test.setValue(5)
         prow.addWidget(self.sb_test)
         prow.addStretch(1)
-        btn_split = QPushButton("🪚  Auto-split + generar data.yaml")
+        btn_split = QPushButton(tr("🪚  Auto-split + generar data.yaml"))
         btn_split.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -210,10 +211,10 @@ class DatasetPage(TrainerPage):
         self.body.addWidget(c4)
 
         # ── Validación del dataset ──
-        c5, l5 = self.card("Validación del dataset", "🔍")
+        c5, l5 = self.card(tr("Validación del dataset"), "🔍")
         info_val = QLabel(
-            "Verifica que el dataset sea correcto antes de entrenar. "
-            "Se comprueba automáticamente al cargar data.yaml."
+            tr("Verifica que el dataset sea correcto antes de entrenar. "
+            "Se comprueba automáticamente al cargar data.yaml.")
         )
         info_val.setWordWrap(True)
         info_val.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
@@ -240,12 +241,12 @@ class DatasetPage(TrainerPage):
             self._val_checks.append((icon, lbl))
         l5.addLayout(val_grid)
 
-        btn_val = QPushButton("🔍  Validar ahora")
+        btn_val = QPushButton(tr("🔍  Validar ahora"))
         btn_val.clicked.connect(self._validate_dataset)
         l5.addWidget(btn_val, 0, Qt.AlignLeft)
 
         # Panel de análisis profundo (distribución de clases, etc.)
-        self.lbl_audit_title = QLabel("Análisis profundo")
+        self.lbl_audit_title = QLabel(tr("Análisis profundo"))
         self.lbl_audit_title.setStyleSheet(
             f"color: {T.INK2}; font-weight: 600; font-size: 10.5pt; "
             f"border: none; margin-top: 8px;")
@@ -283,7 +284,7 @@ class DatasetPage(TrainerPage):
             return
         p = Path(t)
         if not p.exists():
-            self.lbl_yaml_status.setText("✗ Archivo no encontrado.")
+            self.lbl_yaml_status.setText(tr("✗ Archivo no encontrado."))
             self.lbl_yaml_status.setStyleSheet(f"color: {T.ERR}; font-size: 10pt; border: none;")
             return
         try:
@@ -349,7 +350,7 @@ class DatasetPage(TrainerPage):
             # Mostrar mensaje en los tiles
             for tile in self.tiles:
                 tile.setPixmap(QPixmap())
-                tile.setText("(no se encontró\nla carpeta de train)")
+                tile.setText(tr("(no se encontró\nla carpeta de train)"))
             return
 
         imgs: list[Path] = []
@@ -372,7 +373,7 @@ class DatasetPage(TrainerPage):
         if not imgs:
             for tile in self.tiles:
                 tile.setPixmap(QPixmap())
-                tile.setText("(sin imágenes\nen train)")
+                tile.setText(tr("(sin imágenes\nen train)"))
             return
 
         random.shuffle(imgs)
@@ -380,7 +381,7 @@ class DatasetPage(TrainerPage):
         for tile, img_path in zip(self.tiles, sample):
             self._draw_preview(tile, img_path)
         for tile in self.tiles[len(sample):]:
-            tile.setPixmap(QPixmap()); tile.setText("(vacío)")
+            tile.setPixmap(QPixmap()); tile.setText(tr("(vacío)"))
 
     def _draw_preview(self, tile: _PreviewTile, img_path: Path):
         pm = QPixmap(str(img_path))
@@ -529,12 +530,12 @@ class DatasetPage(TrainerPage):
     def _auto_split(self):
         src = self.ed_split_src.text().strip()
         if not src:
-            QMessageBox.warning(self, "Auto-split", "Selecciona la carpeta raíz primero.")
+            QMessageBox.warning(self, tr("Auto-split"), tr("Selecciona la carpeta raíz primero."))
             return
         root = Path(src)
         imgs_dir = root / "images"
         if not imgs_dir.exists():
-            QMessageBox.warning(self, "Auto-split",
+            QMessageBox.warning(self, tr("Auto-split"),
                                 f"No existe {imgs_dir}. Necesitas images/ y labels/ dentro de la carpeta.")
             return
         # recolectar imágenes
@@ -542,12 +543,12 @@ class DatasetPage(TrainerPage):
         for ext in IMAGE_EXTS:
             all_imgs.extend(imgs_dir.rglob(f"*{ext}"))
         if not all_imgs:
-            QMessageBox.warning(self, "Auto-split", "No se encontraron imágenes en images/.")
+            QMessageBox.warning(self, tr("Auto-split"), tr("No se encontraron imágenes en images/."))
             return
 
         tp, vp, sp = self.sb_train.value(), self.sb_val.value(), self.sb_test.value()
         if tp + vp + sp > 100:
-            QMessageBox.warning(self, "Auto-split", "Los porcentajes suman > 100.")
+            QMessageBox.warning(self, tr("Auto-split"), tr("Los porcentajes suman > 100."))
             return
 
         random.seed(42)
@@ -583,7 +584,7 @@ class DatasetPage(TrainerPage):
         yaml_out = root / "data.yaml"
         _save_yaml(yaml_out, d)
         QMessageBox.information(
-            self, "Auto-split",
+            self, tr("Auto-split"),
             f"Listo:\n• Train: {len(train_list)}\n• Val: {len(val_list)}\n"
             f"• Test: {len(test_list)}\n\nGenerado: {yaml_out}"
         )
