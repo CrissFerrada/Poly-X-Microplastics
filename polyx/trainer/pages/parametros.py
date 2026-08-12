@@ -6,6 +6,8 @@ entrenar siempre al máximo posible).
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QSpinBox, QDoubleSpinBox,
@@ -115,6 +117,22 @@ class ParametrosPage(TrainerPage):
         btn_row.addWidget(self.btn_suggest_batch)
         btn_row.addStretch(1)
         gf.addLayout(btn_row)
+
+        # Un solo botón que aplica el orden de prioridades completo, en vez de
+        # dejar que el usuario adivine si primero sube imgsz o primero batch.
+        self.btn_optimizar = QPushButton("🎯  Optimizar todo (imgsz → batch → velocidad)")
+        self.btn_optimizar.setStyleSheet(
+            f"background: {T.OK}; color: white; border: none; "
+            f"border-radius: 6px; padding: 8px 14px; font-weight: 600;"
+        )
+        self.btn_optimizar.setCursor(Qt.PointingHandCursor)
+        self.btn_optimizar.setToolTip(
+            "Fija imgsz al máximo que aguanta la tarjeta (sin pasar de la resolución "
+            "nativa del dataset), después sube el batch con lo que sobre, y al final "
+            "ajusta AMP, workers y cache. En ese orden."
+        )
+        self.btn_optimizar.clicked.connect(self._optimizar_todo)
+        gf.addWidget(self.btn_optimizar)
 
         self.lbl_est = QLabel("Estimación de VRAM: —")
         self.lbl_est.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
@@ -251,6 +269,7 @@ class ParametrosPage(TrainerPage):
         self.btn_detect.setEnabled(False)
         self.btn_maximize.setEnabled(False)
         self.btn_suggest_batch.setEnabled(False)
+        self.btn_optimizar.setEnabled(False)
         self._gpu_worker = _GpuDetectWorker()
         self._gpu_worker.detected.connect(self._on_gpu_detected)
         self._gpu_worker.start()
@@ -260,18 +279,44 @@ class ParametrosPage(TrainerPage):
         self.btn_detect.setEnabled(True)
         self.btn_maximize.setEnabled(True)
         self.btn_suggest_batch.setEnabled(True)
+        self.btn_optimizar.setEnabled(True)
+        self.lbl_gpu.setTextFormat(Qt.RichText)
         if info.available:
+            extra = []
+            if info.n_gpus > 1:
+                extra.append(f"usando la GPU {info.index} de {info.n_gpus} "
+                             f"(la de más VRAM)")
+            if info.capacidad:
+                extra.append(f"capacidad {info.capacidad}")
+            if info.driver:
+                extra.append(f"driver {info.driver}")
+            if info.torch_cuda:
+                extra.append(f"torch {info.torch_version} / CUDA {info.torch_cuda}")
             self.lbl_gpu.setText(
                 f"<b>GPU detectada:</b> {info.name} · "
                 f"VRAM total: <b>{humanize_gb(info.vram_total_gb)}</b> · "
                 f"libre: <b>{humanize_gb(info.vram_free_gb)}</b>"
+                + (f"<br><span style='font-size:9pt'>{' · '.join(extra)}</span>"
+                   if extra else "")
             )
             self.lbl_gpu.setStyleSheet(f"color: {T.OK}; font-size: 10pt; border: none;")
-            self.lbl_gpu.setTextFormat(Qt.RichText)
+        elif info.gpu_sin_torch:
+            # La distinción importa: la tarjeta sirve, lo que está mal es la
+            # instalación. Decir "no hay GPU" aquí mandaría a comprar hardware.
+            self.lbl_gpu.setText(
+                f"⚠ <b>{info.name}</b> está presente "
+                f"({humanize_gb(info.vram_total_gb)}, driver {info.driver}) "
+                f"<b>pero PyTorch no la puede usar.</b><br>"
+                f"<span style='font-size:9pt'>{info.detalle} "
+                f"Reinstala PyTorch con CUDA (SETUP.bat) — hasta entonces se "
+                f"entrena por CPU.</span>"
+            )
+            self.lbl_gpu.setStyleSheet(f"color: {T.ERR}; font-size: 10pt; border: none;")
         else:
             self.lbl_gpu.setText(
-                "✗ No se detectó GPU NVIDIA disponible. Entrenarás en CPU (será MUY lento). "
-                "Verifica que SETUP.bat instaló PyTorch con CUDA."
+                "✗ No se detectó GPU NVIDIA. Entrenarás en CPU (será MUY lento)."
+                + (f"<br><span style='font-size:9pt'>{info.detalle}</span>"
+                   if info.detalle else "")
             )
             self.lbl_gpu.setStyleSheet(f"color: {T.WARN}; font-size: 10pt; border: none;")
         self._update_estimate()
@@ -310,6 +355,90 @@ class ParametrosPage(TrainerPage):
         self.lbl_est.setText(
             f"✓ Recomendación: batch = {b} para imgsz {imgsz} ({humanize_gb(info.vram_free_gb)} libres)"
         )
+
+    def _medir_dataset(self) -> tuple[int, float]:
+        """(lado mayor nativo, GB en disco) del dataset de entrenamiento.
+
+        El lado nativo es el techo útil de imgsz: entrenar a 4096 sobre recortes
+        de 1630 px no añade señal, solo interpola y ocupa la VRAM que el batch
+        necesita. Se muestrean unas pocas imágenes en vez de recorrerlas todas,
+        que con miles de archivos costaría segundos cada vez.
+        """
+        from ...core.yolo_wrap import tamano_imagen
+        yaml_path = self.state.dataset.yaml_path
+        if not yaml_path or not Path(yaml_path).exists():
+            return 0, 0.0
+        raiz = Path(yaml_path).parent
+        imgs: list[Path] = []
+        for patron in ("**/images/**/*.jpg", "**/images/**/*.png", "**/*.jpg"):
+            imgs = [p for p in raiz.glob(patron) if p.is_file()]
+            if imgs:
+                break
+        if not imgs:
+            return 0, 0.0
+        gb = sum(p.stat().st_size for p in imgs) / (1024 ** 3)
+        lado = 0
+        for p in imgs[:25]:
+            wh = tamano_imagen(p)
+            if wh:
+                lado = max(lado, max(wh))
+        return lado, gb
+
+    def _optimizar_todo(self):
+        """Aplica el orden de prioridades: imgsz, luego batch, luego velocidad."""
+        from ..hw import recomendar_config
+        info = getattr(self, "_last_gpu_info", None) or detect_gpu()
+        if not info.available:
+            msg = ("No hay GPU utilizable, así que no hay nada que optimizar: en CPU "
+                   "el techo práctico es imgsz 640.")
+            if info.gpu_sin_torch:
+                msg = (f"La tarjeta está ahí ({info.name}, "
+                       f"{humanize_gb(info.vram_total_gb)}) pero PyTorch no la puede "
+                       f"usar.\n\n{info.detalle}\n\nHay que reinstalar PyTorch con "
+                       f"CUDA; hasta entonces el entrenamiento va por CPU.")
+            QMessageBox.information(self, "Sin GPU utilizable", msg)
+            return
+
+        lado_nativo, dataset_gb = self._medir_dataset()
+        ram_gb = 0.0
+        try:
+            import psutil
+            ram_gb = psutil.virtual_memory().available / (1024 ** 3)
+        except Exception:
+            pass
+
+        r = recomendar_config(
+            self.state.model.size, info.vram_free_gb,
+            imgsz_nativo=lado_nativo, dataset_gb=dataset_gb, ram_libre_gb=ram_gb,
+        )
+
+        # 1. imgsz — el combo es editable, así que se acepta cualquier valor
+        self.combo_imgsz.setCurrentText(str(r.imgsz))
+        # 2. batch
+        self.sb_batch.setValue(r.batch)
+        # 3. velocidad, sin tocar lo anterior
+        self.cb_amp.setChecked(r.amp)
+        self.sb_workers.setValue(r.workers)
+        if r.cache:
+            self.combo_cache.setCurrentText(r.cache)
+
+        limite = {
+            "vram": f"la VRAM ({humanize_gb(info.vram_free_gb)} libres)",
+            "resolucion_nativa": f"la resolución nativa del dataset ({lado_nativo} px)",
+            "tope_batch": "el tope de batch útil",
+        }.get(r.limitado_por, r.limitado_por)
+        texto = (f"imgsz <b>{r.imgsz}</b> → batch <b>{r.batch}</b> → AMP on, "
+                 f"{r.workers} workers, cache {r.cache or 'sin cambio'}. "
+                 f"~{humanize_gb(r.vram_est_gb)} de {humanize_gb(r.vram_cap_gb)} "
+                 f"utilizables. Limitado por {limite}.")
+        if not lado_nativo:
+            texto += (" <i>Sin dataset cargado no se pudo medir la resolución nativa: "
+                      "carga el dataset y vuelve a optimizar.</i>")
+        self.lbl_est.setText(texto)
+        self.lbl_est.setTextFormat(Qt.RichText)
+        if r.notas:
+            QMessageBox.information(self, "Configuración optimizada",
+                                    "\n\n".join(f"• {n}" for n in r.notas))
 
     def _update_estimate(self):
         try:
