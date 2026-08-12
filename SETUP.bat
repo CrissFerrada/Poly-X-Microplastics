@@ -145,35 +145,59 @@ echo.
 echo  Poly-X quedo instalado en:
 echo     !INSTALL!
 echo.
-echo  COMO INICIARLO:
-echo     1) Abre la carpeta:  !INSTALL!
-echo     2) Doble clic en:    iniciar_polyx.bat
-echo.
-echo  NOTA: los modelos entrenados (.pt) NO vienen en la descarga de
-echo        GitHub por su tamano. Copia tu archivo .pt dentro de la
-echo        carpeta  models\  para usar el Detector y el Visor.
-echo.
 
-REM ---- Acceso directo en el Escritorio ----
+REM ============================================================
+REM   8. Carpetas de trabajo
+REM ============================================================
+REM Se crean ahora para que el usuario tenga donde dejar el .pt y el dataset
+REM sin tener que adivinar la estructura.
+if not exist "!INSTALL!\models" mkdir "!INSTALL!\models"
+if not exist "!INSTALL!\data"   mkdir "!INSTALL!\data"
+echo [OK] Carpetas  models\  (pesos .pt)  y  data\  (datasets) listas.
+
+REM ============================================================
+REM   9. Acceso directo en el Escritorio
+REM ============================================================
+REM Apunta a Poly-X.vbs, no al .bat: el .vbs arranca con pythonw y no deja una
+REM ventana negra abierta detras del programa.
 REM (Se usa 'goto' para que los parentesis del comando PowerShell no
 REM  interfieran con el parser de bloques de cmd.)
 set "MKLINK="
-set /p "MKLINK=Crear un acceso directo 'Poly-X' en el Escritorio? (S/N): "
+set /p "MKLINK=Crear un acceso directo 'Poly-X' en el Escritorio? (ENTER = si): "
+if not defined MKLINK set "MKLINK=S"
 if /i not "!MKLINK!"=="S" goto :skip_shortcut
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut((Join-Path $d 'Poly-X.lnk')); $s.TargetPath='!INSTALL!\iniciar_polyx.bat'; $s.WorkingDirectory='!INSTALL!'; $s.Save()"
+set "LAUNCH=!INSTALL!\Poly-X.vbs"
+if not exist "!LAUNCH!" set "LAUNCH=!INSTALL!\iniciar_polyx.bat"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut((Join-Path $d 'Poly-X.lnk')); $s.TargetPath='!LAUNCH!'; $s.WorkingDirectory='!INSTALL!'; $s.Description='Poly-X - deteccion de microplasticos'; $ico=Join-Path '!INSTALL!' 'assets\polyx.ico'; if (Test-Path $ico) { $s.IconLocation=$ico }; $s.Save()"
 if errorlevel 1 (echo [AVISO] No se pudo crear el acceso directo.) else (echo [OK] Acceso directo 'Poly-X' creado en el Escritorio.)
 :skip_shortcut
 
 echo.
+echo  COMO INICIARLO:
+echo     - Doble clic en el acceso directo 'Poly-X' del Escritorio
+echo     - O doble clic en  Poly-X.vbs  dentro de !INSTALL!
+echo.
+echo  QUE FALTA (no viene en la descarga de GitHub, por tamano):
+echo     1) Un modelo entrenado .pt  ->  dejalo en  !INSTALL!\models\
+echo     2) El dataset de entrenamiento  ->  descomprimelo donde quieras
+echo        y en el Entrenador elige su  dataset.yaml
+echo.
+
+echo.
 set "RUNNOW="
-set /p "RUNNOW=Quieres iniciar Poly-X ahora? (S/N): "
+set /p "RUNNOW=Quieres iniciar Poly-X ahora? (ENTER = si): "
+if not defined RUNNOW set "RUNNOW=S"
 if /i not "!RUNNOW!"=="S" goto :no_run
-start "" "!INSTALL!\iniciar_polyx.bat"
+if exist "!INSTALL!\Poly-X.vbs" (
+    start "" "!INSTALL!\Poly-X.vbs"
+) else (
+    start "" "!INSTALL!\iniciar_polyx.bat"
+)
 exit /b 0
 :no_run
 
 echo.
-echo Listo. Cuando quieras, abre  iniciar_polyx.bat  en:
+echo Listo. Cuando quieras, abre  Poly-X.vbs  en:
 echo   !INSTALL!
 echo.
 pause
