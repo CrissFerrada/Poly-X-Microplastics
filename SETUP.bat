@@ -200,6 +200,20 @@ if "!HAS_GPU!"=="1" (
     )
 )
 
+REM ============================================================
+REM   7c. Instalaciones anteriores
+REM ============================================================
+REM Va al final a proposito: si algo de lo de arriba fallo, la copia vieja
+REM sigue intacta y el equipo no queda sin un Poly-X que funcione.
+if exist "%~dp0migrar_instalacion.ps1" (
+    where powershell >nul 2>&1
+    if !errorlevel!==0 (
+        echo.
+        echo [INFO] Buscando instalaciones anteriores de Poly-X...
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0migrar_instalacion.ps1" -InstallDir "!INSTALL!"
+    )
+)
+
 echo.
 echo ============================================================
 echo   Instalacion completada

@@ -44,7 +44,7 @@ if exist "%SRC%\models" (
 )
 
 echo [INFO] Copiando archivos sueltos esenciales...
-for %%F in (SETUP.bat iniciar_polyx.bat actualizar.bat actualizar.ps1 requirements.txt README.md LEEME.txt Manual_PolyX.html generar_manual.py _extract_screenshots.py CLAUDE.md) do (
+for %%F in (SETUP.bat iniciar_polyx.bat actualizar.bat actualizar.ps1 migrar_instalacion.ps1 requirements.txt README.md LEEME.txt Manual_PolyX.html generar_manual.py _extract_screenshots.py CLAUDE.md) do (
     if exist "%SRC%\%%F" copy /y "%SRC%\%%F" "!OUT!\" >nul
 )
 
