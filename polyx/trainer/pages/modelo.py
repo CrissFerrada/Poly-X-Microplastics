@@ -106,6 +106,27 @@ class ModeloPage(TrainerPage):
         l2.addWidget(self.lbl_comparar)
         self._actualizar_aviso_comparar()
 
+        # ── Elegir el peso segun el dominio real ──
+        self.chk_dominio = QCheckBox(
+            tr("Elegir el mejor peso según las fotos de terreno, no las de laboratorio"))
+        self.chk_dominio.setChecked(self.state.params.elegir_por_dominio_real)
+        self.chk_dominio.stateChanged.connect(self._on_dominio)
+        self.chk_dominio.setStyleSheet(
+            f"QCheckBox {{ font-weight: 600; color: {T.OK}; border: none; }}")
+        l2.addWidget(self.chk_dominio)
+
+        aviso = QLabel(tr(
+            "Al terminar, se evalúan todos los checkpoints guardados contra "
+            "<b>solo</b> las imágenes de sedimento real de la validación y se "
+            "guarda el ganador como <b>best_real.pt</b>.<br>"
+            "Hace falta porque <code>best.pt</code> lo elige Ultralytics por el "
+            "mAP global, y en un dataset mixto ese número lo dominan las placas "
+            "dopadas de laboratorio — el dominio que justamente no transfiere a "
+            "las fotos de terreno. <code>best.pt</code> se conserva intacto."))
+        aviso.setWordWrap(True)
+        aviso.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l2.addWidget(aviso)
+
         self.body.addWidget(c2)
 
         # ── Pesos personalizados ──
@@ -148,6 +169,9 @@ class ModeloPage(TrainerPage):
         self.state.model.size = txt
         self._actualizar_aviso_comparar()
         self.state.model_changed.emit()
+
+    def _on_dominio(self):
+        self.state.params.elegir_por_dominio_real = self.chk_dominio.isChecked()
 
     def _on_comparar(self):
         self.state.model.comparar_familias = self.chk_comparar.isChecked()

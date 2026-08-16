@@ -106,6 +106,11 @@ class TrainParams:
     amp: bool = True
     cos_lr: bool = False
     cache: str = "disk"            # "disk", "ram", o "False"
+    # Tras entrenar, reelegir el checkpoint evaluandolo solo sobre el sedimento
+    # real de la validacion. best.pt sale del mAP global, que en un dataset mixto
+    # lo dominan las placas de laboratorio: el dominio equivocado para detectar
+    # en fotos de terreno. Ver polyx/trainer/dominio.py.
+    elegir_por_dominio_real: bool = True
     device: str = "0"
     workers: int = 8
     project_name: str = "polyx_train"

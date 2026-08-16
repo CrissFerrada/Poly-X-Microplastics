@@ -7,6 +7,7 @@ from typing import Optional
 from PySide6.QtCore import QThread, Signal
 
 from .state import TrainerState, EpochMetrics
+from .dominio import elegir_mejor_en_real
 
 
 class TrainerRunner(QThread):
@@ -24,7 +25,13 @@ class TrainerRunner(QThread):
         self.state = state
 
     def _informar_comparacion(self, comparativa: list[dict], p) -> None:
-        """Resume en el log las arquitecturas entrenadas con la misma config."""
+        """Resume en el log las arquitecturas entrenadas con la misma config.
+
+        Si hubo reeleccion por dominio, la comparacion se hace con el F1 sobre
+        sedimento real, que es con lo que se va a detectar de verdad, y no con el
+        mAP global que mezcla laboratorio y terreno.
+        """
+        hay_real = any(c.get("f1_real") is not None for c in comparativa)
         self.log_line.emit("")
         self.log_line.emit("=" * 60)
         self.log_line.emit("  COMPARACION DE ARQUITECTURAS")
@@ -33,20 +40,37 @@ class TrainerRunner(QThread):
             f"  Configuracion identica: imgsz={p.imgsz} · batch={p.batch} · "
             f"epocas={p.epochs} · lr0={p.lr0}")
         self.log_line.emit("")
-        self.log_line.emit(f"  {'familia':<10}{'peso base':<16}{'mAP50':>9}{'epoca':>8}")
-        self.log_line.emit("  " + "-" * 41)
+        cab = f"  {'familia':<10}{'peso base':<16}{'mAP50':>9}{'epoca':>8}"
+        if hay_real:
+            cab += f"{'F1 real':>10}"
+        self.log_line.emit(cab)
+        self.log_line.emit("  " + "-" * (len(cab) - 2))
         for c in comparativa:
-            self.log_line.emit(
-                f"  {c['familia']:<10}{c['peso_base']:<16}"
-                f"{c['map50']:>9.4f}{c['epoca_mejor']:>8}")
+            fila = (f"  {c['familia']:<10}{c['peso_base']:<16}"
+                    f"{c['map50']:>9.4f}{c['epoca_mejor']:>8}")
+            if hay_real:
+                fr = c.get("f1_real")
+                fila += f"{fr:>10.4f}" if fr is not None else f"{'-':>10}"
+            self.log_line.emit(fila)
 
-        mejor = max(comparativa, key=lambda c: c["map50"])
-        peor = min(comparativa, key=lambda c: c["map50"])
-        d = mejor["map50"] - peor["map50"]
+        # Con reeleccion por dominio se compara con el F1 en sedimento real: es
+        # el numero que describe lo que van a hacer estos pesos en las fotos de
+        # terreno. El mAP global mezcla laboratorio y terreno y no sirve aqui.
+        clave = ("f1_real" if hay_real else "map50")
+        etiqueta = ("F1 en sedimento real" if hay_real else "mAP50")
+        utiles = [c for c in comparativa if c.get(clave) is not None]
+        if not utiles:
+            utiles, clave, etiqueta = comparativa, "map50", "mAP50"
+        mejor = max(utiles, key=lambda c: c[clave])
+        peor = min(utiles, key=lambda c: c[clave])
+        d = mejor[clave] - peor[clave]
         self.log_line.emit("")
         self.log_line.emit(
-            f"  Mejor: {mejor['familia']} (mAP50 {mejor['map50']:.4f}, "
+            f"  Mejor: {mejor['familia']} ({etiqueta} {mejor[clave]:.4f}, "
             f"+{d:.4f} sobre {peor['familia']})")
+        if hay_real:
+            self.log_line.emit(
+                "  Los pesos a usar para detectar son los best_real.pt.")
         # Sin repeticiones no se puede separar arquitectura de azar de semilla.
         self.log_line.emit(
             "  Con un entrenamiento por arquitectura, una diferencia pequena")
@@ -259,15 +283,39 @@ class TrainerRunner(QThread):
                 model.train(name=nombre, **train_kwargs)
 
                 best_path = proj_dir / nombre / "weights" / "best.pt"
-                if best_path.exists():
-                    ultimo_best = str(best_path)
+
+                # Reelegir el checkpoint contra el dominio que importa. best.pt
+                # sale del mAP global, que aqui lo dominan las placas de
+                # laboratorio; para detectar en fotos de terreno eso es el
+                # criterio equivocado.
+                peso_final = best_path
+                f1_real = None
+                if getattr(p, "elegir_por_dominio_real", True):
+                    try:
+                        elegido, tabla = elegir_mejor_en_real(
+                            proj_dir / nombre, Path(ds.yaml_path),
+                            imgsz=int(p.imgsz), batch=int(p.batch),
+                            device=effective_device, log=self.log_line.emit)
+                        if elegido is not None:
+                            peso_final = elegido
+                            f1_real = tabla[0]["f1"] if tabla else None
+                    except Exception as exc:
+                        # Que falle la reeleccion no puede tirar un entrenamiento
+                        # de horas: se avisa y se sigue con best.pt.
+                        self.log_line.emit(
+                            f"[WARN] No se pudo reelegir checkpoint: {exc}. "
+                            f"Se conserva best.pt.")
+
+                if peso_final.exists():
+                    ultimo_best = str(peso_final)
                 comparativa.append({
                     "familia": familia,
                     "peso_base": weights,
                     "run": nombre,
-                    "best": str(best_path) if best_path.exists() else "",
+                    "best": str(peso_final) if peso_final.exists() else "",
                     "map50": st.best_map50,
                     "epoca_mejor": st.best_epoch,
+                    "f1_real": f1_real,
                 })
 
             if len(comparativa) > 1:
