@@ -63,12 +63,63 @@ class EjecutarPage(DetectorPage):
         "y podrás cancelar en cualquier momento.")
     )
 
+    def refresh(self):
+        """Al entrar a la pagina, recalcular que hara el troceado con el lote."""
+        self._refrescar_aviso_troceo()
+
+    def _refrescar_aviso_troceo(self):
+        """Resume si las fotos se van a trocear, y cuanto mas va a tardar."""
+        from ...core.yolo_wrap import tamano_imagen, politica_troceado
+        p = self.state.params
+        if not self.state.images:
+            self.lbl_troceo.setText("")
+            return
+
+        wh = tamano_imagen(self.state.images[0])
+        if wh is None:
+            self.lbl_troceo.setText("")
+            return
+
+        if p.troceo == "nunca":
+            self.lbl_troceo.setText(tr(
+                f"Troceado desactivado: cada foto entra completa a imgsz {p.imgsz}. "
+                f"En fotos grandes las partículas pequeñas pueden desaparecer al "
+                f"reescalar."))
+            return
+
+        plan = politica_troceado(
+            wh[0], wh[1], p.imgsz,
+            umbral_px=0 if p.troceo == "siempre" else p.troceo_umbral_px,
+            tile=p.troceo_tile, overlap=p.troceo_overlap)
+
+        if plan is None:
+            self.lbl_troceo.setText(tr(
+                f"Las fotos ({wh[0]}×{wh[1]} px) no llegan al umbral de "
+                f"{p.troceo_umbral_px} px: se analizan de una pieza."))
+        else:
+            self.lbl_troceo.setText(tr(
+                f"⚠ Fotos grandes ({wh[0]}×{wh[1]} px): se analizarán en "
+                f"{plan['n_tiles']} recortes de {plan['tile']} px con "
+                f"{int(plan['overlap'] * 100)}% de solape. Va a tardar unas "
+                f"{plan['n_tiles']}× más.<br>"
+                f"El recorte es solo para que el modelo pueda detectar: los "
+                f"resultados y el informe se entregan sobre la foto completa."))
+
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
         self.runner: DetectorRunner | None = None
 
         # ── Control ──
         c1, l1 = self.card(tr("Control"), "▶")
+
+        # Aviso de troceado. Vivia solo en la pestana Parametros, donde nadie lo
+        # veia; aqui aparece justo antes de pulsar Iniciar, que es cuando importa
+        # saber si el lote va a tardar N veces mas de lo esperado.
+        self.lbl_troceo = QLabel()
+        self.lbl_troceo.setWordWrap(True)
+        self.lbl_troceo.setStyleSheet(f"color: {T.INK2}; font-size: 9.5pt; border: none;")
+        l1.addWidget(self.lbl_troceo)
+
         row = QHBoxLayout()
         row.setSpacing(8)
         self.btn_start = QPushButton(tr("▶  Iniciar detección"))
