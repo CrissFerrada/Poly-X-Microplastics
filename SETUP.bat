@@ -201,6 +201,27 @@ if "!HAS_GPU!"=="1" (
 )
 
 REM ============================================================
+REM   7b-bis. Sello de version
+REM ============================================================
+REM Sin .polyx_version el launcher no puede saber si va atrasado y el aviso de
+REM actualizacion nunca aparece. El paquete "para llevar" ya viene sellado; esto
+REM cubre a quien descargo el ZIP directo desde GitHub, que llega sin sello.
+if not exist "!INSTALL!\.polyx_version" (
+    where powershell >nul 2>&1
+    if !errorlevel!==0 (
+        echo [INFO] Registrando la version instalada...
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-RestMethod -Uri 'https://api.github.com/repos/CrissFerrada/Poly-X-Microplastics/commits/main' -Headers @{'User-Agent'='PolyX-Setup'} -TimeoutSec 15; Set-Content -LiteralPath '!INSTALL!\.polyx_version' -Value $r.sha -Encoding ascii -NoNewline } catch { }"
+        if exist "!INSTALL!\.polyx_version" (
+            echo [OK] Version registrada: el aviso de actualizaciones queda activo.
+        ) else (
+            echo [AVISO] No se pudo consultar GitHub. Poly-X funciona igual, pero
+            echo         no avisara de versiones nuevas hasta la primera
+            echo         actualizacion manual con actualizar.bat.
+        )
+    )
+)
+
+REM ============================================================
 REM   7c. Instalaciones anteriores
 REM ============================================================
 REM Va al final a proposito: si algo de lo de arriba fallo, la copia vieja
