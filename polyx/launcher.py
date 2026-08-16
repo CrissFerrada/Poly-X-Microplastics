@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from .core import theme as T
 from .core.i18n import tr, idioma, set_idioma, IDIOMAS
 from .core.widgets import LogoBadge, HLine
+from .core.updates import ACTUALIZADOR, BuscadorActualizaciones, puede_actualizar
 from . import __version__
 
 
@@ -263,7 +264,25 @@ class LauncherWindow(QMainWindow):
         version_lbl = QLabel(f"v{__version__}")
         version_lbl.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
         tb.addWidget(version_lbl)
+
+        # Aviso de version nueva. Nace oculto y solo aparece si la comprobacion
+        # en segundo plano confirma que GitHub va por delante de lo instalado.
+        self.btn_actualizar = QPushButton(tr("Actualizar"))
+        self.btn_actualizar.setCursor(Qt.PointingHandCursor)
+        self.btn_actualizar.setStyleSheet(
+            f"QPushButton {{ background: {T.WARN}; color: white; border: none; "
+            f"border-radius: 4px; padding: 4px 10px; font-size: 9pt; "
+            f"font-weight: 600; }}"
+            f"QPushButton:hover {{ background: {T.ERR}; }}")
+        self.btn_actualizar.setVisible(False)
+        self.btn_actualizar.clicked.connect(self._lanzar_actualizador)
+        tb.addWidget(self.btn_actualizar)
         root.addWidget(topbar)
+
+        self._buscador = BuscadorActualizaciones(self)
+        self._buscador.hay_version_nueva.connect(self._avisar_version_nueva)
+        # Se dispara despues de que la ventana este dibujada: el arranque manda.
+        QTimer.singleShot(1200, self._buscador.buscar)
 
         # ── Scroll central ──
         scroll = QScrollArea()
@@ -406,6 +425,35 @@ class LauncherWindow(QMainWindow):
             if codigo == "es" else
             "The language will be applied when you reopen Poly-X. Modules you "
             "open from now on already use the new language.")
+
+    # ── Actualizaciones ─────────────────────────────────────────
+    def _avisar_version_nueva(self, sha_corto: str):
+        """Muestra el boton de actualizar cuando GitHub va por delante."""
+        self.btn_actualizar.setText(tr("Actualizar") + f" · {sha_corto}")
+        self.btn_actualizar.setToolTip(
+            tr("Hay una versión nueva disponible en GitHub. "
+               "Pulsa para descargarla e instalarla."))
+        self.btn_actualizar.setVisible(True)
+
+    def _lanzar_actualizador(self):
+        if not puede_actualizar():
+            QMessageBox.information(
+                self, tr("Actualizar"),
+                tr("No se encontró actualizar.bat en la carpeta de "
+                   "instalación. Descarga la versión nueva manualmente "
+                   "desde GitHub."))
+            return
+        if QMessageBox.question(
+                self, tr("Actualizar"),
+                tr("Se descargará la versión nueva y se cerrará Poly-X.\n\n"
+                   "Tus modelos, resultados y datos no se tocan. ¿Continuar?"),
+        ) != QMessageBox.Yes:
+            return
+        # El actualizador sobrescribe archivos del programa; hay que soltar
+        # Poly-X antes para no chocar con los .py que estan en uso.
+        subprocess.Popen(["cmd", "/c", "start", "", str(ACTUALIZADOR)],
+                         cwd=str(ACTUALIZADOR.parent))
+        self.close()
 
     # ── Lanzadores ──────────────────────────────────────────────
     def open_detector(self): self._launch_module("polyx.detector")

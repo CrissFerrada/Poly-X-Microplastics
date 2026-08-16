@@ -51,6 +51,22 @@ for %%F in (SETUP.bat iniciar_polyx.bat actualizar.bat actualizar.ps1 requiremen
 echo [INFO] Copiando modelos .pt de la raiz (para el Detector y el Visor)...
 copy /y "%SRC%\*.pt" "!OUT!\" >nul 2>&1
 
+REM ---- Sello de version ----
+REM Sin este archivo el aviso de "hay version nueva" no puede funcionar: el
+REM launcher compara este SHA contra el ultimo commit de main en GitHub. Se
+REM sella con el commit del que sale ESTE paquete, no con el ultimo de GitHub,
+REM para no declarar actualizado algo que quizas va atrasado.
+set "SHA="
+for /f "tokens=*" %%i in ('git -C "%SRC%" rev-parse HEAD 2^>nul') do set "SHA=%%i"
+if defined SHA (
+    >"!OUT!\.polyx_version" echo !SHA!
+    echo [OK] Paquete sellado con el commit !SHA:~0,7!
+) else (
+    echo [AVISO] No se pudo leer el commit con git.
+    echo         El paquete queda sin sellar y no avisara de versiones nuevas
+    echo         hasta la primera actualizacion manual con actualizar.bat.
+)
+
 REM ---- Tamano del paquete ----
 echo.
 echo [OK] Paquete creado en:
