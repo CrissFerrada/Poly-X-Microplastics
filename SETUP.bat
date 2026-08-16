@@ -106,9 +106,48 @@ if %errorlevel%==0 (
     if !errorlevel!==0 set "HAS_GPU=1"
 )
 
+REM No basta con saber que hay GPU NVIDIA: hay que saber de que generacion es.
+REM Las ruedas cu118 NO traen kernels sm_120 (Blackwell, RTX 50xx). Si se
+REM instalan en una de esas tarjetas, torch.cuda.is_available() devuelve True y
+REM todo parece bien hasta que el primer forward falla con
+REM "no kernel image is available for execution on the device".
+set "CC="
+set "CCMAJ="
 if "!HAS_GPU!"=="1" (
-    echo [OK] GPU NVIDIA detectada. Instalando PyTorch con CUDA 11.8 ^(3-4 GB^)...
-    .venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+    REM Sin "noheader": la coma de "csv,noheader" la parte cmd como separador de
+    REM argumentos y nvidia-smi falla. Con skip=1 se descarta el encabezado.
+    for /f "skip=1 tokens=*" %%i in ('nvidia-smi --query-gpu^=compute_cap --format^=csv 2^>nul') do (
+        if not defined CC set "CC=%%i"
+    )
+    if defined CC (
+        for /f "tokens=1 delims=." %%a in ("!CC!") do set "CCMAJ=%%a"
+    )
+    REM Si nvidia-smi devolvio texto de error en vez de un numero, un "GEQ 12"
+    REM lo compararia como cadena y daria verdadero por accidente, instalando la
+    REM rueda equivocada. Solo se acepta un entero.
+    if defined CCMAJ (
+        echo !CCMAJ!| findstr /r /c:"^[0-9][0-9]*$" >nul || set "CCMAJ="
+    )
+    if not defined CCMAJ (
+        REM Drivers viejos no soportan --query-gpu=compute_cap. Caemos al nombre.
+        for /f "skip=1 tokens=*" %%i in ('nvidia-smi --query-gpu^=name --format^=csv 2^>nul') do (
+            echo %%i | findstr /i /c:"RTX 50" >nul && set "CCMAJ=12"
+        )
+    )
+)
+
+if "!HAS_GPU!"=="1" (
+    set "CUDAWHL=cu118"
+    set "CUDANOM=11.8"
+    if defined CCMAJ (
+        if !CCMAJ! GEQ 12 (
+            set "CUDAWHL=cu128"
+            set "CUDANOM=12.8"
+        )
+    )
+    echo [OK] GPU NVIDIA detectada ^(compute capability: !CC!^).
+    echo [INFO] Instalando PyTorch con CUDA !CUDANOM! ^(3-4 GB^)...
+    .venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/!CUDAWHL!
 ) else (
     echo [INFO] Sin GPU NVIDIA. Instalando PyTorch CPU...
     .venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
@@ -135,6 +174,30 @@ if errorlevel 1 (
     echo         El programa podria fallar. Revisa los mensajes de arriba.
 ) else (
     echo [OK] Todas las dependencias se importan correctamente ^(incluida la exportacion a PDF^).
+)
+
+REM ============================================================
+REM   7b. Comprobar que torch trae kernels para ESTA GPU
+REM ============================================================
+REM Que torch.cuda.is_available() diga True no garantiza nada: lo que importa
+REM es que la arquitectura de la tarjeta este en get_arch_list(). Si no esta,
+REM el fallo aparece recien al entrenar, y ahi cuesta mucho mas diagnosticarlo.
+if "!HAS_GPU!"=="1" (
+    echo [INFO] Verificando compatibilidad GPU/PyTorch...
+    .venv\Scripts\python.exe -c "import sys, torch; ok=torch.cuda.is_available(); archs=torch.cuda.get_arch_list() if ok else []; cap='sm_%%d%%d'%%torch.cuda.get_device_capability(0) if ok else ''; print('   GPU  :', torch.cuda.get_device_name(0) if ok else 'no disponible'); print('   arch :', cap); print('   torch:', torch.__version__, '| soporta:', ' '.join(archs) if archs else 'nada'); sys.exit(0 if (ok and cap in archs) else 1)"
+    if errorlevel 1 (
+        echo.
+        echo [ERROR] PyTorch NO trae kernels para esta GPU.
+        echo         Entrenar o detectar fallaria con
+        echo         "no kernel image is available for execution on the device".
+        echo.
+        echo         Solucion: reinstalar torch con la rueda correcta, por ejemplo
+        echo         .venv\Scripts\python.exe -m pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu128
+        echo.
+        pause
+    ) else (
+        echo [OK] PyTorch tiene kernels para esta GPU.
+    )
 )
 
 echo.
