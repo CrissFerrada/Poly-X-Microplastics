@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QLabel, QComboBox, QLineEdit, QPushButton,
-    QFileDialog,
+    QFileDialog, QCheckBox,
 )
 
 from ._base import TrainerPage
@@ -90,6 +90,22 @@ class ModeloPage(TrainerPage):
             line.addWidget(text, 1)
             l2.addLayout(line)
 
+        # ── Comparar arquitecturas ──
+        self.chk_comparar = QCheckBox(
+            tr("Entrenar ambas arquitecturas (v8 y v11) con la misma configuración"))
+        self.chk_comparar.setChecked(self.state.model.comparar_familias)
+        self.chk_comparar.stateChanged.connect(self._on_comparar)
+        self.chk_comparar.setStyleSheet(
+            f"QCheckBox {{ font-weight: 600; color: {T.ACCENT}; border: none; }}")
+        l2.addWidget(self.chk_comparar)
+
+        self.lbl_comparar = QLabel()
+        self.lbl_comparar.setWordWrap(True)
+        self.lbl_comparar.setStyleSheet(
+            f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l2.addWidget(self.lbl_comparar)
+        self._actualizar_aviso_comparar()
+
         self.body.addWidget(c2)
 
         # ── Pesos personalizados ──
@@ -125,11 +141,40 @@ class ModeloPage(TrainerPage):
 
     def _on_family(self, txt: str):
         self.state.model.family = "v11" if "11" in txt else "v8"
+        self._actualizar_aviso_comparar()
         self.state.model_changed.emit()
 
     def _on_size(self, txt: str):
         self.state.model.size = txt
+        self._actualizar_aviso_comparar()
         self.state.model_changed.emit()
+
+    def _on_comparar(self):
+        self.state.model.comparar_familias = self.chk_comparar.isChecked()
+        # La familia elegida arriba queda sin efecto al comparar: se entrenan
+        # las dos. Se desactiva el combo para que eso se vea, no se adivine.
+        self.combo_family.setEnabled(not self.chk_comparar.isChecked())
+        self._actualizar_aviso_comparar()
+        self.state.model_changed.emit()
+
+    def _actualizar_aviso_comparar(self):
+        """Explica exactamente que se va a entrenar, con los nombres reales."""
+        mdl = self.state.model
+        if self.chk_comparar.isChecked():
+            pesos = " y ".join(mdl.peso_de(f) for f in ("v8", "v11"))
+            self.lbl_comparar.setText(tr(
+                f"Se entrenarán <b>{pesos}</b> uno tras otro, con idénticos "
+                f"imgsz, batch, épocas, semilla y augmentación. Así la "
+                f"diferencia de métricas se puede atribuir a la arquitectura "
+                f"y no a los hiperparámetros.<br>"
+                f"Tarda <b>el doble</b>: van en secuencia porque comparten GPU. "
+                f"Al terminar, la comparación sale en el log y en la pestaña "
+                f"Comparar."))
+        else:
+            self.lbl_comparar.setText(tr(
+                f"Se entrenará solo <b>{mdl.base_weights_name()}</b>. "
+                f"Marca la casilla para entrenar también la otra familia y "
+                f"compararlas en igualdad de condiciones."))
 
     def _on_custom(self):
         t = self.ed_custom.text().strip()

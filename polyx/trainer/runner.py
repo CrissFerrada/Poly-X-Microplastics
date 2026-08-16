@@ -23,6 +23,39 @@ class TrainerRunner(QThread):
         super().__init__(parent)
         self.state = state
 
+    def _informar_comparacion(self, comparativa: list[dict], p) -> None:
+        """Resume en el log las arquitecturas entrenadas con la misma config."""
+        self.log_line.emit("")
+        self.log_line.emit("=" * 60)
+        self.log_line.emit("  COMPARACION DE ARQUITECTURAS")
+        self.log_line.emit("=" * 60)
+        self.log_line.emit(
+            f"  Configuracion identica: imgsz={p.imgsz} · batch={p.batch} · "
+            f"epocas={p.epochs} · lr0={p.lr0}")
+        self.log_line.emit("")
+        self.log_line.emit(f"  {'familia':<10}{'peso base':<16}{'mAP50':>9}{'epoca':>8}")
+        self.log_line.emit("  " + "-" * 41)
+        for c in comparativa:
+            self.log_line.emit(
+                f"  {c['familia']:<10}{c['peso_base']:<16}"
+                f"{c['map50']:>9.4f}{c['epoca_mejor']:>8}")
+
+        mejor = max(comparativa, key=lambda c: c["map50"])
+        peor = min(comparativa, key=lambda c: c["map50"])
+        d = mejor["map50"] - peor["map50"]
+        self.log_line.emit("")
+        self.log_line.emit(
+            f"  Mejor: {mejor['familia']} (mAP50 {mejor['map50']:.4f}, "
+            f"+{d:.4f} sobre {peor['familia']})")
+        # Sin repeticiones no se puede separar arquitectura de azar de semilla.
+        self.log_line.emit(
+            "  Con un entrenamiento por arquitectura, una diferencia pequena")
+        self.log_line.emit(
+            "  no distingue el diseno del azar de inicializacion.")
+        self.log_line.emit(
+            "  Los pesos quedaron en runs_train/; comparalos en la pestana Comparar.")
+        self.log_line.emit("=" * 60)
+
     def run(self):
         try:
             import torch
@@ -70,22 +103,37 @@ class TrainerRunner(QThread):
                 self.log_line.emit(f"[INFO] Entrenando en GPU: {effective_device}")
             self.log_line.emit("=" * 60)
 
-            # Modelo base
-            if mdl.custom_weights and Path(mdl.custom_weights).exists():
-                weights = str(mdl.custom_weights)
+            # Que familias se entrenan. Con pesos personalizados no tiene
+            # sentido comparar arquitecturas: el .pt ya fija una.
+            usa_custom = bool(mdl.custom_weights and Path(mdl.custom_weights).exists())
+            if usa_custom:
+                familias = [mdl.family]
+                if mdl.comparar_familias:
+                    self.log_line.emit(
+                        "[ATENCION] Hay pesos personalizados cargados: se ignora "
+                        "la comparacion de arquitecturas y se entrena solo ese .pt.")
             else:
-                weights = mdl.base_weights_name()    # ej. yolov8m.pt
+                familias = mdl.familias_a_entrenar()
 
-            self.log_line.emit(f"[INFO] Cargando modelo base: {weights}")
-            model = YOLO(weights)
-
-            # Run name
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            run_name = p.run_name.strip() or f"train_{stamp}"
+            base_name = p.run_name.strip() or f"train_{stamp}"
 
             proj_dir = Path(__file__).resolve().parents[2] / "runs_train"
             proj_dir.mkdir(parents=True, exist_ok=True)
-            st.run_dir = proj_dir / run_name
+
+            if len(familias) > 1:
+                self.log_line.emit("=" * 60)
+                self.log_line.emit(
+                    f"[INFO] Comparacion de arquitecturas: se entrenaran "
+                    f"{len(familias)} modelos ({', '.join(familias)}) con "
+                    f"identica configuracion.")
+                self.log_line.emit(
+                    "[INFO] Van en secuencia, no en paralelo: comparten GPU.")
+                self.log_line.emit("=" * 60)
+
+            # Los callbacks se registran una vez pero sirven a varias corridas,
+            # asi que leen el nombre desde aqui en vez de capturarlo por cierre.
+            run_actual = {"nombre": base_name}
 
             # Callback: progreso por época
             def _on_train_epoch_end(trainer):
@@ -115,7 +163,7 @@ class TrainerRunner(QThread):
 
             def _on_train_start(trainer):
                 self.log_line.emit(f"[INFO] Entrenamiento iniciado.")
-                self.log_line.emit(f"[INFO] Run: {run_name}")
+                self.log_line.emit(f"[INFO] Run: {run_actual['nombre']}")
                 self.log_line.emit(f"[INFO] Imgsz: {p.imgsz} · Batch: {p.batch} · Epochs: {p.epochs}")
                 # Confirmar device EFECTIVO del modelo (esto es la verdad)
                 try:
@@ -132,10 +180,6 @@ class TrainerRunner(QThread):
 
             def _on_train_end(trainer):
                 self.log_line.emit(f"[INFO] Entrenamiento finalizado.")
-
-            model.add_callback("on_train_start", _on_train_start)
-            model.add_callback("on_train_epoch_end", _on_train_epoch_end)
-            model.add_callback("on_train_end", _on_train_end)
 
             # Cache: ultralytics acepta True/False/'ram'/'disk'
             cache_val: object = p.cache
@@ -170,18 +214,66 @@ class TrainerRunner(QThread):
                 copy_paste=float(a.copy_paste),
                 # Proyecto
                 project=str(proj_dir),
-                name=run_name,
                 exist_ok=True,
                 verbose=True,
                 plots=True,
             )
 
-            self.log_line.emit("[INFO] Iniciando model.train(...)")
-            results = model.train(**train_kwargs)
+            comparativa = []
+            ultimo_best = ""
 
-            # Best.pt en runs_train/<run_name>/weights/best.pt
-            best_path = st.run_dir / "weights" / "best.pt"
-            self.finished_ok.emit(str(best_path) if best_path.exists() else "")
+            for i, familia in enumerate(familias, start=1):
+                if usa_custom:
+                    weights = str(mdl.custom_weights)
+                else:
+                    weights = mdl.peso_de(familia)
+
+                # Con una sola familia se respeta el nombre tal cual lo puso el
+                # usuario; con varias hay que desambiguar o la segunda corrida
+                # sobrescribiria a la primera (exist_ok=True).
+                nombre = base_name if len(familias) == 1 else f"{base_name}_{familia}"
+                run_actual["nombre"] = nombre
+                st.run_dir = proj_dir / nombre
+
+                # El historial es por corrida: si no se limpia, las curvas de la
+                # segunda arquitectura se dibujarian encima de las de la primera.
+                st.history.clear()
+                st.best_map50 = 0.0
+                st.best_epoch = 0
+                st.epochs_no_improve = 0
+
+                if len(familias) > 1:
+                    self.log_line.emit("")
+                    self.log_line.emit("=" * 60)
+                    self.log_line.emit(
+                        f"[INFO] Modelo {i} de {len(familias)}: {familia} ({weights})")
+                    self.log_line.emit("=" * 60)
+
+                self.log_line.emit(f"[INFO] Cargando modelo base: {weights}")
+                model = YOLO(weights)
+                model.add_callback("on_train_start", _on_train_start)
+                model.add_callback("on_train_epoch_end", _on_train_epoch_end)
+                model.add_callback("on_train_end", _on_train_end)
+
+                self.log_line.emit("[INFO] Iniciando model.train(...)")
+                model.train(name=nombre, **train_kwargs)
+
+                best_path = proj_dir / nombre / "weights" / "best.pt"
+                if best_path.exists():
+                    ultimo_best = str(best_path)
+                comparativa.append({
+                    "familia": familia,
+                    "peso_base": weights,
+                    "run": nombre,
+                    "best": str(best_path) if best_path.exists() else "",
+                    "map50": st.best_map50,
+                    "epoca_mejor": st.best_epoch,
+                })
+
+            if len(comparativa) > 1:
+                self._informar_comparacion(comparativa, p)
+
+            self.finished_ok.emit(ultimo_best)
 
         except KeyboardInterrupt:
             self.aborted.emit()
