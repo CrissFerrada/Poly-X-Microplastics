@@ -312,6 +312,82 @@ def generate_report(state, output_path: Path,
             f"<td class='r'>{f1_cell}</td></tr>"
         )
 
+    # ── Comparación entre modelos, foto por foto ──
+    # La tabla global de arriba dice cual modelo gana en total; esta dice en
+    # cuales fotos gana. Con lotes desiguales como los del Loa, donde un tramo
+    # concentra la mayoria de las particulas, el total lo decide ese tramo y
+    # puede esconder que en el resto el otro modelo va mejor.
+    compare_html = ""
+    activos = [mi for mi, s in enumerate(state.model_slots) if s.path is not None]
+    if len(activos) > 1:
+        por_foto = {}
+        for mi in activos:
+            for r in resultados.get(mi, []):
+                por_foto.setdefault(r.image_path, {})[mi] = r
+
+        hay_gt = any(r.has_gt for rs in resultados.values() for r in rs)
+        cab = "<tr><th>Imagen</th>"
+        for mi in activos:
+            alias = state.model_slots[mi].alias
+            cab += (f"<th>{alias}<br><span style='font-weight:400;font-size:8.5pt'>dets</span></th>")
+            if hay_gt:
+                cab += (f"<th><span style='font-weight:400;font-size:8.5pt'>"
+                        f"{LABEL_TP}/{LABEL_FP}/{LABEL_FN}</span></th>")
+        cab += "</tr>"
+
+        filas = ""
+        for ruta in sorted(por_foto):
+            filas += f"<tr><td>{Path(ruta).name}</td>"
+            for mi in activos:
+                r = por_foto[ruta].get(mi)
+                if r is None:
+                    filas += "<td class='r'>—</td>"
+                    if hay_gt:
+                        filas += "<td class='r'>—</td>"
+                    continue
+                filas += f"<td class='r'>{len(r.predictions)}</td>"
+                if hay_gt:
+                    celda = (f"{r.tp}/{r.fp}/{r.fn}" if r.has_gt else "—")
+                    filas += f"<td class='r'>{celda}</td>"
+            filas += "</tr>"
+
+        # Veredicto: solo se declara si hay ground truth con que juzgar. Sin el,
+        # mas detecciones no es mejor, y decir lo contrario seria enganoso.
+        veredicto = ""
+        if hay_gt:
+            marcador = []
+            for mi in activos:
+                rs = resultados.get(mi, [])
+                tp = sum(r.tp for r in rs); fp = sum(r.fp for r in rs)
+                fn = sum(r.fn for r in rs)
+                pr = tp/(tp+fp) if (tp+fp) else 0
+                rc = tp/(tp+fn) if (tp+fn) else 0
+                marcador.append((2*pr*rc/(pr+rc) if (pr+rc) else 0,
+                                 state.model_slots[mi].alias))
+            marcador.sort(reverse=True)
+            mejor_f1, mejor = marcador[0]
+            veredicto = (
+                f"<p><b>Mejor F1 global:</b> {mejor} ({mejor_f1:.3f}). "
+                f"Con un solo pase por modelo y sobre {total_imgs} imagen(es), "
+                f"una diferencia pequeña no basta para preferir uno u otro.</p>")
+        else:
+            veredicto = ("<p class='caption' style='text-align:left'>Sin ground "
+                         "truth no se puede declarar un ganador: un modelo con "
+                         "más detecciones puede estar acertando o inventando. "
+                         "Carga anotaciones para obtener F1 por modelo.</p>")
+
+        compare_html = (
+            "<p>Detecciones de cada modelo imagen por imagen. El total puede "
+            "estar dominado por unas pocas fotos densas, así que conviene mirar "
+            "el detalle antes de elegir modelo.</p>"
+            + veredicto
+            + f"<table class='data'>{cab}{filas}</table>")
+    elif len(activos) == 1:
+        compare_html = ("<p class='caption' style='text-align:left'>Solo se "
+                        "ejecutó un modelo, así que no hay comparación. Carga un "
+                        "segundo modelo en la pestaña Modelos para compararlos "
+                        "sobre las mismas imágenes.</p>")
+
     # ── Galería comparativa: Predicción vs Ground Truth (lado a lado) ──
     gallery_html = ""
     omitidas = 0
@@ -515,8 +591,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 {err_section}
 
 <h2 id='compare'>6. Comparación entre modelos</h2>
-<p>Esta sección consolida las métricas globales de cada modelo (tabla anterior) y permite
-identificar cuál ofrece el mejor balance de precisión y cobertura sobre este conjunto de imágenes.</p>
+{compare_html}
 
 {gallery_html}
 
