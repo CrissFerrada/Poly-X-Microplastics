@@ -94,10 +94,13 @@ Repo: https://github.com/CrissFerrada/Poly-X-Microplastics
 
 REFERENCIAS
 -----------
-Pérez M, Parra S, Ferrada C, et al. (2024).
+Pérez M, Parra S, Ferrada C, Bravo M, Pérez PA, Quiroz W (2024).
+   Development of a new methodology for the determination of PET microplastics in sediment, based on microwave-assisted acid digestion.
    PLoS ONE 19(12): e0314520.
    https://doi.org/10.1371/journal.pone.0314520
 
-Ferrada C, Pérez M, Parra S, et al. (2024).
-   J. Chil. Chem. Soc. 69(1): 6082.
+Ferrada C, Pérez M, Parra S, Salas E, Sepúlveda F, Bravo MA, Quiroz W (2024).
+   Evaluation of microwave-assisted acid/oxidant digestion method for the detection of polyethylene microplastics in Merluccius gayi fish by Nile Red fluorescent staining and image analysis.
+   J. Chil. Chem. Soc. 69(1): 6082-6085.
+   https://doi.org/10.4067/s0717-97072024000106082
 ================================================================

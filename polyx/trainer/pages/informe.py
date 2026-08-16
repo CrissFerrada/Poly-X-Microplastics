@@ -134,8 +134,8 @@ def build_training_report(run_dir: Path, out_path: Path, include_refs: bool = Tr
         refs = """
         <h2>Referencias</h2>
         <ol>
-          <li>Pérez M, Parra S, Ferrada C et al. (2024). <em>PLoS ONE</em> 19(12): e0314520.</li>
-          <li>Ferrada C, Pérez M, Parra S et al. (2024). <em>J. Chil. Chem. Soc.</em> 69(1): 6082.</li>
+          <li>Pérez M, Parra S, Ferrada C, Bravo M, Pérez PA, Quiroz W (2024). Development of a new methodology for the determination of PET microplastics in sediment, based on microwave-assisted acid digestion. <em>PLoS ONE</em> 19(12): e0314520.</li>
+          <li>Ferrada C, Pérez M, Parra S, Salas E, Sepúlveda F, Bravo MA, Quiroz W (2024). Evaluation of microwave-assisted acid/oxidant digestion method for the detection of polyethylene microplastics in <em>Merluccius gayi</em> fish by Nile Red fluorescent staining and image analysis. <em>J. Chil. Chem. Soc.</em> 69(1): 6082-6085.</li>
           <li>Jocher G, Chaurasia A, Qiu J (2023). Ultralytics YOLOv8/v11.</li>
         </ol>
         """

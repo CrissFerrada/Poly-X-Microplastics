@@ -530,7 +530,8 @@ def generate_report(state, output_path: Path,
           <li>Ferrada C, Pérez M, Parra S, Salas E, Sepúlveda F, Bravo MA, Quiroz W (2024).
               Evaluation of microwave-assisted acid/oxidant digestion method for the detection of
               polyethylene microplastics in <em>Merluccius gayi</em> fish by Nile Red fluorescent
-              staining and image analysis. <em>J. Chil. Chem. Soc.</em> 69(1): 6082.</li>
+              staining and image analysis. <em>J. Chil. Chem. Soc.</em> 69(1): 6082-6085.
+              <a href='https://doi.org/10.4067/s0717-97072024000106082'>https://doi.org/10.4067/s0717-97072024000106082</a></li>
         </ol>
         """
 
