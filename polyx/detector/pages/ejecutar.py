@@ -82,9 +82,9 @@ class EjecutarPage(DetectorPage):
 
         if p.troceo == "nunca":
             self.lbl_troceo.setText(tr(
-                f"Troceado desactivado: cada foto entra completa a imgsz {p.imgsz}. "
-                f"En fotos grandes las partículas pequeñas pueden desaparecer al "
-                f"reescalar."))
+                "Troceado desactivado: cada foto entra completa a imgsz {}. "
+                "En fotos grandes las partículas pequeñas pueden desaparecer al "
+                "reescalar.").format(p.imgsz))
             return
 
         plan = politica_troceado(
@@ -94,16 +94,19 @@ class EjecutarPage(DetectorPage):
 
         if plan is None:
             self.lbl_troceo.setText(tr(
-                f"Las fotos ({wh[0]}×{wh[1]} px) no llegan al umbral de "
-                f"{p.troceo_umbral_px} px: se analizan de una pieza."))
+                "Las fotos ({}×{} px) no llegan al umbral de "
+                "{} px: se analizan de una pieza.").format(
+                    wh[0], wh[1], p.troceo_umbral_px))
         else:
             self.lbl_troceo.setText(tr(
-                f"⚠ Fotos grandes ({wh[0]}×{wh[1]} px): se analizarán en "
-                f"{plan['n_tiles']} recortes de {plan['tile']} px con "
-                f"{int(plan['overlap'] * 100)}% de solape. Va a tardar unas "
-                f"{plan['n_tiles']}× más.<br>"
-                f"El recorte es solo para que el modelo pueda detectar: los "
-                f"resultados y el informe se entregan sobre la foto completa."))
+                "⚠ Fotos grandes ({}×{} px): se analizarán en "
+                "{} recortes de {} px con "
+                "{}% de solape. Va a tardar unas "
+                "{}× más.<br>"
+                "El recorte es solo para que el modelo pueda detectar: los "
+                "resultados y el informe se entregan sobre la foto completa.").format(
+                    wh[0], wh[1], plan['n_tiles'], plan['tile'],
+                    int(plan['overlap'] * 100), plan['n_tiles']))
 
     def __init__(self, state, parent=None):
         super().__init__(state, parent)

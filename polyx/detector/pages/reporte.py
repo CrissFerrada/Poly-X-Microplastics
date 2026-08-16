@@ -204,11 +204,11 @@ class ReportePage(DetectorPage):
         n = len(self._fotos_marcadas())
         total = self.lst_fotos.count()
         if not usa_lista:
-            self.lbl_sel.setText(tr(f"{total} foto(s) en el trabajo"))
+            self.lbl_sel.setText(tr("{} foto(s) en el trabajo").format(total))
         elif n == 0:
             self.lbl_sel.setText(tr("⚠ ninguna marcada"))
         else:
-            self.lbl_sel.setText(tr(f"{n} de {total} marcadas"))
+            self.lbl_sel.setText(tr("{} de {} marcadas").format(n, total))
 
     def _check_results(self) -> bool:
         """Avisa si todavía no hay detecciones ejecutadas."""
@@ -253,7 +253,7 @@ class ReportePage(DetectorPage):
             trabajos.append(("", None, tr("trabajo completo")))
         if pide_marcadas:
             trabajos.append(("_seleccion", marcadas,
-                             tr(f"{len(marcadas)} foto(s) marcada(s)")))
+                             tr("{} foto(s) marcada(s)").format(len(marcadas))))
         return trabajos
 
     def _generate(self):
@@ -281,7 +281,7 @@ class ReportePage(DetectorPage):
                 self._write_html(out_path, solo_imagenes=fotos)
                 generados.append(out_path)
             self.lbl_status.setText(
-                "✓ " + tr(f"{len(generados)} informe(s) generado(s) en {out_dir}"))
+                "✓ " + tr("{} informe(s) generado(s) en {}").format(len(generados), out_dir))
             for p in generados:
                 try:
                     os.startfile(str(p))
@@ -342,7 +342,7 @@ class ReportePage(DetectorPage):
 
             if hechos:
                 self.lbl_status.setText(
-                    "✓ " + tr(f"{len(hechos)} PDF generado(s) en {pdf_base.parent}"))
+                    "✓ " + tr("{} PDF generado(s) en {}").format(len(hechos), pdf_base.parent))
                 for p in hechos:
                     try:
                         os.startfile(str(p))

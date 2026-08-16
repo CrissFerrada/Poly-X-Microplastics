@@ -11,6 +11,7 @@ simplemente se salta su captura y deja la del manual original.
 """
 from __future__ import annotations
 import sys
+import os
 import re
 import base64
 import argparse
@@ -158,16 +159,26 @@ def patch_manual(manual_path: Path, replacements: dict[int, str]) -> int:
 
 # ────────────────────────────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser(description="Regenera capturas del Manual_PolyX.html")
+    parser = argparse.ArgumentParser(description="Regenera capturas del manual")
     parser.add_argument("--solo", default="todos",
                         help="launcher | detector | trainer | etiquetador | visor | todos")
+    parser.add_argument("--manual", default="Manual_PolyX.html",
+                        help="manual a actualizar (por defecto el de español)")
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parent
-    manual = root / "Manual_PolyX.html"
+    manual = Path(args.manual)
+    if not manual.is_absolute():
+        manual = root / manual
     if not manual.exists():
         print(f"[ERROR] no se encuentra {manual}")
         return 1
+    # El idioma de la interfaz debe coincidir con el del manual, o las capturas
+    # mostrarian pestañas con nombres que el texto no usa. Se fija con la
+    # variable POLYX_IDIOMA al invocar, p. ej.:
+    #     POLYX_IDIOMA=en python generar_manual.py --manual Manual_PolyX.en.html
+    print(f"Manual destino : {manual.name}")
+    print(f"Idioma UI      : {os.environ.get('POLYX_IDIOMA', '(preferencia guardada)')}")
 
     # Selección de figuras según --solo
     name_to_figs = {

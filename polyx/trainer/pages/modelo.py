@@ -187,18 +187,19 @@ class ModeloPage(TrainerPage):
         if self.chk_comparar.isChecked():
             pesos = " y ".join(mdl.peso_de(f) for f in ("v8", "v11"))
             self.lbl_comparar.setText(tr(
-                f"Se entrenarán <b>{pesos}</b> uno tras otro, con idénticos "
-                f"imgsz, batch, épocas, semilla y augmentación. Así la "
-                f"diferencia de métricas se puede atribuir a la arquitectura "
-                f"y no a los hiperparámetros.<br>"
-                f"Tarda <b>el doble</b>: van en secuencia porque comparten GPU. "
-                f"Al terminar, la comparación sale en el log y en la pestaña "
-                f"Comparar."))
+                "Se entrenarán <b>{}</b> uno tras otro, con idénticos "
+                "imgsz, batch, épocas, semilla y augmentación. Así la "
+                "diferencia de métricas se puede atribuir a la arquitectura "
+                "y no a los hiperparámetros.<br>"
+                "Tarda <b>el doble</b>: van en secuencia porque comparten GPU. "
+                "Al terminar, la comparación sale en el log y en la pestaña "
+                "Comparar.").format(pesos))
         else:
             self.lbl_comparar.setText(tr(
-                f"Se entrenará solo <b>{mdl.base_weights_name()}</b>. "
-                f"Marca la casilla para entrenar también la otra familia y "
-                f"compararlas en igualdad de condiciones."))
+                "Se entrenará solo <b>{}</b>. "
+                "Marca la casilla para entrenar también la otra familia y "
+                "compararlas en igualdad de condiciones.").format(
+                    mdl.base_weights_name()))
 
     def _on_custom(self):
         t = self.ed_custom.text().strip()
