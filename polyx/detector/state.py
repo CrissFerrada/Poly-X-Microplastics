@@ -4,6 +4,7 @@ Hereda de QObject para emitir señales cuando cambia (las páginas se suscriben)
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -45,9 +46,29 @@ class InferenceParams:
     troceo_overlap: float = 0.25    # solape entre tiles; el NMS quita el duplicado
 
 
+@lru_cache(maxsize=12)
+def _leer_png(ruta: str, _mtime: float) -> Optional[bytes]:
+    """Lee un PNG del run, con caché acotada.
+
+    ``_mtime`` no se usa dentro: entra en la firma para que la caché se
+    invalide sola si el archivo cambia en disco.
+    """
+    try:
+        return Path(ruta).read_bytes()
+    except OSError:
+        return None
+
+
 @dataclass
 class ImageResult:
-    """Resultado de inferir un modelo sobre una imagen."""
+    """Resultado de inferir un modelo sobre una imagen.
+
+    Las imágenes anotadas se guardan en disco dentro del run y aquí solo viven
+    sus rutas. Retener los bytes costaba ~6.4 GB de RAM en un lote de 552
+    recortes con tres modelos, y era gasto puro: los PNG ya estaban escritos.
+    Las propiedades ``*_png`` siguen devolviendo bytes, así que quien las
+    consumía no cambia; lo que cambia es que se leen bajo demanda.
+    """
     image_path: Path
     model_idx: int
     predictions: List[Detection] = field(default_factory=list)
@@ -57,16 +78,36 @@ class ImageResult:
     fp: int = 0
     fn: int = 0
     miscls: int = 0
-    # bytes PNG de la imagen anotada combinada (predicción + GT) — preview/errores
-    annotated_png: Optional[bytes] = None
-    # bytes PNG solo con las predicciones del modelo (cajas de YOLO)
-    pred_png: Optional[bytes] = None
-    # bytes PNG solo con el Ground Truth (None si la imagen no tiene GT)
-    gt_png: Optional[bytes] = None
+    # Rutas de las imágenes anotadas guardadas en la carpeta del run.
+    annotated_path: Optional[Path] = None   # predicción + GT (preview/errores)
+    pred_path: Optional[Path] = None        # solo predicciones del modelo
+    gt_path: Optional[Path] = None          # solo GT (None si no hay)
     # veredicto del usuario tras revisión visual: None / "buena" / "mala"
     verdict: Optional[str] = None
     # geometría del troceado si la foto se partió; "" = se infirió de una pieza
     troceo: str = ""
+
+    @staticmethod
+    def _bytes_de(ruta: Optional[Path]) -> Optional[bytes]:
+        if ruta is None:
+            return None
+        try:
+            mtime = ruta.stat().st_mtime
+        except OSError:
+            return None
+        return _leer_png(str(ruta), mtime)
+
+    @property
+    def annotated_png(self) -> Optional[bytes]:
+        return self._bytes_de(self.annotated_path)
+
+    @property
+    def pred_png(self) -> Optional[bytes]:
+        return self._bytes_de(self.pred_path)
+
+    @property
+    def gt_png(self) -> Optional[bytes]:
+        return self._bytes_de(self.gt_path)
 
 
 # ────────────────────────────────────────────────────────────────────

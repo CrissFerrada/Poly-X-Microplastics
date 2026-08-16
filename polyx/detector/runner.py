@@ -78,7 +78,7 @@ class DetectorRunner(QThread):
             total = len(state.images) * len(slots)
             done = 0
 
-            for img_path in state.images:
+            for idx_img, img_path in enumerate(state.images):
                 if state.consume_abort():
                     self.aborted.emit()
                     return
@@ -183,27 +183,35 @@ class DetectorRunner(QThread):
                     sub.mkdir(parents=True, exist_ok=True)
 
                     def _encode_and_save(image, suffix: str):
-                        """Codifica a PNG, lo guarda en disco y devuelve los bytes."""
+                        """Codifica a PNG, lo guarda en disco y devuelve su ruta.
+
+                        Devuelve la ruta y no los bytes a proposito: en un lote
+                        grande retener cada PNG en memoria llegaba a varios GB, y
+                        el archivo ya queda escrito aqui mismo.
+                        """
                         if image is None:
                             return None
                         is_ok, buf = cv2.imencode(".png", image)
                         if not is_ok:
                             return None
-                        data = bytes(buf)
-                        (sub / f"{img_path.stem}{suffix}.png").write_bytes(data)
-                        return data
+                        # El nombre lleva el indice de la imagen porque dos fotos
+                        # de carpetas distintas pueden compartir nombre (1.1.jpg
+                        # existe en varios testigos) y se pisarian entre si.
+                        destino = sub / f"{idx_img:04d}_{img_path.stem}{suffix}.png"
+                        destino.write_bytes(bytes(buf))
+                        return destino
 
-                    annotated_bytes = _encode_and_save(combined, "_annot")
-                    pred_bytes = _encode_and_save(pred_img, "_pred")
-                    gt_bytes = _encode_and_save(gt_img, "_gt") if has_gt else None
+                    annotated_path = _encode_and_save(combined, "_annot")
+                    pred_path = _encode_and_save(pred_img, "_pred")
+                    gt_path = _encode_and_save(gt_img, "_gt") if has_gt else None
 
                     res = ImageResult(
                         image_path=img_path, model_idx=real_idx,
                         predictions=preds, gt=gts, has_gt=has_gt,
                         tp=tp, fp=fp, fn=fn, miscls=mc,
-                        annotated_png=annotated_bytes,
-                        pred_png=pred_bytes,
-                        gt_png=gt_bytes,
+                        annotated_path=annotated_path,
+                        pred_path=pred_path,
+                        gt_path=gt_path,
                         troceo=troceo_desc,
                     )
                     state.results.setdefault(real_idx, []).append(res)
