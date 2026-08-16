@@ -197,6 +197,12 @@ if "!HAS_GPU!"=="1" (
         REM cambia la rueda, aunque sea la equivocada. Aqui hace falta forzarlo.
         echo [INFO] Reinstalando PyTorch con CUDA !CUDANOM! ^(~2.5 GB^)...
         .venv\Scripts\python.exe -m pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/!CUDAWHL!
+        REM Reinstalar torch arrastra sus dependencias y se lleva por delante los
+        REM pines de requirements.txt. En la practica subio numpy a 2.x, donde
+        REM np.trapz ya no existe, y ultralytics 8.3.40 lo sigue usando: el
+        REM entrenamiento moria al validar la primera epoca, con la GPU ya bien.
+        echo [INFO] Restaurando las versiones fijadas en requirements.txt...
+        .venv\Scripts\python.exe -m pip install -r requirements.txt
         echo.
         echo [INFO] Verificando de nuevo...
         .venv\Scripts\python.exe -c "import sys, torch; ok=torch.cuda.is_available(); archs=torch.cuda.get_arch_list() if ok else []; cap='sm_%%d%%d'%%torch.cuda.get_device_capability(0) if ok else ''; print('   torch:', torch.__version__, '| arch:', cap); sys.exit(0 if (ok and cap in archs) else 1)"
