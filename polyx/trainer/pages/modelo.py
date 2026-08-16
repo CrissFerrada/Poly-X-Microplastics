@@ -84,7 +84,7 @@ class ModeloPage(TrainerPage):
             bullet = QLabel("•")
             bullet.setStyleSheet(f"color: {color}; font-weight: 700; border: none;")
             line.addWidget(bullet)
-            text = QLabel(f"<b>{code}</b> → <b>{name}</b> — {desc}")
+            text = QLabel(f"<b>{code}</b> → <b>{name}</b> — {tr(desc)}")
             text.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none;")
             text.setTextFormat(Qt.RichText)
             line.addWidget(text, 1)
