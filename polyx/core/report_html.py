@@ -215,19 +215,34 @@ def _fig_confusion_matrix(cm: np.ndarray, class_names: List[str]) -> str:
 def generate_report(state, output_path: Path,
                     include_refs: bool = True,
                     include_gallery: bool = True,
-                    max_gallery: int = 60) -> Path:
+                    max_gallery: int = 60,
+                    solo_imagenes=None) -> Path:
     """Genera el reporte HTML. `state` es un DetectorState con resultados.
 
     ``max_gallery`` limita cuántas imágenes se incrustan en la galería. Las
     imágenes van en base64 dentro del propio HTML, de modo que sin tope un lote
     grande generaba un archivo inabrible (14.5 MB con solo 4 imágenes).
+
+    ``solo_imagenes`` acota el informe a un conjunto de rutas. Con ``None`` entra
+    el trabajo completo. El filtro se aplica antes de calcular nada, de forma que
+    los totales, los gráficos y la matriz de confusión describan exactamente el
+    mismo subconjunto que se muestra; si se filtrara solo la galería, las cifras
+    de arriba hablarían de un lote y las imágenes de otro.
     """
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     active = state.active_models()
-    all_results = [r for rs in state.results.values() for r in rs]
+
+    if solo_imagenes is None:
+        resultados = dict(state.results)
+    else:
+        elegidas = {Path(p) for p in solo_imagenes}
+        resultados = {mi: [r for r in rs if Path(r.image_path) in elegidas]
+                      for mi, rs in state.results.items()}
+
+    all_results = [r for rs in resultados.values() for r in rs]
     total_imgs = len({r.image_path for r in all_results})
     total_dets = sum(len(r.predictions) for r in all_results)
     confs = [p.conf for r in all_results for p in r.predictions]
@@ -246,7 +261,7 @@ def generate_report(state, output_path: Path,
     err_section = ""
     if any_gt and active:
         main_mi = state.model_slots.index(active[0])
-        rs = state.results.get(main_mi, [])
+        rs = resultados.get(main_mi, [])
         gts_only = [r.gt for r in rs if r.has_gt]
         preds_only = [r.predictions for r in rs if r.has_gt]
         cls_ids = sorted({d.class_id for lst in gts_only + preds_only for d in lst})
@@ -281,7 +296,7 @@ def generate_report(state, output_path: Path,
     rows_models = ""
     for mi, slot in enumerate(state.model_slots):
         if slot.path is None: continue
-        rs = state.results.get(mi, [])
+        rs = resultados.get(mi, [])
         n_img = len({r.image_path for r in rs})
         n_det = sum(len(r.predictions) for r in rs)
         cf = [p.conf for r in rs for p in r.predictions]
@@ -304,7 +319,7 @@ def generate_report(state, output_path: Path,
         blocks = []
         # Tope de imágenes en galería: cada una se incrusta en base64, así que
         # sin límite un lote de varios cientos produce un HTML de gigabytes.
-        candidatas = [(mi, r) for mi, rs in state.results.items() for r in rs]
+        candidatas = [(mi, r) for mi, rs in resultados.items() for r in rs]
         omitidas = max(0, len(candidatas) - max_gallery)
         for mi, r in candidatas[:max_gallery]:
             slot = state.model_slots[mi]
