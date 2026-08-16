@@ -66,6 +66,12 @@
   la comparación
 - **Auditoría del dataset** antes de entrenar: distribución de clases, formato y
   validación, con veredicto de si es apto
+- **`best_real.pt`: el peso que sirve para tus fotos.** Ultralytics guarda
+  `best.pt` según el mAP de la validación completa, y en un dataset mixto ese
+  número lo dominan las placas dopadas de laboratorio (en el dataset del Loa,
+  1191 cajas de laboratorio frente a 47 de sedimento real). Al terminar, Poly-X
+  evalúa todos los checkpoints contra **solo** el sedimento real y guarda el
+  ganador aparte. `best.pt` se conserva intacto
 
 ### 🏷 Etiquetador
 - Canvas interactivo: **arrastrar** para dibujar cajas YOLO normalizadas
