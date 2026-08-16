@@ -191,10 +191,24 @@ if "!HAS_GPU!"=="1" (
         echo         Entrenar o detectar fallaria con
         echo         "no kernel image is available for execution on the device".
         echo.
-        echo         Solucion: reinstalar torch con la rueda correcta, por ejemplo
-        echo         .venv\Scripts\python.exe -m pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu128
+        REM Reinstalar de verdad, no solo avisar. El pip de arriba puede no haber
+        REM hecho nada: si el .venv ya traia torch de un intento anterior o de una
+        REM instalacion migrada, "pip install torch" lo da por satisfecho y no
+        REM cambia la rueda, aunque sea la equivocada. Aqui hace falta forzarlo.
+        echo [INFO] Reinstalando PyTorch con CUDA !CUDANOM! ^(~2.5 GB^)...
+        .venv\Scripts\python.exe -m pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/!CUDAWHL!
         echo.
-        pause
+        echo [INFO] Verificando de nuevo...
+        .venv\Scripts\python.exe -c "import sys, torch; ok=torch.cuda.is_available(); archs=torch.cuda.get_arch_list() if ok else []; cap='sm_%%d%%d'%%torch.cuda.get_device_capability(0) if ok else ''; print('   torch:', torch.__version__, '| arch:', cap); sys.exit(0 if (ok and cap in archs) else 1)"
+        if errorlevel 1 (
+            echo.
+            echo [ERROR] Sigue sin coincidir. Revisa que la rueda !CUDAWHL! cubra
+            echo         esta tarjeta y reinstala a mano.
+            echo.
+            pause
+        ) else (
+            echo [OK] Corregido: PyTorch ya tiene kernels para esta GPU.
+        )
     ) else (
         echo [OK] PyTorch tiene kernels para esta GPU.
     )
