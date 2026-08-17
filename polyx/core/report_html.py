@@ -439,6 +439,21 @@ def generate_report(state, output_path: Path,
                 f"<td class='r'>{cm_.precision:.3f}</td><td class='r'>{cm_.recall:.3f}</td>"
                 f"<td class='r'>{cm_.f1:.3f}</td></tr>"
             )
+        # Las clases que el modelo conoce pero que no aparecen ni en el GT ni en
+        # las predicciones se quedan fuera de la tabla, porque no tienen metrica
+        # que calcular. Se declaran igual: un informe que anuncia PET/PP/LDPE y
+        # luego muestra dos filas parece roto, y el lector no puede distinguir
+        # "ausente del lote" de "se perdio por el camino".
+        conocidas = dict(getattr(getattr(active[0], "loaded", None), "names", {}) or {})
+        ausentes = [n for cid, n in sorted(conocidas.items()) if cid not in set(cls_ids)]
+        nota_ausentes = ""
+        if ausentes:
+            nota_ausentes = (
+                f"<p class='caption' style='text-align:left'>Sin fila para "
+                f"{', '.join(ausentes)}: no aparece ni en la anotación manual ni "
+                f"entre las predicciones de este lote, de modo que no hay métrica "
+                f"que informar. El modelo sí está entrenado para esa clase.</p>")
+
         err_section = f"""
         <h2 id='errors'>5. Análisis de errores</h2>
         <h3>5.1 Matriz de confusión</h3>
@@ -447,6 +462,7 @@ def generate_report(state, output_path: Path,
         <h3>5.2 Precisión / Recall / F1 por clase</h3>
         <table class='data'><tr><th>Clase</th><th>{LABEL_TP}</th><th>{LABEL_FP}</th><th>{LABEL_FN}</th>
         <th>Precisión</th><th>Recall</th><th>F1</th></tr>{rows}</table>
+        {nota_ausentes}
         """
 
     # ── Resumen por modelo (tabla comparativa) ──
@@ -596,10 +612,13 @@ def generate_report(state, output_path: Path,
                                  state.model_slots[mi].alias))
             marcador.sort(reverse=True)
             mejor_f1, mejor = marcador[0]
+            # Este F1 es el permisivo (localizacion). Decia solo "F1 global" y
+            # convivia con el veredicto estricto de arriba: dos numeros distintos
+            # llamados igual en la misma seccion.
             veredicto = (
-                f"<p><b>Mejor F1 global:</b> {mejor} ({mejor_f1:.3f}). "
-                f"Con un solo pase por modelo y sobre {total_imgs} imagen(es), "
-                f"una diferencia pequeña no basta para preferir uno u otro.</p>")
+                f"<p><b>Mejor F1 de localización:</b> {mejor} ({mejor_f1:.3f}) — "
+                f"encontrar la partícula, sin exigir que acierte el polímero. El "
+                f"veredicto con clase está más arriba.</p>")
         else:
             veredicto = ("<p class='caption' style='text-align:left'>Sin ground "
                          "truth no se puede declarar un ganador: un modelo con "
@@ -625,9 +644,20 @@ def generate_report(state, output_path: Path,
         blocks = []
         # Tope de imágenes en galería: cada una se incrusta en base64, así que
         # sin límite un lote de varios cientos produce un HTML de gigabytes.
-        candidatas = [(mi, r) for mi, rs in resultados.items() for r in rs]
-        omitidas = max(0, len(candidatas) - max_gallery)
-        for mi, r in candidatas[:max_gallery]:
+        # Se agrupa por imagen y no por modelo. Aplanando modelo a modelo, el
+        # tope se agotaba dentro del primero y el segundo no aparecia nunca en
+        # la galeria: con dos modelos cargados solo se veian las fotos de uno,
+        # que es justo la comparacion visual que se quiere. Ahora el tope cuenta
+        # imagenes, y de cada una entran todos los modelos, uno bajo el otro.
+        por_imagen: dict = {}
+        for mi in sorted(resultados):
+            for r in resultados[mi]:
+                por_imagen.setdefault(r.image_path, []).append((mi, r))
+        candidatas = []
+        for grupo in list(por_imagen.values())[:max_gallery]:
+            candidatas.extend(grupo)
+        omitidas = max(0, len(por_imagen) - max_gallery)
+        for mi, r in candidatas:
             slot = state.model_slots[mi]
             if True:
                 # Imagen de predicción (preferimos pred_png; si no, la combinada)
@@ -681,9 +711,11 @@ def generate_report(state, output_path: Path,
         if blocks:
             nota = ""
             if omitidas:
-                nota = (f"<p class='caption'>Se muestran las primeras {max_gallery} "
-                        f"imágenes; {omitidas} quedaron fuera de la galería para que "
-                        f"el archivo siga siendo manejable. Las métricas de las "
+                n_mostradas = len({r.image_path for _, r in candidatas})
+                nota = (f"<p class='caption'>Se muestran las primeras "
+                        f"{n_mostradas} imágenes, cada una con todos los modelos; "
+                        f"{omitidas} quedaron fuera de la galería para que el "
+                        f"archivo siga siendo manejable. Las métricas de las "
                         f"secciones anteriores sí incluyen todas.</p>")
             gallery_html = (
                 "<h2 id='gallery'>7. Galería comparativa: Predicción vs Ground Truth</h2>"
