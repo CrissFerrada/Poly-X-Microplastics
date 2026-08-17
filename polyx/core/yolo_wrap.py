@@ -59,6 +59,13 @@ class YoloModel:
     # memoria: en vez de fallar, se reintenta con el siguiente tamaño menor.
     FALLBACK_SIZES = (8192, 7168, 6144, 5120, 4096, 3008, 2048, 1536, 1280, 1024, 640)
 
+    # Tope de detecciones por pase. Ultralytics trae 300, que aqui trunca en
+    # silencio: una placa de desembocadura pasa de 500 particulas, y a confianza
+    # baja el modelo propone bastante mas. Al recortar el sobrante se perderian
+    # justo las cajas de menor confianza sin aviso, de modo que un barrido de
+    # umbrales dejaria de ser comparable con una corrida hecha a ese umbral.
+    MAX_DET = 5000
+
     def __init__(self, weights_path: str | Path, alias: str = ""):
         self.weights_path = str(weights_path)
         self.alias = alias or Path(self.weights_path).stem
@@ -132,7 +139,8 @@ class YoloModel:
             try:
                 res = self._model.predict(
                     source=str(image_path), conf=conf, iou=iou, imgsz=sz,
-                    device=device, verbose=False, save=False
+                    device=device, verbose=False, save=False,
+                    max_det=self.MAX_DET,
                 )
                 self.last_imgsz = sz
                 self.last_fallback = (i > 0)
@@ -207,6 +215,7 @@ class YoloModel:
             results = self._model.predict(
                 source=chunk, conf=conf, iou=iou, imgsz=infer_sz,
                 device=device, verbose=False, save=False,
+                max_det=self.MAX_DET,
             )
             for (x0, y0), r in zip(chunk_org, results):
                 if r.boxes is None or len(r.boxes) == 0:
