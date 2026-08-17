@@ -311,6 +311,125 @@ def _fig_barrido(barrido: Dict[str, list]) -> str:
     return _fig_to_b64(fig)
 
 
+_PALETA = (T.ACCENT, T.VIO, T.WARN)
+
+
+def _fig_comparacion_metricas(datos: List[tuple]) -> str:
+    """Barras agrupadas de P/R/F1 por modelo, en los dos criterios.
+
+    ``datos``: ``[(alias, p_loc, r_loc, f1_loc, p_cls, r_cls, f1_cls), ...]``.
+
+    Se dibujan los dos paneles juntos y no solo el permisivo: la distancia entre
+    ambos es la confusion entre polimeros, y verla al lado evita leer el numero
+    bueno como si fuera el desempeno completo.
+    """
+    if not datos:
+        return ""
+    fig, axes = plt.subplots(1, 2, figsize=(7.6, 3.2), sharey=True)
+    etiquetas = ["Precisión", "Recall", "F1"]
+    x = np.arange(len(etiquetas))
+    ancho = 0.8 / max(1, len(datos))
+    for panel, (ax, desplazamiento, titulo) in enumerate((
+            (axes[0], 1, "Localización"), (axes[1], 4, "Con clase"))):
+        for i, fila in enumerate(datos):
+            vals = fila[desplazamiento:desplazamiento + 3]
+            pos = x - 0.4 + ancho * (i + 0.5)
+            barras = ax.bar(pos, vals, ancho, label=fila[0],
+                            color=_PALETA[i % len(_PALETA)])
+            if panel == 1 or len(datos) <= 2:
+                ax.bar_label(barras, fmt="%.3f", fontsize=7, padding=1)
+        ax.set_title(titulo, fontsize=10)
+        ax.set_xticks(x)
+        ax.set_xticklabels(etiquetas, fontsize=9)
+        ax.set_ylim(0, 1.12)
+        ax.grid(axis="y", alpha=0.3)
+        ax.set_axisbelow(True)
+    axes[0].set_ylabel("Valor")
+    # La leyenda va bajo la figura: dentro de los ejes se montaba sobre las
+    # barras, que con estos valores llegan casi al techo en las dos mitades.
+    manejadores, nombres = axes[0].get_legend_handles_labels()
+    fig.legend(manejadores, nombres, frameon=False, fontsize=9,
+               loc="lower center", ncol=len(datos),
+               bbox_to_anchor=(0.5, -0.04))
+    fig.tight_layout()
+    return _fig_to_b64(fig)
+
+
+def _fig_acuerdo_por_imagen(alias_a: str, alias_b: str, pares: List[tuple]) -> str:
+    """Detecciones por imagen de un modelo frente al otro, con la diagonal.
+
+    El total de un lote esta dominado por unas pocas placas densas, asi que dos
+    modelos pueden empatar en la suma y discrepar foto a foto. Aqui cada punto es
+    una imagen: sobre la diagonal cuentan igual, y la distancia a ella dice
+    cuanto se separan y en que placas.
+
+    Escala simetrica-logaritmica porque la mayoria de las placas tiene 0-10
+    particulas y unas pocas pasan de 500; en escala lineal el grueso de los
+    puntos se apelotona en el origen.
+    """
+    if not pares:
+        return ""
+    a = [p[0] for p in pares]
+    b = [p[1] for p in pares]
+    tope = max(max(a), max(b), 1)
+    fig, ax = plt.subplots(figsize=(4.6, 4.2))
+    ax.plot([0, tope], [0, tope], "--", color="#999", linewidth=1,
+            label="acuerdo exacto")
+    ax.scatter(a, b, s=26, alpha=0.75, color=T.ACCENT, edgecolor="white",
+               linewidth=0.5)
+    # Se rotulan las placas que mas se separan: son las que hay que ir a mirar.
+    for na, nb, nombre in sorted(pares, key=lambda p: -abs(p[0] - p[1]))[:3]:
+        if abs(na - nb) > 0:
+            ax.annotate(nombre, (na, nb), fontsize=7, color=T.INK2,
+                        xytext=(4, 4), textcoords="offset points")
+    ax.set_xscale("symlog", linthresh=10)
+    ax.set_yscale("symlog", linthresh=10)
+    ax.set_xlim(-1, tope * 1.6)
+    ax.set_ylim(-1, tope * 1.6)
+    ax.set_xlabel(f"Detecciones · {alias_a}")
+    ax.set_ylabel(f"Detecciones · {alias_b}")
+    ax.grid(alpha=0.3)
+    ax.set_axisbelow(True)
+    ax.legend(frameon=False, fontsize=8, loc="upper left")
+    fig.tight_layout()
+    return _fig_to_b64(fig)
+
+
+def _fig_metricas_por_clase(por_modelo: Dict[str, Dict[str, tuple]]) -> str:
+    """F1 por clase y por modelo: donde gana cada uno.
+
+    El F1 global promedia polimeros con desempeno muy distinto -- PET separa
+    bien, PP y LDPE comparten tono y se confunden -- de modo que un modelo puede
+    ganar en el agregado y perder en la clase que interesa.
+    """
+    if not por_modelo:
+        return ""
+    clases = []
+    for m in por_modelo.values():
+        for c in m:
+            if c not in clases:
+                clases.append(c)
+    if not clases:
+        return ""
+    fig, ax = plt.subplots(figsize=(7, 3.2))
+    x = np.arange(len(clases))
+    ancho = 0.8 / max(1, len(por_modelo))
+    for i, (alias, metricas) in enumerate(por_modelo.items()):
+        vals = [metricas.get(c, (0, 0, 0))[2] for c in clases]
+        barras = ax.bar(x - 0.4 + ancho * (i + 0.5), vals, ancho, label=alias,
+                        color=_PALETA[i % len(_PALETA)])
+        ax.bar_label(barras, fmt="%.3f", fontsize=7, padding=1)
+    ax.set_xticks(x)
+    ax.set_xticklabels(clases)
+    ax.set_ylabel("F1 por clase")
+    ax.set_ylim(0, 1.12)
+    ax.grid(axis="y", alpha=0.3)
+    ax.set_axisbelow(True)
+    ax.legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    return _fig_to_b64(fig)
+
+
 def _fig_class_distribution(per_class_counts: Dict[str, int]) -> str:
     if not per_class_counts:
         return ""
@@ -625,11 +744,91 @@ def generate_report(state, output_path: Path,
                          "más detecciones puede estar acertando o inventando. "
                          "Carga anotaciones para obtener F1 por modelo.</p>")
 
+        # ── Figuras de comparación ──
+        figuras_cmp = ""
+        if hay_gt:
+            datos_barras = []
+            por_clase_modelo: Dict[str, Dict[str, tuple]] = {}
+            for mi in activos:
+                alias = state.model_slots[mi].alias
+                rs = [r for r in resultados.get(mi, []) if r.has_gt]
+                tp = sum(r.tp for r in rs); fp = sum(r.fp for r in rs)
+                fn = sum(r.fn for r in rs); mc = sum(r.miscls for r in rs)
+                p_l, r_l, f_l = _pr_f1(tp, fp, fn)
+                p_c, r_c, f_c = _pr_f1(tp, fp + mc, fn + mc)
+                datos_barras.append((alias, p_l, r_l, f_l, p_c, r_c, f_c))
+
+                gts_m = [r.gt for r in rs]
+                preds_m = [r.predictions for r in rs]
+                ids = sorted({d.class_id for lst in gts_m + preds_m for d in lst})
+                if ids:
+                    metricas = aggregate_per_class(preds_m, gts_m, ids,
+                                                   iou_thr=state.params.iou_tp)
+                    nombres_cls = {
+                        cid: next((d.class_name for lst in gts_m + preds_m
+                                   for d in lst if d.class_id == cid), str(cid))
+                        for cid in ids}
+                    por_clase_modelo[alias] = {
+                        nombres_cls[cid]: (metricas[cid].precision,
+                                           metricas[cid].recall,
+                                           metricas[cid].f1) for cid in ids}
+
+            f_barras = _fig_comparacion_metricas(datos_barras)
+            if f_barras:
+                figuras_cmp += (
+                    f"<div class='fig'><img src='data:image/png;base64,{f_barras}' />"
+                    f"<div class='caption'>Figura. Precisión, Recall y F1 de cada "
+                    f"modelo al umbral {state.params.conf:g}, en los dos criterios. "
+                    f"La distancia entre paneles es la confusión entre "
+                    f"polímeros.</div></div>")
+
+            f_clase = _fig_metricas_por_clase(por_clase_modelo)
+            if f_clase:
+                figuras_cmp += (
+                    f"<div class='fig'><img src='data:image/png;base64,{f_clase}' />"
+                    f"<div class='caption'>Figura. F1 por clase. Un modelo puede "
+                    f"ganar en el agregado y perder en el polímero que "
+                    f"interesa.</div></div>")
+
+            # Acuerdo foto a foto entre los dos primeros modelos.
+            if len(activos) >= 2:
+                a, b = activos[0], activos[1]
+                pares = []
+                for ruta in sorted(por_foto):
+                    ra, rb = por_foto[ruta].get(a), por_foto[ruta].get(b)
+                    if ra is not None and rb is not None:
+                        pares.append((len(ra.predictions), len(rb.predictions),
+                                      Path(ruta).name))
+                f_acuerdo = _fig_acuerdo_por_imagen(
+                    state.model_slots[a].alias, state.model_slots[b].alias, pares)
+                if f_acuerdo:
+                    figuras_cmp += (
+                        f"<div class='fig'><img src='data:image/png;base64,{f_acuerdo}' />"
+                        f"<div class='caption'>Figura. Detecciones por imagen de un "
+                        f"modelo frente al otro; la diagonal es el acuerdo exacto. "
+                        f"Escala simétrica-logarítmica, porque casi todas las "
+                        f"placas tienen pocas partículas y unas pocas "
+                        f"cientos.</div></div>")
+
+            # Curva de F1 frente al umbral: sostiene la eleccion del punto de
+            # operacion con evidencia, en vez de afirmarla.
+            barrido = _barrido_confianza(resultados, state, state.params.iou_tp,
+                                         state.params.conf)
+            f_barrido = _fig_barrido(barrido)
+            if f_barrido:
+                figuras_cmp += (
+                    f"<div class='fig'><img src='data:image/png;base64,{f_barrido}' />"
+                    f"<div class='caption'>Figura. F1 (con clase) frente al umbral "
+                    f"de confianza; la estrella marca el máximo de cada modelo. La "
+                    f"curva arranca en {state.params.conf:g}, el umbral con que se "
+                    f"ejecutó: por debajo las detecciones no se calcularon.</div></div>")
+
         compare_html = (
             "<p>Detecciones de cada modelo imagen por imagen. El total puede "
             "estar dominado por unas pocas fotos densas, así que conviene mirar "
             "el detalle antes de elegir modelo.</p>"
             + veredicto
+            + figuras_cmp
             + f"<table class='data'>{cab}{filas}</table>")
     elif len(activos) == 1:
         compare_html = ("<p class='caption' style='text-align:left'>Solo se "
