@@ -20,6 +20,9 @@ from dataclasses import dataclass, field
 import copy
 import json
 
+import numpy as np
+import cv2
+
 from PySide6.QtCore import Qt, QRectF, QPointF, Signal, QSize
 from PySide6.QtGui import (
     QPixmap, QPainter, QPen, QColor, QBrush, QImage, QFont, QCursor,
@@ -33,8 +36,35 @@ from PySide6.QtWidgets import (
 
 from ._base import DetectorPage
 from ...core import theme as T
-from ...core.yolo_wrap import Detection, read_yolo_txt, find_gt_for_image
+from ...core.yolo_wrap import (
+    Detection, read_yolo_txt, find_gt_for_image, tamano_imagen,
+)
 from ...core.i18n import tr
+
+
+def _qpixmap_de(path: Path) -> QPixmap:
+    """Decodifica con cv2, no con el lector de Qt.
+
+    El anotador y el detector tienen que trabajar en el MISMO marco de pixeles.
+    Qt aplica la rotacion EXIF al abrir un JPEG y cv2 no, asi que una foto
+    marcada como girada se anotaba en un marco y se leia en otro: las cajas
+    guardadas salian desplazadas -- alguna incluso fuera de la placa -- aunque
+    en el anotador se vieran perfectamente puestas. Y el .txt no tiene forma de
+    declarar en que marco se escribio.
+
+    De paso, cv2.imdecode sobre np.fromfile es lo unico que abre con fiabilidad
+    rutas con acentos en Windows, que es la razon por la que el resto del
+    proyecto ya lee asi.
+    """
+    bgr = cv2.imdecode(np.fromfile(str(path), dtype=np.uint8), cv2.IMREAD_COLOR)
+    if bgr is None:
+        return QPixmap()
+    h, w = bgr.shape[:2]
+    rgb = np.ascontiguousarray(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+    # .copy() para que la QImage sea duena de sus bytes: el array de numpy se
+    # libera al salir y sin la copia quedaria apuntando a memoria muerta.
+    return QPixmap.fromImage(
+        QImage(rgb.data, w, h, 3 * w, QImage.Format_RGB888).copy())
 
 DEFAULT_CLASSES = ["PET", "PP", "LDPE"]
 
@@ -140,7 +170,7 @@ class AnnotCanvas(QGraphicsView):
 
     def load_image(self, path: Path, existing: List[Detection]):
         self._image_path = path
-        pm = QPixmap(str(path))
+        pm = _qpixmap_de(path)
         if pm.isNull():
             self.scene_.clear()
             self._pixmap_item = None
@@ -697,11 +727,14 @@ class GTManualPage(DetectorPage):
         existing: List[Detection] = []
         gt_txt = find_gt_for_image(path, self.state.gt_folder)
         if gt_txt:
-            img = QImage(str(path))
-            existing = read_yolo_txt(
-                gt_txt, img.width(), img.height(),
-                {i: n for i, n in enumerate(DEFAULT_CLASSES)},
-            )
+            # Mismas dimensiones que usa el detector. PIL lee la cabecera sin
+            # aplicar la rotacion EXIF, igual que cv2; QImage si la aplicaba.
+            wh = tamano_imagen(path)
+            if wh:
+                existing = read_yolo_txt(
+                    gt_txt, wh[0], wh[1],
+                    {i: n for i, n in enumerate(DEFAULT_CLASSES)},
+                )
         self.canvas.load_image(path, existing)
         self._on_boxes_changed()
         self.canvas.setFocus()
@@ -736,8 +769,10 @@ class GTManualPage(DetectorPage):
 
     def _save_to_txt(self, img_path: Path, dets: List[Detection]):
         out_dir, out_path = self._gt_out_path(img_path)
-        img = QImage(str(img_path))
-        W, H = img.width(), img.height()
+        wh = tamano_imagen(img_path)
+        if not wh or wh[0] <= 0 or wh[1] <= 0:
+            raise ValueError(f"No se pudo leer el tamano de {img_path.name}")
+        W, H = wh
         lines = []
         for d in dets:
             cx = (d.x1 + d.x2) / 2 / W

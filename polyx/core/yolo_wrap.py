@@ -278,11 +278,21 @@ def tamano_imagen(image_path: str | Path) -> Optional[Tuple[int, int]]:
 
     Se consulta antes de cada inferencia, asi que decodificar una foto de 3260 px
     solo para medirla costaria mas que la propia decision.
+
+    Devuelve el tamano YA ROTADO segun EXIF, porque ese es el marco en el que
+    trabaja el resto del programa: ``cv2.imdecode`` aplica la orientacion y
+    Pillow no. Sin corregirlo, una foto marcada con orientation 6 se medi­a
+    4096x3072 y se decodificaba 3072x4096, de modo que las cajas normalizadas
+    contra un tamano se desnormalizaban contra el otro y acababan desplazadas.
     """
     try:
         from PIL import Image
         with Image.open(str(image_path)) as im:
-            return int(im.size[0]), int(im.size[1])
+            ancho, alto = int(im.size[0]), int(im.size[1])
+            # 5,6,7,8 son las orientaciones que intercambian los ejes.
+            if im.getexif().get(274) in (5, 6, 7, 8):
+                ancho, alto = alto, ancho
+            return ancho, alto
     except Exception:
         # Rutas con acentos o formatos que Pillow no abre: cae al camino de cv2,
         # que ya se usa en todo el resto del proyecto por esa misma razon.
