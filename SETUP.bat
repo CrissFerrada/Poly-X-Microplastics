@@ -71,10 +71,33 @@ REM ============================================================
 REM   2. Limpiar venv viejo si esta roto
 REM ============================================================
 if exist .venv (
+    set "VENV_ROTO="
     .venv\Scripts\python.exe --version >nul 2>&1
-    if errorlevel 1 (
-        echo [INFO] El .venv existente esta roto. Recreando...
+    if errorlevel 1 set "VENV_ROTO=1"
+
+    REM No basta con que Python arranque. Una reinstalacion de torch hecha con el
+    REM programa abierto deja DLLs a medio reemplazar: python funciona, pero
+    REM "import torch" falla con WinError 1114 al cargar c10.dll. Reinstalar
+    REM encima no lo arregla, porque pip ve el paquete como ya instalado. La
+    REM unica salida fiable es rehacer el entorno.
+    if not defined VENV_ROTO (
+        .venv\Scripts\python.exe -c "import torch" >nul 2>&1
+        if errorlevel 1 (
+            .venv\Scripts\python.exe -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('torch') is None else 1)" >nul 2>&1
+            if errorlevel 1 (
+                echo [AVISO] PyTorch esta instalado pero no carga ^(DLL corrupta^).
+                set "VENV_ROTO=1"
+            )
+        )
+    )
+
+    if defined VENV_ROTO (
+        echo [INFO] El entorno .venv no sirve. Se rehace desde cero...
         rmdir /s /q .venv
+        if exist .venv (
+            echo [ERROR] No se pudo borrar .venv. Cierra Poly-X y vuelve a ejecutar.
+            pause & exit /b 1
+        )
     )
 )
 
@@ -99,6 +122,12 @@ echo [INFO] Actualizando pip...
 REM ============================================================
 REM   5. Detectar GPU NVIDIA
 REM ============================================================
+REM Version de torch fijada a proposito. Sin pin, pip trae la ultima (2.11 en
+REM agosto 2026), que no es la probada con numpy 1.26.4 y ultralytics 8.3.40.
+REM 2.7.1 tiene rueda cu128, asi que cubre tambien las tarjetas Blackwell.
+set "TORCHVER=2.7.1"
+set "TVISIONVER=0.22.1"
+
 set "HAS_GPU=0"
 where nvidia-smi >nul 2>&1
 if %errorlevel%==0 (
@@ -147,10 +176,10 @@ if "!HAS_GPU!"=="1" (
     )
     echo [OK] GPU NVIDIA detectada ^(compute capability: !CC!^).
     echo [INFO] Instalando PyTorch con CUDA !CUDANOM! ^(3-4 GB^)...
-    .venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/!CUDAWHL!
+    .venv\Scripts\python.exe -m pip install torch==!TORCHVER! torchvision==!TVISIONVER! --index-url https://download.pytorch.org/whl/!CUDAWHL!
 ) else (
     echo [INFO] Sin GPU NVIDIA. Instalando PyTorch CPU...
-    .venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    .venv\Scripts\python.exe -m pip install torch==!TORCHVER! torchvision==!TVISIONVER! --index-url https://download.pytorch.org/whl/cpu
 )
 
 REM ============================================================
@@ -196,7 +225,7 @@ if "!HAS_GPU!"=="1" (
         REM instalacion migrada, "pip install torch" lo da por satisfecho y no
         REM cambia la rueda, aunque sea la equivocada. Aqui hace falta forzarlo.
         echo [INFO] Reinstalando PyTorch con CUDA !CUDANOM! ^(~2.5 GB^)...
-        .venv\Scripts\python.exe -m pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/!CUDAWHL!
+        .venv\Scripts\python.exe -m pip install --force-reinstall torch==!TORCHVER! torchvision==!TVISIONVER! --index-url https://download.pytorch.org/whl/!CUDAWHL!
         REM Reinstalar torch arrastra sus dependencias y se lleva por delante los
         REM pines de requirements.txt. En la practica subio numpy a 2.x, donde
         REM np.trapz ya no existe, y ultralytics 8.3.40 lo sigue usando: el
