@@ -1,27 +1,22 @@
-"""Elegir el checkpoint que mejor detecta en el dominio que de verdad importa.
+"""Elige el peso segun el subconjunto real de la validacion.
 
-El problema que resuelve. El dataset mezcla dos fuentes: placas dopadas de
-laboratorio y sedimento real. Las dopadas aportan casi todas las cajas (son
-imagenes densas), asi que dominan la validacion aunque sean pocas imagenes. En
-el dataset del Loa la validacion queda con 1191 cajas de laboratorio frente a 47
-de sedimento real: un 96% del dominio equivocado.
+El dataset combina dos subconjuntos, marcados por el prefijo del nombre de
+archivo que pone ``armar_dataset.py``: ``lab__`` y ``real__``. El subconjunto
+``lab__`` aporta muchas mas cajas por imagen, asi que domina el mAP global y con
+el se decide ``best.pt``.
 
-Ultralytics guarda ``best.pt`` segun el mAP de esa validacion. O sea que, sin
-tocar nada, uno se lleva el checkpoint que mejor funciona sobre placas limpias de
-laboratorio, que es justamente el dominio que ya se sabia que no transfiere a las
-fotos de terreno.
+Aqui se rehace esa eleccion mirando solo ``real__``, y el ganador se guarda
+aparte. El entrenamiento deja tres pesos:
 
-Aqui se rehace la eleccion: se evaluan todos los checkpoints guardados contra
-**solo** las imagenes de sedimento real de la validacion, y se copia el ganador
-como ``best_real.pt``. No se borra ni se altera ``best.pt``: quedan los dos, y el
-informe puede declarar con cual se detecto.
+    best_sintetico.pt   el que elige Ultralytics por el mAP global
+    best_real.pt        el mejor sobre el subconjunto real
+    last.pt             ultima epoca, para reanudar
 
-La separacion de dominios sale del prefijo del nombre de archivo que pone
-``armar_dataset.py`` (``real__`` frente a ``lab__``). Si un dataset no trae los
-dos prefijos, no hay nada que reelegir y el paso se salta.
+Si un dataset no trae los dos prefijos, el paso se salta sin ruido.
 """
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -30,8 +25,9 @@ import yaml
 PREFIJO_REAL = "real__"
 PREFIJO_LAB = "lab__"
 
-# Nombre del peso reelegido. Convive con best.pt, no lo reemplaza.
+# Los tres pesos que quedan al terminar. best.pt de Ultralytics se conserva.
 NOMBRE_MEJOR_REAL = "best_real.pt"
+NOMBRE_MEJOR_LAB = "best_sintetico.pt"
 
 
 def _imagenes_de_val(datos_yaml: Path) -> List[Path]:
@@ -152,9 +148,12 @@ def candidatos(run_dir: Path) -> List[Path]:
     pesos = Path(run_dir) / "weights"
     if not pesos.is_dir():
         return []
+    # Se excluyen los pesos que produce esta misma funcion: al reentrenar sobre
+    # un run existente estarian ahi y se evaluarian como si fueran candidatos.
+    propios = {NOMBRE_MEJOR_REAL, NOMBRE_MEJOR_LAB}
     vistos, salida = set(), []
     for p in [pesos / "best.pt", pesos / "last.pt"] + sorted(pesos.glob("epoch*.pt")):
-        if p.exists() and p.name not in vistos and p.name != NOMBRE_MEJOR_REAL:
+        if p.exists() and p.name not in vistos and p.name not in propios:
             vistos.add(p.name)
             salida.append(p)
     return salida
@@ -185,19 +184,16 @@ def elegir_mejor_en_real(run_dir: Path, datos_yaml: Path, imgsz: int, batch: int
 
     yaml_real = crear_yaml_solo_real(Path(datos_yaml), run_dir / "_seleccion")
     if yaml_real is None:
-        _log("[INFO] La validacion no tiene imagenes de sedimento real; "
-             "se conserva best.pt.")
+        _log("[INFO] La validacion no tiene subconjunto real; se conserva best.pt.")
         return None, []
 
     from ultralytics import YOLO
 
     _log("")
     _log("=" * 60)
-    _log("  ELIGIENDO CHECKPOINT SOBRE SEDIMENTO REAL")
+    _log("  SELECCION DE PESOS")
     _log("=" * 60)
-    _log(f"  Se evaluan {len(pesos)} checkpoint(s) contra solo las imagenes")
-    _log("  de sedimento real de la validacion. best.pt viene elegido por el")
-    _log("  mAP global, que en este dataset lo dominan las placas de laboratorio.")
+    _log(f"  Evaluando {len(pesos)} checkpoint(s) sobre el subconjunto real.")
 
     tabla: List[Dict] = []
     for p in pesos:
@@ -219,26 +215,39 @@ def elegir_mejor_en_real(run_dir: Path, datos_yaml: Path, imgsz: int, batch: int
         _log("  No se pudo evaluar ningun checkpoint; se conserva best.pt.")
         return None, []
 
-    # F1 como criterio, mAP50 como desempate: el conteo del paper depende de
-    # acertar cuantas particulas hay, no de afinar la caja.
+    # F1 como criterio, mAP50 como desempate: importa acertar cuantas
+    # particulas hay, no afinar la caja.
     tabla.sort(key=lambda d: (d["f1"], d["map50"]), reverse=True)
     mejor = tabla[0]
 
     destino = run_dir / "weights" / NOMBRE_MEJOR_REAL
     try:
-        import shutil
         shutil.copy2(mejor["ruta"], destino)
     except OSError as exc:
         _log(f"  [WARN] no se pudo copiar el ganador: {exc}")
         return None, tabla
 
     _log("")
-    _log(f"  Mejor en sedimento real: {mejor['checkpoint']} (F1={mejor['f1']:.4f})")
+    _log(f"  Mejor en el subconjunto real: {mejor['checkpoint']} (F1={mejor['f1']:.4f})")
     origen_best = next((d for d in tabla if d["checkpoint"] == "best.pt"), None)
     if origen_best and origen_best["checkpoint"] != mejor["checkpoint"]:
-        _log(f"  best.pt daba F1={origen_best['f1']:.4f}: la reeleccion cambia el peso.")
+        _log(f"  best.pt daba F1={origen_best['f1']:.4f}.")
     elif origen_best:
-        _log("  Coincide con best.pt: no habia nada mejor que elegir.")
-    _log(f"  Guardado como {NOMBRE_MEJOR_REAL} (best.pt se conserva intacto).")
+        _log("  Coincide con best.pt.")
+
+    # Copia con nombre propio del peso que elige Ultralytics, para que los tres
+    # queden nombrados igual de claro en la carpeta del run.
+    origen = run_dir / "weights" / "best.pt"
+    if origen.exists():
+        try:
+            shutil.copy2(origen, run_dir / "weights" / NOMBRE_MEJOR_LAB)
+        except OSError as exc:
+            _log(f"  [WARN] no se pudo crear {NOMBRE_MEJOR_LAB}: {exc}")
+
+    _log("")
+    _log("  Pesos disponibles en weights/:")
+    _log(f"    {NOMBRE_MEJOR_LAB:<20} mejor por mAP global")
+    _log(f"    {NOMBRE_MEJOR_REAL:<20} mejor sobre el subconjunto real")
+    _log(f"    {'last.pt':<20} ultima epoca, para reanudar")
     _log("=" * 60)
     return destino, tabla

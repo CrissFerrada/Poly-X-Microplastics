@@ -106,9 +106,9 @@ class ModeloPage(TrainerPage):
         l2.addWidget(self.lbl_comparar)
         self._actualizar_aviso_comparar()
 
-        # ── Elegir el peso segun el dominio real ──
+        # ── Pesos que produce el entrenamiento ──
         self.chk_dominio = QCheckBox(
-            tr("Elegir el mejor peso según las fotos de terreno, no las de laboratorio"))
+            tr("Guardar también el mejor peso para el conjunto real"))
         self.chk_dominio.setChecked(self.state.params.elegir_por_dominio_real)
         self.chk_dominio.stateChanged.connect(self._on_dominio)
         self.chk_dominio.setStyleSheet(
@@ -116,13 +116,9 @@ class ModeloPage(TrainerPage):
         l2.addWidget(self.chk_dominio)
 
         aviso = QLabel(tr(
-            "Al terminar, se evalúan todos los checkpoints guardados contra "
-            "<b>solo</b> las imágenes de sedimento real de la validación y se "
-            "guarda el ganador como <b>best_real.pt</b>.<br>"
-            "Hace falta porque <code>best.pt</code> lo elige Ultralytics por el "
-            "mAP global, y en un dataset mixto ese número lo dominan las placas "
-            "dopadas de laboratorio — el dominio que justamente no transfiere a "
-            "las fotos de terreno. <code>best.pt</code> se conserva intacto."))
+            "Al terminar quedan tres pesos en la carpeta del run: "
+            "<b>best_sintetico.pt</b>, <b>best_real.pt</b> y <b>last.pt</b> "
+            "(este último sirve para reanudar el entrenamiento)."))
         aviso.setWordWrap(True)
         aviso.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         l2.addWidget(aviso)
