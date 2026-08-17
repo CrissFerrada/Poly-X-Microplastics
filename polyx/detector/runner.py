@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from datetime import datetime
 import io
+import json
 
 import numpy as np
 import cv2
@@ -45,6 +46,29 @@ def _draw_annotated(img_bgr: np.ndarray, dets, color_for, label_for) -> np.ndarr
                         cv2.FONT_HERSHEY_SIMPLEX, escala_txt, (255, 255, 255),
                         grosor_txt, cv2.LINE_AA)
     return out
+
+
+def _guardar_labels(dets, ruta_txt: Path, W: int, H: int) -> None:
+    """Escribe las predicciones en formato YOLO dentro de la carpeta del run.
+
+    Nunca junto a la foto: ahi vive el .txt del conteo manual, y volcar las
+    predicciones encima destruiria el ground truth de forma irrecuperable.
+
+    La confianza va como sexta columna. ``read_yolo_txt`` ignora las columnas de
+    mas, asi que el archivo se puede reabrir en el Etiquetador como
+    pre-anotacion -- contar a mano 500 particulas partiendo de las cajas del
+    modelo es otra tarea que hacerlo desde cero -- y a la vez queda el registro
+    de con que confianza salio cada caja.
+    """
+    lineas = []
+    for d in dets:
+        cx = ((d.x1 + d.x2) / 2) / W
+        cy = ((d.y1 + d.y2) / 2) / H
+        w = (d.x2 - d.x1) / W
+        h = (d.y2 - d.y1) / H
+        lineas.append(f"{d.class_id} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f} {d.conf:.4f}")
+    ruta_txt.parent.mkdir(parents=True, exist_ok=True)
+    ruta_txt.write_text("\n".join(lineas), encoding="utf-8")
 
 
 def _color_bgr_for_class(name: str):
@@ -226,6 +250,13 @@ class DetectorRunner(QThread):
                     pred_path = _encode_and_save(pred_img, "_pred")
                     gt_path = _encode_and_save(gt_img, "_gt") if has_gt else None
 
+                    # Las cajas en texto, no solo dibujadas: un PNG no se puede
+                    # reanalizar ni reabrir para corregir.
+                    _guardar_labels(
+                        preds,
+                        sub / "labels" / f"{idx_img:04d}_{img_path.stem}.txt",
+                        W, H)
+
                     res = ImageResult(
                         image_path=img_path, model_idx=real_idx,
                         predictions=preds, gt=gts, has_gt=has_gt,
@@ -241,6 +272,55 @@ class DetectorRunner(QThread):
                     done += 1
                     self.progress.emit(done, total, img_path.name)
 
+            self._escribir_resumen(state, slots)
             self.finished_ok.emit()
         except Exception as e:
             self.failed.emit(f"{type(e).__name__}: {e}")
+
+    def _escribir_resumen(self, state, slots) -> None:
+        """Deja el run autodescrito: parametros y totales por modelo.
+
+        Sin esto una carpeta de run son PNGs sueltos y no se puede saber con que
+        confianza ni con que peso salieron. No se falla la corrida si el volcado
+        no se puede escribir: los resultados ya estan en memoria y en disco.
+        """
+        p = state.params
+        datos = {
+            "parametros": {
+                "confianza": p.conf, "iou_nms": p.iou_nms, "iou_tp": p.iou_tp,
+                "imgsz": p.imgsz, "device": p.device, "um_por_px": p.um_per_px,
+                "troceo": p.troceo, "troceo_umbral_px": p.troceo_umbral_px,
+            },
+            "imagenes": len(state.images),
+            "modelos": [],
+        }
+        for slot in slots:
+            mi = state.model_slots.index(slot)
+            rs = state.results.get(mi, [])
+            con_gt = [r for r in rs if r.has_gt]
+            tp = sum(r.tp for r in con_gt); fp = sum(r.fp for r in con_gt)
+            fn = sum(r.fn for r in con_gt); mc = sum(r.miscls for r in con_gt)
+            datos["modelos"].append({
+                "alias": slot.alias,
+                "peso": str(slot.path) if slot.path else "",
+                "detecciones": sum(len(r.predictions) for r in rs),
+                "imagenes_con_gt": len(con_gt),
+                "tp": tp, "fp": fp, "fn": fn, "mal_clasificados": mc,
+            })
+            # classes.txt junto a los labels, para poder reabrirlos como
+            # pre-anotacion en el Etiquetador sin adivinar el orden de clases.
+            nombres = getattr(slot.loaded, "names", None) or {}
+            if nombres:
+                destino = state.run_dir / slot.alias / "classes.txt"
+                try:
+                    destino.parent.mkdir(parents=True, exist_ok=True)
+                    destino.write_text(
+                        "\n".join(nombres[k] for k in sorted(nombres)),
+                        encoding="utf-8")
+                except OSError:
+                    pass
+        try:
+            (state.run_dir / "resumen.json").write_text(
+                json.dumps(datos, indent=2, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
