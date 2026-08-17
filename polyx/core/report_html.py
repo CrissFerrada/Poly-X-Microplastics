@@ -2,7 +2,7 @@
 
 Contenido:
   1. Abstract (resumen ejecutivo)
-  2. Métodos (modelo, params, calibración, dispositivo, fecha)
+  2. Métodos (modelo, params, calibración, dispositivo)
   3. Resultados generales (clase, conf, tamaño, P/R/F1)
   4. Resumen por modelo
   5. Análisis de errores (matriz de confusión + galería)
@@ -152,6 +152,107 @@ def _uri_galeria(data: bytes, ancho_max: int = _ANCHO_GALERIA) -> str:
     except Exception:
         pass
     return "data:image/png;base64," + _img_b64(data)
+
+
+def _equipo() -> List[tuple]:
+    """Componentes de la maquina, para poder declarar donde se ejecuto."""
+    import platform
+
+    filas = [("Sistema operativo", f"{platform.system()} {platform.release()}"),
+             ("Procesador", platform.processor() or "—")]
+    try:
+        import psutil
+        filas.append(("Memoria RAM",
+                      f"{psutil.virtual_memory().total / 1024**3:.1f} GB"))
+    except Exception:
+        pass
+    try:
+        import torch
+        if torch.cuda.is_available():
+            props = torch.cuda.get_device_properties(0)
+            filas += [
+                ("GPU", props.name),
+                ("VRAM", f"{props.total_memory / 1024**3:.1f} GB"),
+                ("Compute capability", f"{props.major}.{props.minor}"),
+                ("PyTorch", f"{torch.__version__} (CUDA {torch.version.cuda})"),
+            ]
+        else:
+            filas += [("GPU", "no disponible"), ("PyTorch", torch.__version__)]
+    except Exception:
+        pass
+    return filas
+
+
+def _entrenamiento_de(peso: Path) -> Optional[Dict]:
+    """Lee del checkpoint con que configuracion y resultado se entreno.
+
+    Ultralytics guarda ``train_args`` y ``train_metrics`` dentro del propio .pt,
+    asi que el informe puede declarar imgsz, batch, epocas y metricas sin
+    depender de que la carpeta del run siga existiendo.
+    """
+    try:
+        import torch
+        ck = torch.load(str(peso), map_location="cpu", weights_only=False)
+    except Exception:
+        return None
+    args = ck.get("train_args") or {}
+    met = ck.get("train_metrics") or {}
+    if not args and not met:
+        return None
+    return {
+        "base": args.get("model", "—"),
+        "imgsz": args.get("imgsz", "—"),
+        "batch": args.get("batch", "—"),
+        "epocas": args.get("epochs", "—"),
+        "optimizador": args.get("optimizer", "—"),
+        "lr0": args.get("lr0", "—"),
+        "amp": args.get("amp", "—"),
+        "precision": met.get("metrics/precision(B)"),
+        "recall": met.get("metrics/recall(B)"),
+        "map50": met.get("metrics/mAP50(B)"),
+        "map": met.get("metrics/mAP50-95(B)"),
+    }
+
+
+def _seccion_equipo(active) -> str:
+    """Tabla de componentes y de como se entreno cada modelo cargado."""
+    filas_eq = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in _equipo())
+    html = ("<h3>2.1 Equipo de cómputo</h3>"
+            f"<table class='data'><tr><th>Componente</th><th>Detalle</th></tr>"
+            f"{filas_eq}</table>")
+
+    entrenos = []
+    for s in active:
+        if s.path is None:
+            continue
+        info = _entrenamiento_de(Path(s.path))
+        if info:
+            entrenos.append((s.alias, info))
+    if not entrenos:
+        return html
+
+    def _n(v):
+        return f"{v:.4f}" if isinstance(v, (int, float)) else "—"
+
+    filas = ""
+    for alias, i in entrenos:
+        filas += (
+            f"<tr><td>{alias}</td><td>{i['base']}</td>"
+            f"<td class='r'>{i['imgsz']}</td><td class='r'>{i['batch']}</td>"
+            f"<td class='r'>{i['epocas']}</td><td>{i['optimizador']}</td>"
+            f"<td class='r'>{_n(i['precision'])}</td><td class='r'>{_n(i['recall'])}</td>"
+            f"<td class='r'>{_n(i['map50'])}</td><td class='r'>{_n(i['map'])}</td></tr>")
+
+    html += (
+        "<h3>2.2 Entrenamiento de cada modelo</h3>"
+        "<p>Configuración y métricas de validación con que se entrenó cada peso, "
+        "leídas del propio archivo <code>.pt</code>.</p>"
+        "<table class='data'>"
+        "<tr><th>Modelo</th><th>Arquitectura base</th><th>imgsz</th><th>batch</th>"
+        "<th>épocas</th><th>optimizador</th><th>Precisión</th><th>Recall</th>"
+        "<th>mAP@50</th><th>mAP@50-95</th></tr>"
+        f"{filas}</table>")
+    return html
 
 
 def _fig_class_distribution(per_class_counts: Dict[str, int]) -> str:
@@ -490,12 +591,12 @@ def generate_report(state, output_path: Path,
         ("Filtro tamaño (μm)", f"{p.size_min_um} – {p.size_max_um}" if (p.size_min_um or p.size_max_um) else "sin filtro"),
         ("Imágenes procesadas", str(total_imgs)),
         ("Total de detecciones", str(total_dets)),
-        ("Fecha de generación", now),
     ]
     methods_html = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in methods_rows)
+    equipo_html = _seccion_equipo(active)
 
     # Párrafo de métodos redactado, listo para copiar al manuscrito
-    # (reproducibilidad: modelo, versión, parámetros y fecha exactos).
+    # (reproducibilidad: modelo, versión y parámetros exactos).
     try:
         import ultralytics
         _ul_ver = ultralytics.__version__
@@ -512,8 +613,8 @@ def generate_report(state, output_path: Path,
         + (f"Las métricas de error se calcularon contra anotación manual independiente, "
            f"emparejando predicciones y etiquetas con IoU ≥ {p.iou_tp}. " if any_gt else "")
         + (f"La calibración óptica fue de {p.um_per_px} μm/píxel. " if p.um_per_px > 0 else "")
-        + f"Se procesaron {total_imgs} imágenes con un total de {total_dets} detecciones "
-        f"(análisis del {now})."
+        + f"Se procesaron {total_imgs} imágenes con un total de "
+        f"{total_dets} detecciones."
         "</blockquote>"
     )
 
@@ -538,7 +639,7 @@ def generate_report(state, output_path: Path,
     # ── Ensamblar HTML ──
     html = f"""<!doctype html>
 <html lang='es'><head><meta charset='utf-8'>
-<title>Reporte Poly-X · {now}</title>
+<title>Reporte Poly-X</title>
 <style>{REPORT_CSS}</style></head><body>
 <div class='container'>
 
@@ -546,7 +647,6 @@ def generate_report(state, output_path: Path,
   <div class='kicker'>Poly-X · Reporte paper-quality</div>
   <h1>Análisis automatizado de microplásticos<br>por fluorescencia Nile Red e IA</h1>
   <p class='meta'><strong>Autor:</strong> Cristofher Ferrada &middot;
-    <strong>Generado:</strong> {now} &middot;
     <strong>Modelos:</strong> {', '.join(s.alias for s in active) or '—'}</p>
 </header>
 
@@ -580,6 +680,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 
 <h2 id='methods'>2. Métodos</h2>
 <table class='data'><tr><th>Parámetro</th><th>Valor</th></tr>{methods_html}</table>
+{equipo_html}
 {methods_para}
 
 <h2 id='results'>3. Resultados generales</h2>
@@ -599,7 +700,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 {refs_html}
 
 <footer>
-  © Cristofher Ferrada · Generado por Poly-X · {now}<br>
+  © Cristofher Ferrada · Generado por Poly-X<br>
   Suite de detección de microplásticos por fluorescencia Nile Red (254 nm) e IA (YOLO v8/v11).
 </footer>
 </div></body></html>
