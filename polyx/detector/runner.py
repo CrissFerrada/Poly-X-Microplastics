@@ -17,17 +17,33 @@ from .state import DetectorState, ImageResult
 
 
 def _draw_annotated(img_bgr: np.ndarray, dets, color_for, label_for) -> np.ndarray:
+    """Dibuja las cajas con un grosor proporcional al tamano de la imagen.
+
+    Con grosor fijo de 2 px las anotaciones se volvian invisibles en las placas
+    completas: una foto de 4096 px se reescala a 1100 para incrustarla en el
+    informe, asi que esa linea acababa midiendo medio pixel. Escalando con el
+    lado mayor, una placa se dibuja con ~6 px (lo mismo que usa
+    paper/recomponer_placas.py) y un recorte de 1630 px conserva sus 2.
+    """
     out = img_bgr.copy()
+    lado = max(out.shape[:2])
+    grosor = max(2, int(round(lado / 700)))
+    escala_txt = max(0.5, lado / 3000)
+    grosor_txt = max(1, int(round(escala_txt * 2)))
+
     for d in dets:
         c = color_for(d)
         x1, y1, x2, y2 = int(d.x1), int(d.y1), int(d.x2), int(d.y2)
-        cv2.rectangle(out, (x1, y1), (x2, y2), c, 2)
+        cv2.rectangle(out, (x1, y1), (x2, y2), c, grosor)
         label = label_for(d)
         if label:
-            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-            cv2.rectangle(out, (x1, y1 - th - 6), (x1 + tw + 6, y1), c, -1)
-            cv2.putText(out, label, (x1 + 3, y1 - 4),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX,
+                                          escala_txt, grosor_txt)
+            margen = max(4, grosor * 2)
+            cv2.rectangle(out, (x1, y1 - th - margen), (x1 + tw + margen, y1), c, -1)
+            cv2.putText(out, label, (x1 + margen // 2, y1 - margen // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, escala_txt, (255, 255, 255),
+                        grosor_txt, cv2.LINE_AA)
     return out
 
 

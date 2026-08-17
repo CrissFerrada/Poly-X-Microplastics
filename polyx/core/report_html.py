@@ -255,6 +255,62 @@ def _seccion_equipo(active) -> str:
     return html
 
 
+def _barrido_confianza(resultados, state, iou_thr: float, conf_actual: float):
+    """Recalcula P/R/F1 a distintos umbrales de confianza, sin re-inferir.
+
+    Las predicciones guardadas ya pasaron el umbral con que se ejecuto, asi que
+    subirlo es solo filtrar y volver a emparejar. Bajarlo NO se puede: esas
+    detecciones nunca se calcularon. Por eso el barrido arranca en el umbral
+    usado y avisa de esa limitacion.
+
+    Devuelve {alias: [(conf, precision, recall, f1, n_det), ...]}.
+    """
+    from .metrics import match_image
+
+    umbrales = [round(u, 2) for u in np.arange(conf_actual, 0.96, 0.05)]
+    salida = {}
+    for mi, slot in enumerate(state.model_slots):
+        if slot.path is None:
+            continue
+        rs = [r for r in resultados.get(mi, []) if r.has_gt]
+        if not rs:
+            continue
+        filas = []
+        for u in umbrales:
+            tp = fp = fn = mc = nd = 0
+            for r in rs:
+                preds = [p for p in r.predictions if p.conf >= u]
+                nd += len(preds)
+                m = match_image(preds, r.gt, iou_thr=iou_thr)
+                tp += m.tp; fp += m.fp; fn += m.fn; mc += m.miscls
+            # Estricto: la mala clasificacion penaliza en ambos lados.
+            p = tp / (tp + fp + mc) if (tp + fp + mc) else 0.0
+            rec = tp / (tp + fn + mc) if (tp + fn + mc) else 0.0
+            f1 = 2 * p * rec / (p + rec) if (p + rec) else 0.0
+            filas.append((u, p, rec, f1, nd))
+        salida[slot.alias] = filas
+    return salida
+
+
+def _fig_barrido(barrido: Dict[str, list]) -> str:
+    """Curva de F1 frente al umbral de confianza, una linea por modelo."""
+    if not barrido:
+        return ""
+    fig, ax = plt.subplots(figsize=(7, 3.4))
+    for alias, filas in barrido.items():
+        ax.plot([f[0] for f in filas], [f[3] for f in filas],
+                marker="o", markersize=3, label=alias, linewidth=1.6)
+        mejor = max(filas, key=lambda f: f[3])
+        ax.plot([mejor[0]], [mejor[3]], marker="*", markersize=13, zorder=5,
+                color=ax.lines[-1].get_color())
+    ax.set_xlabel("Umbral de confianza")
+    ax.set_ylabel("F1 (con clase)")
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False, fontsize=9)
+    fig.tight_layout()
+    return _fig_to_b64(fig)
+
+
 def _fig_class_distribution(per_class_counts: Dict[str, int]) -> str:
     if not per_class_counts:
         return ""
@@ -394,24 +450,130 @@ def generate_report(state, output_path: Path,
         """
 
     # ── Resumen por modelo (tabla comparativa) ──
+    #
+    # Se reportan DOS F1, y la diferencia entre ambos no es un detalle:
+    #
+    #   localizacion  tp/(tp+fp) y tp/(tp+fn). Las cajas bien situadas pero con
+    #                 la clase equivocada quedan fuera de ambos denominadores,
+    #                 asi que mide solo si el detector encuentra la particula.
+    #   con clase     esas mismas cajas cuentan como falso positivo de la clase
+    #                 predicha y falso negativo de la real, que es lo estricto.
+    #
+    # Publicar solo el primero sobreestima el desempeno, y ademas contradice la
+    # tabla por clase, que si penaliza la confusion. Se declaran los dos.
+    def _pr_f1(tp: int, fp: int, fn: int):
+        p = tp / (tp + fp) if (tp + fp) else 0.0
+        r = tp / (tp + fn) if (tp + fn) else 0.0
+        return p, r, (2 * p * r / (p + r) if (p + r) else 0.0)
+
     rows_models = ""
+    total_mc = 0
     for mi, slot in enumerate(state.model_slots):
         if slot.path is None: continue
         rs = resultados.get(mi, [])
         n_img = len({r.image_path for r in rs})
         n_det = sum(len(r.predictions) for r in rs)
         cf = [p.conf for r in rs for p in r.predictions]
-        tp = sum(r.tp for r in rs); fp = sum(r.fp for r in rs); fn = sum(r.fn for r in rs)
-        prec = tp/(tp+fp) if (tp+fp) else 0; rec = tp/(tp+fn) if (tp+fn) else 0
-        f1 = 2*prec*rec/(prec+rec) if (prec+rec) else 0
+        tp = sum(r.tp for r in rs); fp = sum(r.fp for r in rs)
+        fn = sum(r.fn for r in rs); mc = sum(r.miscls for r in rs)
+        total_mc += mc
+        _, _, f1_loc = _pr_f1(tp, fp, fn)
+        _, _, f1_cls = _pr_f1(tp, fp + mc, fn + mc)
         avg_cf = (sum(cf)/len(cf)) if cf else 0
-        f1_cell = f"{f1:.3f}" if any(r.has_gt for r in rs) else "—"
+        hay_gt = any(r.has_gt for r in rs)
+        c_loc = f"{f1_loc:.3f}" if hay_gt else "—"
+        c_cls = f"{f1_cls:.3f}" if hay_gt else "—"
         rows_models += (
             f"<tr><td>{slot.alias}</td><td class='r'>{n_img}</td><td class='r'>{n_det}</td>"
             f"<td class='r'>{avg_cf:.3f}</td>"
             f"<td class='r'>{tp}</td><td class='r'>{fp}</td><td class='r'>{fn}</td>"
-            f"<td class='r'>{f1_cell}</td></tr>"
+            f"<td class='r'>{mc}</td>"
+            f"<td class='r'>{c_loc}</td><td class='r'>{c_cls}</td></tr>"
         )
+
+    # Nota que acompana la tabla, con las cifras del propio lote.
+    nota_miscls = ""
+    if any_gt:
+        tp_g = sum(r.tp for r in all_results)
+        fp_g = sum(r.fp for r in all_results)
+        fn_g = sum(r.fn for r in all_results)
+        p_loc, r_loc, f_loc = _pr_f1(tp_g, fp_g, fn_g)
+        p_cls, r_cls, f_cls = _pr_f1(tp_g, fp_g + total_mc, fn_g + total_mc)
+        nota_miscls = (
+            "<p><strong>Los dos F1 miden cosas distintas.</strong> "
+            f"<em>Localización</em> responde si el detector encuentra la partícula "
+            f"(P {p_loc:.3f} · R {r_loc:.3f} · <strong>F1 {f_loc:.3f}</strong>). "
+            f"<em>Con clase</em> exige además acertar el polímero, contando cada "
+            f"caja mal clasificada como falso positivo de la clase predicha y "
+            f"falso negativo de la real "
+            f"(P {p_cls:.3f} · R {r_cls:.3f} · <strong>F1 {f_cls:.3f}</strong>).</p>"
+            f"<p>La diferencia corresponde a <strong>{total_mc}</strong> "
+            f"partícula(s) bien localizada(s) pero asignada(s) a la clase "
+            f"incorrecta. Es la cifra que concilia esta tabla con la de "
+            f"precisión por clase de la sección de errores.</p>")
+
+    # ── Veredicto y barrido de confianza ──
+    veredicto_html = ""
+    if any_gt:
+        barrido = _barrido_confianza(resultados, state, state.params.iou_tp,
+                                     state.params.conf)
+        if barrido:
+            fig_b = _fig_barrido(barrido)
+            filas_b = ""
+            resumen = []
+            for alias, filas in barrido.items():
+                mejor = max(filas, key=lambda f: f[3])
+                actual = filas[0]
+                resumen.append((alias, actual, mejor))
+                for u, p, r, f, nd in filas:
+                    marca = " ★" if u == mejor[0] else ""
+                    filas_b += (f"<tr><td>{alias}{marca}</td><td class='r'>{u:.2f}</td>"
+                                f"<td class='r'>{nd}</td><td class='r'>{p:.3f}</td>"
+                                f"<td class='r'>{r:.3f}</td><td class='r'>{f:.3f}</td></tr>")
+
+            # Veredicto: gana quien tenga mejor F1 con clase en su mejor umbral.
+            resumen.sort(key=lambda x: x[2][3], reverse=True)
+            g_alias, g_act, g_mej = resumen[0]
+            texto = (f"<p><strong>Mejor desempeño: {g_alias}</strong>, con "
+                     f"F1 {g_mej[3]:.3f} al umbral {g_mej[0]:.2f} "
+                     f"(P {g_mej[1]:.3f} · R {g_mej[2]:.3f}).</p>")
+            if len(resumen) > 1:
+                p_alias, _, p_mej = resumen[-1]
+                d = g_mej[3] - p_mej[3]
+                texto += (f"<p>La diferencia con {p_alias} es de "
+                          f"<strong>{d:.3f}</strong> de F1. Con un solo "
+                          f"entrenamiento por arquitectura, una diferencia "
+                          f"pequeña no distingue el diseño de la red del azar "
+                          f"de inicialización: haría falta repetir con distintas "
+                          f"semillas para afirmar que una es superior.</p>")
+            if abs(g_mej[0] - g_act[0]) > 1e-9:
+                d = g_mej[3] - g_act[3]
+                texto += (f"<p><strong>El umbral usado no es el óptimo.</strong> "
+                          f"Con {g_act[0]:.2f} el F1 de {g_alias} es "
+                          f"{g_act[3]:.3f}; subiéndolo a {g_mej[0]:.2f} llega a "
+                          f"{g_mej[3]:.3f} ({d:+.3f}).</p>")
+            else:
+                texto += (f"<p>El umbral {g_act[0]:.2f} ya es el mejor del rango "
+                          f"explorado.</p>")
+
+            veredicto_html = (
+                "<h3>6.1 Barrido de confianza</h3>"
+                "<p>Métricas recalculadas filtrando las mismas detecciones a "
+                "distintos umbrales, con el criterio estricto (la mala "
+                "clasificación penaliza). La estrella marca el mejor F1 de cada "
+                "modelo.</p>"
+                + (f"<div class='fig'><img src='data:image/png;base64,{fig_b}' />"
+                   f"<div class='caption'>F1 frente al umbral de confianza.</div>"
+                   f"</div>" if fig_b else "")
+                + "<table class='data'><tr><th>Modelo</th><th>Confianza</th>"
+                  "<th>Detecciones</th><th>Precisión</th><th>Recall</th>"
+                  f"<th>F1</th></tr>{filas_b}</table>"
+                + texto
+                + f"<p class='caption' style='text-align:left'>El barrido "
+                  f"empieza en {state.params.conf:g} porque las detecciones por "
+                  f"debajo de ese umbral no se calcularon. Para explorar valores "
+                  f"menores hay que volver a ejecutar con una confianza más "
+                  f"baja.</p>")
 
     # ── Comparación entre modelos, foto por foto ──
     # La tabla global de arriba dice cual modelo gana en total; esta dice en
@@ -688,11 +850,15 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 
 <h2 id='models'>4. Resumen por modelo</h2>
 <table class='data'><tr><th>Modelo</th><th>Imágenes</th><th>Detecciones</th>
-<th>Conf. media</th><th>{LABEL_TP}</th><th>{LABEL_FP}</th><th>{LABEL_FN}</th><th>F1</th></tr>{rows_models}</table>
+<th>Conf. media</th><th>{LABEL_TP}</th><th>{LABEL_FP}</th><th>{LABEL_FN}</th>
+<th>{LABEL_MISCLS}</th><th>F1<br><span style='font-weight:400;font-size:8.5pt'>localización</span></th>
+<th>F1<br><span style='font-weight:400;font-size:8.5pt'>con clase</span></th></tr>{rows_models}</table>
+{nota_miscls}
 
 {err_section}
 
 <h2 id='compare'>6. Comparación entre modelos</h2>
+{veredicto_html}
 {compare_html}
 
 {gallery_html}

@@ -152,12 +152,28 @@ class ResultadosPage(DetectorPage):
         # Sugerencia de umbral óptimo
         sugg = self._suggest_operating_point(all_results) if any_gt else None
         if sugg:
-            t, f1s, ps, rs_ = sugg
-            self.lbl_sugg.setText(
-                f"💡 Punto de operación sugerido: confianza ≥ {t:.2f} → "
-                f"F1 {f1s:.3f} (Precisión {ps:.3f} / Recall {rs_:.3f}). "
-                f"Consejo: ejecuta con confianza baja (ej. 0.05) para explorar "
-                f"todo el rango y deja que esta sugerencia elija el corte.")
+            (tb, f1b, pb, rb), (ta, f1a, pa, ra) = sugg
+            usado = (f"Con la confianza usada ({ta:g}): F1 {f1a:.3f} "
+                     f"(Precisión {pa:.3f} / Recall {ra:.3f}).")
+            # Se exige mejora real, no solo un umbral distinto: con F1 plano
+            # (p. ej. un modelo que no acierta nada) el maximo cae en cualquier
+            # punto y aconsejar moverse ahi seria ruido.
+            if tb > ta + 1e-9 and (f1b - f1a) > 0.002:
+                # Merece la pena avisar solo si la mejora es apreciable.
+                señal = "⚠" if (f1b - f1a) >= 0.01 else "💡"
+                consejo = (
+                    f"{señal} SUBE la confianza a {tb:.2f} antes de generar el "
+                    f"informe: F1 pasaría de {f1a:.3f} a {f1b:.3f} "
+                    f"({f1b - f1a:+.3f}), con Precisión {pb:.3f} y Recall {rb:.3f}. "
+                    f"Cámbiala en Parámetros y vuelve a Ejecutar.")
+            else:
+                consejo = (
+                    f"✓ La confianza {ta:g} es la mejor del rango explorado. "
+                    f"Para probar valores MÁS BAJOS hay que volver a ejecutar "
+                    f"con una confianza menor (p. ej. 0.05): las detecciones por "
+                    f"debajo de {ta:g} no se calcularon y no se pueden recuperar "
+                    f"filtrando.")
+            self.lbl_sugg.setText(usado + "  " + consejo)
         else:
             self.lbl_sugg.setText("")
 
@@ -185,9 +201,32 @@ class ResultadosPage(DetectorPage):
             self.table.item(i, 1).setData(Qt.UserRole, str(p))
             self.table.item(i, 0).setData(Qt.UserRole, alias)
 
+    def _metricas_a(self, gt_results, umbral: float):
+        """P/R/F1 estrictos filtrando las predicciones a un umbral dado.
+
+        Estricto: una caja bien situada con la clase equivocada cuenta como
+        falso positivo de la clase predicha y falso negativo de la real. El
+        criterio permisivo, que la deja fuera de ambos denominadores, sobreestima
+        el desempeno y ademas contradice la tabla de precision por clase.
+        """
+        iou_thr = self.state.params.iou_tp
+        tp = fp = fn = mc = 0
+        for r in gt_results:
+            preds = [p for p in r.predictions if p.conf >= umbral]
+            m = match_image(preds, r.gt, iou_thr)
+            tp += m.tp; fp += m.fp; fn += m.fn; mc += m.miscls
+        prec = tp / (tp + fp + mc) if (tp + fp + mc) else 0.0
+        rec = tp / (tp + fn + mc) if (tp + fn + mc) else 0.0
+        f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
+        return f1, prec, rec
+
     def _suggest_operating_point(self, all_results):
-        """Barre umbrales de confianza sobre las predicciones guardadas y
-        devuelve (conf, f1, precision, recall) del F1 máximo contra el GT."""
+        """Busca el umbral de confianza con mejor F1 sobre lo ya detectado.
+
+        Devuelve (mejor, actual) con (umbral, f1, precision, recall) cada uno.
+        Solo puede explorar hacia ARRIBA del umbral con que se ejecuto: las
+        detecciones por debajo nunca se calcularon.
+        """
         gt_results = [r for r in all_results if r.has_gt]
         if not gt_results:
             return None
@@ -195,20 +234,14 @@ class ResultadosPage(DetectorPage):
         if not confs:
             return None
         step = max(1, len(confs) // 25)   # acotar a ~25 umbrales
-        iou_thr = self.state.params.iou_tp
-        best = None
+        mejor = None
         for t in confs[::step]:
-            tp = fp = fn = 0
-            for r in gt_results:
-                preds = [p for p in r.predictions if p.conf >= t]
-                m = match_image(preds, r.gt, iou_thr)
-                tp += m.tp; fp += m.fp; fn += m.fn
-            prec = tp / (tp + fp) if (tp + fp) else 0.0
-            rec = tp / (tp + fn) if (tp + fn) else 0.0
-            f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
-            if best is None or f1 > best[1]:
-                best = (t, f1, prec, rec)
-        return best
+            f1, prec, rec = self._metricas_a(gt_results, t)
+            if mejor is None or f1 > mejor[1]:
+                mejor = (t, f1, prec, rec)
+        usado = self.state.params.conf
+        f1_a, p_a, r_a = self._metricas_a(gt_results, usado)
+        return mejor, (usado, f1_a, p_a, r_a)
 
     def _update_histogram(self):
         """Dibuja histograma de diam_um por clase; solo si hay calibración."""
