@@ -55,7 +55,7 @@ class ResultadosPage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Métricas detalladas ──
-        c2, l2 = self.card(tr("Métricas detalladas (modelo principal)"), "📋")
+        c2, l2 = self.card(tr("Métricas detalladas (suma de todos los modelos)"), "📋")
         row = QHBoxLayout()
         row.setSpacing(20)
         self.lbl_prec = QLabel(tr("Precisión:  —"))
@@ -149,33 +149,8 @@ class ResultadosPage(DetectorPage):
         mc = sum(r.miscls for r in all_results)
         self.lbl_mis.setText(f"{LABEL_MISCLS}:  {mc}" if any_gt else f"{LABEL_MISCLS}:  —")
 
-        # Sugerencia de umbral óptimo
-        sugg = self._suggest_operating_point(all_results) if any_gt else None
-        if sugg:
-            (tb, f1b, pb, rb), (ta, f1a, pa, ra) = sugg
-            usado = (f"Con la confianza usada ({ta:g}): F1 {f1a:.3f} "
-                     f"(Precisión {pa:.3f} / Recall {ra:.3f}).")
-            # Se exige mejora real, no solo un umbral distinto: con F1 plano
-            # (p. ej. un modelo que no acierta nada) el maximo cae en cualquier
-            # punto y aconsejar moverse ahi seria ruido.
-            if tb > ta + 1e-9 and (f1b - f1a) > 0.002:
-                # Merece la pena avisar solo si la mejora es apreciable.
-                señal = "⚠" if (f1b - f1a) >= 0.01 else "💡"
-                consejo = (
-                    f"{señal} SUBE la confianza a {tb:.2f} antes de generar el "
-                    f"informe: F1 pasaría de {f1a:.3f} a {f1b:.3f} "
-                    f"({f1b - f1a:+.3f}), con Precisión {pb:.3f} y Recall {rb:.3f}. "
-                    f"Cámbiala en Parámetros y vuelve a Ejecutar.")
-            else:
-                consejo = (
-                    f"✓ La confianza {ta:g} es la mejor del rango explorado. "
-                    f"Para probar valores MÁS BAJOS hay que volver a ejecutar "
-                    f"con una confianza menor (p. ej. 0.05): las detecciones por "
-                    f"debajo de {ta:g} no se calcularon y no se pueden recuperar "
-                    f"filtrando.")
-            self.lbl_sugg.setText(usado + "  " + consejo)
-        else:
-            self.lbl_sugg.setText("")
+        # Sugerencia de umbral óptimo, modelo por modelo
+        self.lbl_sugg.setText(self._texto_sugerencia() if any_gt else "")
 
         # Histograma de tamaños (solo si hay calibración)
         self._update_histogram()
@@ -200,6 +175,94 @@ class ResultadosPage(DetectorPage):
             # guardamos la ruta para doble-clic
             self.table.item(i, 1).setData(Qt.UserRole, str(p))
             self.table.item(i, 0).setData(Qt.UserRole, alias)
+
+    def _resultados_por_modelo(self):
+        """[(alias, [ImageResult con GT])], en el orden de los slots."""
+        salida = []
+        for mi, rs in sorted(self.state.results.items()):
+            if mi >= len(self.state.model_slots):
+                continue
+            con_gt = [r for r in rs if r.has_gt]
+            if con_gt:
+                salida.append((self.state.model_slots[mi].alias, con_gt))
+        return salida
+
+    def _umbral_comun(self, por_modelo):
+        """Umbral unico que maximiza el F1 medio de todos los modelos.
+
+        Comparar dos arquitecturas solo es limpio si ambas se miden en el mismo
+        punto de operacion. Si cada una usa su propio optimo se compara tambien
+        el ajuste del umbral, y el veredicto del informe deja de hablar de la
+        arquitectura. Devuelve (umbral, f1_medio) o None con un solo modelo.
+        """
+        if len(por_modelo) < 2:
+            return None
+        candidatos = sorted({round(p.conf, 2) for _, rs in por_modelo
+                             for r in rs for p in r.predictions})
+        if not candidatos:
+            return None
+        paso = max(1, len(candidatos) // 25)
+        mejor = None
+        for t in candidatos[::paso]:
+            f1s = [self._metricas_a(rs, t)[0] for _, rs in por_modelo]
+            medio = sum(f1s) / len(f1s)
+            if mejor is None or medio > mejor[1]:
+                mejor = (t, medio)
+        return mejor
+
+    def _texto_sugerencia(self) -> str:
+        """Consejo de confianza, una linea por modelo mas la recomendacion.
+
+        El barrido va por modelo a proposito: sumando los dos, el optimo sale
+        de una mezcla que no corresponde a ninguno, y es justo el numero con el
+        que se decide cual gana.
+        """
+        por_modelo = self._resultados_por_modelo()
+        if not por_modelo:
+            return ""
+        usado = self.state.params.conf
+        lineas: list[str] = []
+        optimos: list[float] = []
+        for alias, rs in por_modelo:
+            sugg = self._suggest_operating_point(rs)
+            if not sugg:
+                continue
+            (tb, f1b, pb, rb), (ta, f1a, pa, ra) = sugg
+            cabeza = f"{alias} — conf {ta:g}: F1 {f1a:.3f} (P {pa:.3f} / R {ra:.3f})."
+            # Se exige mejora real, no solo un umbral distinto: con F1 plano el
+            # maximo cae en cualquier punto y aconsejar moverse ahi seria ruido.
+            if tb > ta + 1e-9 and (f1b - f1a) > 0.002:
+                señal = "⚠" if (f1b - f1a) >= 0.01 else "💡"
+                lineas.append(
+                    f"{señal} {cabeza}  Su mejor umbral es {tb:.2f}: F1 {f1b:.3f} "
+                    f"({f1b - f1a:+.3f}), P {pb:.3f} / R {rb:.3f}.")
+                optimos.append(tb)
+            else:
+                lineas.append(
+                    f"✓ {cabeza}  Es el mejor del rango explorado; por debajo de "
+                    f"{ta:g} no hay detecciones calculadas y no se recuperan "
+                    f"filtrando.")
+                optimos.append(ta)
+        if not lineas:
+            return ""
+
+        comun = self._umbral_comun(por_modelo)
+        distintos = len({round(t, 2) for t in optimos}) > 1
+        if comun and distintos:
+            lineas.append(
+                f"➜ Cada modelo prefiere un umbral distinto. Usa {comun[0]:.2f} "
+                f"para los dos (F1 medio {comun[1]:.3f}): es el mismo punto de "
+                f"operación y la comparación queda limpia. Cámbialo en "
+                f"Parámetros y vuelve a Ejecutar.")
+        elif max(optimos) > usado + 1e-9:
+            lineas.append(
+                f"➜ Cambia la confianza a {max(optimos):.2f} en Parámetros y "
+                f"vuelve a Ejecutar antes de generar el informe.")
+        else:
+            lineas.append(
+                f"➜ La confianza {usado:g} ya es el punto de operación bueno. "
+                f"Puedes generar el informe.")
+        return "\n".join(lineas)
 
     def _metricas_a(self, gt_results, umbral: float):
         """P/R/F1 estrictos filtrando las predicciones a un umbral dado.
