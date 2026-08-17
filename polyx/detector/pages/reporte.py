@@ -1,4 +1,4 @@
-"""Página 9 — Reporte HTML paper-quality."""
+"""Página 9 — Informe de detección en HTML."""
 from __future__ import annotations
 import os
 from pathlib import Path
@@ -19,7 +19,7 @@ from ...core.i18n import tr
 
 class ReportePage(DetectorPage):
     STEP_N = 9
-    STEP_TITLE = tr("Reporte paper-quality")
+    STEP_TITLE = tr("Informe de detección")
     STEP_DESCRIPTION = (
         tr("Genera un informe HTML autocontenido (todas las imágenes embebidas en base64, "
         "así no se rompen al enviarlo a otra persona) con métodos, métricas, gráficos, "
@@ -34,7 +34,7 @@ class ReportePage(DetectorPage):
         c1, l1 = self.card(tr("Generar informe"), "📄")
         info = QLabel(
             tr("Después de ejecutar al menos una detección, presiona <b>Generar reporte HTML</b> "
-            "(se crea <code>reporte_paper.html</code> dentro de la carpeta del run y se abre "
+            "(se crea <code>informe_deteccion.html</code> dentro de la carpeta del run y se abre "
             "en tu navegador) o <b>Exportar a PDF</b> para obtener un archivo listo para enviar. "
             "Todas las imágenes van embebidas en base64, por lo que el archivo es autocontenido.")
         )
@@ -58,7 +58,7 @@ class ReportePage(DetectorPage):
 
         row = QHBoxLayout()
         row.setSpacing(8)
-        self.btn_gen = QPushButton(tr("📄  Generar reporte HTML"))
+        self.btn_gen = QPushButton(tr("📄  Generar informe HTML"))
         self.btn_gen.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -277,7 +277,7 @@ class ReportePage(DetectorPage):
         generados = []
         try:
             for sufijo, fotos, etiqueta in trabajos:
-                out_path = out_dir / f"reporte_paper{sufijo}.html"
+                out_path = out_dir / f"informe_deteccion{sufijo}.html"
                 self._write_html(out_path, solo_imagenes=fotos)
                 generados.append(out_path)
             self.lbl_status.setText(
@@ -312,9 +312,9 @@ class ReportePage(DetectorPage):
 
         # Carpeta del run como base; si no existe, junto al PDF elegido
         base_dir = self.state.run_dir if (self.state.run_dir and self.state.run_dir.exists()) else Path.home()
-        suggested = str(base_dir / "reporte_paper.pdf")
+        suggested = str(base_dir / "informe_deteccion.pdf")
         path, _ = QFileDialog.getSaveFileName(
-            self, "Guardar reporte como PDF", suggested, "PDF (*.pdf)"
+            self, "Guardar informe como PDF", suggested, "PDF (*.pdf)"
         )
         if not path:
             return
@@ -328,7 +328,7 @@ class ReportePage(DetectorPage):
         try:
             hechos, fallidos = [], []
             for sufijo, fotos, etiqueta in trabajos:
-                html_path = html_dir / f"reporte_paper{sufijo}.html"
+                html_path = html_dir / f"informe_deteccion{sufijo}.html"
                 # Con "ambos" se escriben dos PDF: el nombre elegido por el
                 # usuario para el completo, y ese mismo con sufijo para la
                 # seleccion. Reutilizar el nombre pisaria el primero.

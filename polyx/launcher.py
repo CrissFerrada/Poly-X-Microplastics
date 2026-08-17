@@ -372,7 +372,7 @@ class LauncherWindow(QMainWindow):
         grid.addWidget(ModuleCard(
             1, "🔬", tr("Detector"),
             tr("Analiza imágenes con un modelo .pt entrenado. Genera salidas anotadas, "
-               "CSV con centroides y diámetros, métricas globales y reporte HTML paper-quality."),
+               "CSV con centroides y diámetros, métricas globales e informe HTML de detección."),
             T.ACCENT, self.open_detector), 0, 0)
         grid.addWidget(ModuleCard(
             2, "🎯", tr("Entrenador"),

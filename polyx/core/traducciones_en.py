@@ -61,9 +61,9 @@ EN: dict[str, str] = {
     "Copia esta imagen y sus cajas corregidas a dataset_correcciones/ para mejorar el modelo con fine-tuning (active learning).":
         "Copies this image and its corrected boxes into dataset_correcciones/ so the "
         "model can be improved by fine-tuning (active learning).",
-    "Después de ejecutar al menos una detección, presiona <b>Generar reporte HTML</b> (se crea <code>reporte_paper.html</code> dentro de la carpeta del run y se abre en tu navegador) o <b>Exportar a PDF</b> para obtener un archivo listo para enviar. Todas las imágenes van embebidas en base64, por lo que el archivo es autocontenido.":
+    "Después de ejecutar al menos una detección, presiona <b>Generar reporte HTML</b> (se crea <code>informe_deteccion.html</code> dentro de la carpeta del run y se abre en tu navegador) o <b>Exportar a PDF</b> para obtener un archivo listo para enviar. Todas las imágenes van embebidas en base64, por lo que el archivo es autocontenido.":
         "After running at least one detection, press <b>Generate HTML report</b> "
-        "(<code>reporte_paper.html</code> is written inside the run folder and opened "
+        "(<code>informe_deteccion.html</code> is written inside the run folder and opened "
         "in your browser) or <b>Export to PDF</b> for a file ready to send. Every image "
         "is embedded as base64, so the file is self-contained.",
     "Detenido por el usuario.": "Stopped by the user.",
@@ -390,7 +390,7 @@ EN: dict[str, str] = {
     'Visor': 'Viewer',
     'Detección automatizada de PET, PP y LDPE por fluorescencia Nile Red (254 nm) e inteligencia artificial. Entrenamiento, etiquetado, detección y reporte en un mismo flujo.': 'Automated detection of PET, PP and LDPE by Nile Red fluorescence (254 nm) and machine learning. Training, labeling, detection and reporting in a single workflow.',
     '✍  Diseñado y desarrollado por <b>Cristofher Ferrada</b> · Doctorado en Química, 2026': '✍  Designed and developed by <b>Cristofher Ferrada</b> · PhD in Chemistry, 2026',
-    'Analiza imágenes con un modelo .pt entrenado. Genera salidas anotadas, CSV con centroides y diámetros, métricas globales y reporte HTML paper-quality.': 'Analyzes images with a trained .pt model. Produces annotated output, a CSV of centroids and diameters, global metrics and a paper-quality HTML report.',
+    'Analiza imágenes con un modelo .pt entrenado. Genera salidas anotadas, CSV con centroides y diámetros, métricas globales e informe HTML de detección.': 'Analyzes images with a trained .pt model. Produces annotated output, a CSV of centroids and diameters, global metrics and an HTML detection report.',
     'Entrena modelos YOLO v8 / v11. Curvas en vivo, recomendaciones automáticas de calidad y comparación con runs anteriores.': 'Trains YOLO v8 / v11 models. Live curves, automatic quality recommendations and comparison against earlier runs.',
     'Anota imágenes en formato YOLO. Soporta pre-anotación con un modelo existente y atajos de teclado, ahorra ~80 % del tiempo manual.': 'Annotates images in YOLO format. Supports pre-annotation with an existing model plus keyboard shortcuts, saving ~80% of the manual time.',
     'Inspección de una imagen a la vez con calibración interactiva μm/píxel (línea o círculo) y medición precisa por partícula.': 'Inspects one image at a time with interactive μm/pixel calibration (line or circle) and precise per-particle measurement.',
@@ -451,7 +451,7 @@ EN: dict[str, str] = {
     'Resumen por modelo': 'Per-model summary',
     'Detecciones por imagen': 'Detections per image',
     'Si cargaste más de un modelo, aquí ves tabla resumen con todas las métricas lado a lado y cuántas detecciones hizo cada uno por imagen.': 'If you loaded more than one model, here is a summary table with every metric side by side and how many detections each one made per image.',
-    'Reporte paper-quality': 'Paper-quality report',
+    'Informe de detección': 'Detection report',
     'Generar informe': 'Generate report',
     'Contenido del reporte': 'Report contents',
     'Alcance del informe': 'Report scope',

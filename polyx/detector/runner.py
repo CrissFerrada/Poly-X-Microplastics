@@ -162,7 +162,12 @@ class DetectorRunner(QThread):
                         preds = keep
 
                     # Match con GT
-                    has_gt = bool(gts)
+                    # El .txt existe = hay ground truth, aunque no tenga
+                    # ninguna caja: una placa revisada con cero particulas es un
+                    # dato, no una placa sin revisar. Con bool(gts) esas placas
+                    # quedaban fuera de las metricas y las detecciones que el
+                    # modelo hacia sobre ellas no contaban como falso positivo.
+                    has_gt = gt_txt is not None
                     if has_gt:
                         m = match_image(preds, gts, iou_thr=params.iou_tp)
                         tp, fp, fn, mc = m.tp, m.fp, m.fn, m.miscls

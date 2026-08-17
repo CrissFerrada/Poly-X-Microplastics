@@ -1,4 +1,4 @@
-"""Generador de reporte HTML paper-quality (autocontenido, imágenes en base64).
+"""Generador del informe de detección en HTML (autocontenido, imágenes en base64).
 
 Contenido:
   1. Abstract (resumen ejecutivo)
@@ -518,18 +518,11 @@ def generate_report(state, output_path: Path,
         barrido = _barrido_confianza(resultados, state, state.params.iou_tp,
                                      state.params.conf)
         if barrido:
-            fig_b = _fig_barrido(barrido)
-            filas_b = ""
             resumen = []
             for alias, filas in barrido.items():
                 mejor = max(filas, key=lambda f: f[3])
                 actual = filas[0]
                 resumen.append((alias, actual, mejor))
-                for u, p, r, f, nd in filas:
-                    marca = " ★" if u == mejor[0] else ""
-                    filas_b += (f"<tr><td>{alias}{marca}</td><td class='r'>{u:.2f}</td>"
-                                f"<td class='r'>{nd}</td><td class='r'>{p:.3f}</td>"
-                                f"<td class='r'>{r:.3f}</td><td class='r'>{f:.3f}</td></tr>")
 
             # Veredicto: gana quien tenga mejor F1 con clase en su mejor umbral.
             resumen.sort(key=lambda x: x[2][3], reverse=True)
@@ -546,34 +539,8 @@ def generate_report(state, output_path: Path,
                           f"pequeña no distingue el diseño de la red del azar "
                           f"de inicialización: haría falta repetir con distintas "
                           f"semillas para afirmar que una es superior.</p>")
-            if abs(g_mej[0] - g_act[0]) > 1e-9:
-                d = g_mej[3] - g_act[3]
-                texto += (f"<p><strong>El umbral usado no es el óptimo.</strong> "
-                          f"Con {g_act[0]:.2f} el F1 de {g_alias} es "
-                          f"{g_act[3]:.3f}; subiéndolo a {g_mej[0]:.2f} llega a "
-                          f"{g_mej[3]:.3f} ({d:+.3f}).</p>")
-            else:
-                texto += (f"<p>El umbral {g_act[0]:.2f} ya es el mejor del rango "
-                          f"explorado.</p>")
 
-            veredicto_html = (
-                "<h3>6.1 Barrido de confianza</h3>"
-                "<p>Métricas recalculadas filtrando las mismas detecciones a "
-                "distintos umbrales, con el criterio estricto (la mala "
-                "clasificación penaliza). La estrella marca el mejor F1 de cada "
-                "modelo.</p>"
-                + (f"<div class='fig'><img src='data:image/png;base64,{fig_b}' />"
-                   f"<div class='caption'>F1 frente al umbral de confianza.</div>"
-                   f"</div>" if fig_b else "")
-                + "<table class='data'><tr><th>Modelo</th><th>Confianza</th>"
-                  "<th>Detecciones</th><th>Precisión</th><th>Recall</th>"
-                  f"<th>F1</th></tr>{filas_b}</table>"
-                + texto
-                + f"<p class='caption' style='text-align:left'>El barrido "
-                  f"empieza en {state.params.conf:g} porque las detecciones por "
-                  f"debajo de ese umbral no se calcularon. Para explorar valores "
-                  f"menores hay que volver a ejecutar con una confianza más "
-                  f"baja.</p>")
+            veredicto_html = texto
 
     # ── Comparación entre modelos, foto por foto ──
     # La tabla global de arriba dice cual modelo gana en total; esta dice en
@@ -766,7 +733,7 @@ def generate_report(state, output_path: Path,
         _ul_ver = "—"
     _model_names = ", ".join(s.alias for s in active) if active else "—"
     methods_para = (
-        "<p><strong>Texto sugerido para la sección de métodos del manuscrito:</strong></p>"
+        "<p><strong>Resumen de la configuración empleada:</strong></p>"
         "<blockquote style='border-left:3px solid var(--accent); margin:8px 0; "
         "padding:6px 14px; color:#424a53; background:#f6f8fa; border-radius:0 6px 6px 0;'>"
         f"La detección automatizada se realizó con el modelo YOLO «{_model_names}» "
@@ -801,13 +768,13 @@ def generate_report(state, output_path: Path,
     # ── Ensamblar HTML ──
     html = f"""<!doctype html>
 <html lang='es'><head><meta charset='utf-8'>
-<title>Reporte Poly-X</title>
+<title>Informe de detección · Poly-X</title>
 <style>{REPORT_CSS}</style></head><body>
 <div class='container'>
 
 <header class='cover'>
-  <div class='kicker'>Poly-X · Reporte paper-quality</div>
-  <h1>Análisis automatizado de microplásticos<br>por fluorescencia Nile Red e IA</h1>
+  <div class='kicker'>Poly-X · Informe de detección</div>
+  <h1>Informe de detección de microplásticos<br>por fluorescencia Nile Red</h1>
   <p class='meta'><strong>Autor:</strong> Cristofher Ferrada &middot;
     <strong>Modelos:</strong> {', '.join(s.alias for s in active) or '—'}</p>
 </header>
