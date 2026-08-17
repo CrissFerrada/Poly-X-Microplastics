@@ -582,12 +582,12 @@ def generate_report(state, output_path: Path,
     p = state.params
     methods_rows = [
         ("Modelos cargados", ", ".join(s.alias for s in active) or "—"),
-        ("Confianza mínima", f"{p.conf}"),
-        ("IoU NMS", f"{p.iou_nms}"),
-        ("IoU para emparejar Verdaderos Positivos", f"{p.iou_tp}"),
+        ("Confianza mínima", f"{p.conf:g}"),
+        ("IoU NMS", f"{p.iou_nms:g}"),
+        ("IoU para emparejar Verdaderos Positivos", f"{p.iou_tp:g}"),
         ("Tamaño de imagen (imgsz)", f"{p.imgsz}"),
         ("Dispositivo", p.device),
-        ("μm por píxel", f"{p.um_per_px}" if p.um_per_px > 0 else "—"),
+        ("μm por píxel", f"{p.um_per_px:g}" if p.um_per_px > 0 else "—"),
         ("Filtro tamaño (μm)", f"{p.size_min_um} – {p.size_max_um}" if (p.size_min_um or p.size_max_um) else "sin filtro"),
         ("Imágenes procesadas", str(total_imgs)),
         ("Total de detecciones", str(total_dets)),
@@ -609,10 +609,10 @@ def generate_report(state, output_path: Path,
         "padding:6px 14px; color:#424a53; background:#f6f8fa; border-radius:0 6px 6px 0;'>"
         f"La detección automatizada se realizó con el modelo YOLO «{_model_names}» "
         f"(Ultralytics {_ul_ver}) a una resolución de entrada de {p.imgsz} px, "
-        f"umbral de confianza {p.conf} y supresión de no-máximos con IoU {p.iou_nms}. "
+        f"umbral de confianza {p.conf:g} y supresión de no-máximos con IoU {p.iou_nms:g}. "
         + (f"Las métricas de error se calcularon contra anotación manual independiente, "
-           f"emparejando predicciones y etiquetas con IoU ≥ {p.iou_tp}. " if any_gt else "")
-        + (f"La calibración óptica fue de {p.um_per_px} μm/píxel. " if p.um_per_px > 0 else "")
+           f"emparejando predicciones y etiquetas con IoU ≥ {p.iou_tp:g}. " if any_gt else "")
+        + (f"La calibración óptica fue de {p.um_per_px:g} μm/píxel. " if p.um_per_px > 0 else "")
         + f"Se procesaron {total_imgs} imágenes con un total de "
         f"{total_dets} detecciones."
         "</blockquote>"
