@@ -10,7 +10,8 @@ import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QTableWidget, QTableWidgetItem,
-    QHeaderView, QPushButton, QFileDialog, QFrame,
+    QHeaderView, QPushButton, QFileDialog, QFrame, QProgressDialog, QMessageBox,
+    QApplication,
 )
 
 from ._base import DetectorPage
@@ -88,6 +89,30 @@ class ResultadosPage(DetectorPage):
         l_hist.addWidget(self._hist_placeholder)
         self._hist_canvas = None
         self.body.addWidget(self.c_hist)
+
+        # ── Recargar GT del disco ──
+        c_gt, l_gt = self.card(tr("Ground truth"), "🔄")
+        nota_gt = QLabel(tr(
+            "La corrida guarda el ground truth que leyó, así que corregir una "
+            "anotación después no cambia estas métricas ni el informe. Esto "
+            "vuelve a leer los .txt del disco y recalcula todo sin pasar el "
+            "modelo otra vez: solo se redibujan las imágenes que cambiaron."))
+        nota_gt.setWordWrap(True)
+        nota_gt.setStyleSheet(
+            f"color: {T.INK3}; font-size: 9.5pt; border: none;")
+        l_gt.addWidget(nota_gt)
+        self.lbl_recarga = QLabel("")
+        self.lbl_recarga.setWordWrap(True)
+        self.lbl_recarga.setStyleSheet(
+            f"color: {T.OK}; font-size: 10pt; font-weight: 600; border: none;")
+        row_gt = QHBoxLayout()
+        self.btn_recargar = QPushButton(tr("🔄  Recargar GT y recalcular"))
+        self.btn_recargar.clicked.connect(self._recargar_gt)
+        row_gt.addWidget(self.btn_recargar)
+        row_gt.addStretch(1)
+        l_gt.addLayout(row_gt)
+        l_gt.addWidget(self.lbl_recarga)
+        self.body.addWidget(c_gt)
 
         # ── Exportar CSV ──
         c_csv, l_csv = self.card(tr("Exportar datos"), "💾")
@@ -175,6 +200,62 @@ class ResultadosPage(DetectorPage):
             # guardamos la ruta para doble-clic
             self.table.item(i, 1).setData(Qt.UserRole, str(p))
             self.table.item(i, 0).setData(Qt.UserRole, alias)
+
+    def _recargar_gt(self):
+        """Relee los .txt del disco y recalcula, sin volver a inferir."""
+        from ..recargar_gt import recargar_gt
+
+        if not self.state.results:
+            self.lbl_recarga.setText(
+                "No hay resultados que recalcular: ejecuta primero la detección.")
+            return
+
+        dlg = QProgressDialog(tr("Releyendo ground truth…"), tr("Cancelar"),
+                              0, 0, self)
+        dlg.setWindowTitle(tr("Recargar GT"))
+        dlg.setMinimumDuration(0)
+        dlg.setValue(0)
+
+        cancelado = {"si": False}
+
+        def progreso(hechas, total, nombre):
+            if dlg.wasCanceled():
+                cancelado["si"] = True
+                return False
+            dlg.setMaximum(total)
+            dlg.setValue(hechas)
+            dlg.setLabelText(f"{nombre}  ({hechas}/{total})")
+            QApplication.processEvents()
+
+        self.btn_recargar.setEnabled(False)
+        try:
+            resumen = recargar_gt(self.state, progreso=progreso)
+        except Exception as e:
+            dlg.close()
+            self.btn_recargar.setEnabled(True)
+            QMessageBox.warning(self, tr("Recargar GT"), f"{type(e).__name__}: {e}")
+            return
+        finally:
+            dlg.close()
+            self.btn_recargar.setEnabled(True)
+
+        cambiadas = resumen["cambiadas"]
+        if cambiadas:
+            lista = ", ".join(cambiadas[:8])
+            if len(cambiadas) > 8:
+                lista += f" y {len(cambiadas) - 8} más"
+            texto = (f"✓ {len(cambiadas)} imagen(es) con ground truth distinto: "
+                     f"{lista}. Métricas e imágenes de control actualizadas; "
+                     f"ya puedes generar el informe.")
+        else:
+            texto = (f"✓ Revisadas {resumen['revisadas']} imágenes: ningún .txt "
+                     f"cambió respecto a la corrida. No había nada que recalcular.")
+        if resumen["sin_gt"]:
+            texto += f"  ({len(resumen['sin_gt'])} sin .txt de control.)"
+        if cancelado["si"]:
+            texto += "  Se canceló a mitad: vuelve a pulsar para terminar."
+        self.lbl_recarga.setText(texto)
+        self.refresh()
 
     def _resultados_por_modelo(self):
         """[(alias, [ImageResult con GT])], en el orden de los slots."""
