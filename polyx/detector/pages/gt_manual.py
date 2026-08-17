@@ -776,8 +776,25 @@ class GTManualPage(DetectorPage):
         path = Path(it.data(Qt.UserRole))
         dets = self.canvas.detections()
         if not dets:
-            QMessageBox.information(self, tr("GT manual"), tr("No hay cajas para guardar."))
-            return
+            # Guardar cero cajas es un dato, no un error. Antes se rechazaba y el
+            # .txt anterior sobrevivia intacto: borrar todas las cajas mal puestas
+            # de una placa no tenia ningun efecto, y el informe seguia mostrando
+            # la anotacion vieja como si nada. Ademas el detector solo cuenta los
+            # falsos positivos de una placa vacia si su .txt existe.
+            r = QMessageBox.question(
+                self, tr("GT manual"),
+                tr("No hay ninguna caja dibujada. ¿Guardar esta imagen como "
+                   "revisada con cero partículas? Se sobrescribirá la anotación "
+                   "anterior, si la hubiera."),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if r != QMessageBox.Yes:
+                return
         out_path = self._save_to_txt(path, dets)
-        self.lbl_canvas_status.setText(f"✓ Guardado en: {out_path}")
+        # El informe no relee los .txt: usa el GT que se cargo durante la corrida.
+        # Sin este aviso, reetiquetar y regenerar el informe parece no hacer nada.
+        aviso = ""
+        if any(self.state.results.values()):
+            aviso = tr("   ⚠ Vuelve a Ejecutar la detección: el informe usa el "
+                       "GT leído en la última corrida.")
+        self.lbl_canvas_status.setText(f"✓ Guardado en: {out_path}{aviso}")
         self._refresh_list()
