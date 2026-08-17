@@ -93,10 +93,12 @@ class ResultadosPage(DetectorPage):
         # ── Recargar GT del disco ──
         c_gt, l_gt = self.card(tr("Ground truth"), "🔄")
         nota_gt = QLabel(tr(
-            "La corrida guarda el ground truth que leyó, así que corregir una "
-            "anotación después no cambia estas métricas ni el informe. Esto "
-            "vuelve a leer los .txt del disco y recalcula todo sin pasar el "
-            "modelo otra vez: solo se redibujan las imágenes que cambiaron."))
+            "No pide ninguna carpeta: relee los .txt que están junto a cada "
+            "foto, los mismos que ves en GT manual. Hace falta porque la corrida "
+            "guarda el ground truth que leyó, así que corregir una anotación "
+            "después no cambia por sí solo estas métricas ni el informe. "
+            "Recalcula sin pasar el modelo otra vez y solo redibuja las imágenes "
+            "cuyo .txt cambió."))
         nota_gt.setWordWrap(True)
         nota_gt.setStyleSheet(
             f"color: {T.INK3}; font-size: 9.5pt; border: none;")
@@ -106,7 +108,7 @@ class ResultadosPage(DetectorPage):
         self.lbl_recarga.setStyleSheet(
             f"color: {T.OK}; font-size: 10pt; font-weight: 600; border: none;")
         row_gt = QHBoxLayout()
-        self.btn_recargar = QPushButton(tr("🔄  Recargar GT y recalcular"))
+        self.btn_recargar = QPushButton(tr("🔄  Releer los .txt del disco y recalcular"))
         self.btn_recargar.clicked.connect(self._recargar_gt)
         row_gt.addWidget(self.btn_recargar)
         row_gt.addStretch(1)
