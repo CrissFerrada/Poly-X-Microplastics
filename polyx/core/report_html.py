@@ -8,11 +8,13 @@ Contenido:
   5. Análisis de errores (matriz de confusión + galería)
   6. Comparación entre modelos
   7. Galería completa por imagen anotada
-  8. Referencias bibliográficas
+  8. Conteo por muestra y tipo de plástico
+  9. Referencias bibliográficas
 """
 from __future__ import annotations
 import base64
 import io
+import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -92,6 +94,18 @@ padding:7px 10px;text-align:center;border-top:1px solid var(--rule_soft);}
 .compare-meta{font-size:9pt;color:var(--ink2);padding:9px 12px;
 border-top:1px solid var(--rule);font-variant-numeric:tabular-nums;}
 .compare-meta .tag{display:inline-block;margin-right:10px;}
+/* Conteo por polimero de una sola foto, bajo el par de imagenes. */
+table.conteo{width:100%;border-collapse:collapse;font-size:9.5pt;
+border-top:1px solid var(--rule);background:var(--bg);}
+table.conteo th{background:var(--bg_soft);text-align:right;padding:6px 12px;
+font-weight:600;color:var(--ink2);border-bottom:1px solid var(--rule_soft);}
+table.conteo th:first-child{text-align:left;}
+table.conteo td{padding:5px 12px;text-align:right;
+font-variant-numeric:tabular-nums;border-bottom:1px solid var(--rule_soft);}
+table.conteo td:first-child{text-align:left;font-weight:600;}
+table.conteo tr.tot td{border-bottom:none;background:var(--bg_soft);font-weight:700;}
+table.conteo td.dif-pos{color:var(--err);}
+table.conteo td.dif-neg{color:var(--accent_d);}
 .nogt{display:flex;align-items:center;justify-content:center;min-height:180px;
 color:var(--muted);font-size:10pt;text-align:center;padding:16px;
 background:repeating-linear-gradient(45deg,#fbfcfd,#fbfcfd 12px,#f0f2f4 12px,#f0f2f4 24px);}
@@ -105,7 +119,9 @@ font-weight:600;letter-spacing:.04em;}
 footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:18px;
 font-size:9.5pt;color:var(--ink3);}
 @media print{.container{max-width:none;padding:24px;}
-h2{page-break-after:avoid;}.fig,.gallery .item{page-break-inside:avoid;}}
+h2{page-break-after:avoid;}.fig,.gallery .item{page-break-inside:avoid;}
+/* Que la foto y su tabla no queden en paginas distintas del PDF. */
+.compare{page-break-inside:avoid;}}
 """
 
 
@@ -118,6 +134,105 @@ def _fig_to_b64(fig) -> str:
 
 def _img_b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
+
+
+# ────────────────────────────────────────────────────────────────────
+# Conteo por polímero y por muestra
+# ────────────────────────────────────────────────────────────────────
+# Orden de presentación de los polímeros. Cualquier clase que aparezca en los
+# datos y no esté aquí se agrega al final, para que un dataset con otras clases
+# no pierda columnas en silencio.
+_ORDEN_CLASES = ["PET", "PP", "LDPE"]
+
+# Las placas del río Loa se nombran `<tramo>.<testigo>` con sufijo `x`/`xx` para
+# la segunda y tercera placa del mismo tramo. Los recortes agregan `__f<fila>c<col>`.
+_RE_PLACA = re.compile(r"^(\d+)\.(\d+)(x*)$")
+_ESTACION = {"1": "Chiu Chiu", "2": "Taira", "3": "Desembocadura"}
+_ORDEN_ESTACION = ["Chiu Chiu", "Taira", "Desembocadura"]
+_PLACA = {"": "a", "x": "b", "xx": "c"}
+
+
+def _conteo_por_clase(detecciones) -> Counter:
+    c = Counter()
+    for d in detecciones:
+        c[d.class_name] += 1
+    return c
+
+
+def _clases_vistas(resultados_planos) -> List[str]:
+    """Clases presentes en el lote, en orden de presentación.
+
+    Se toman de las detecciones **y** del Ground Truth: un polímero que el
+    modelo nunca detecta seguiría siendo una fila de la tabla, con cero, que es
+    justo el dato que interesa mirar.
+    """
+    vistas = {d.class_name for r in resultados_planos
+              for d in list(r.predictions) + list(r.gt)}
+    orden = [c for c in _ORDEN_CLASES if c in vistas]
+    return orden + sorted(vistas - set(orden))
+
+
+def _muestra_de(ruta) -> Optional[tuple]:
+    """(estación, tramo, placa) a partir del nombre, o None si no sigue la pauta.
+
+    El informe no puede exigir esta nomenclatura: si las imágenes vienen de otro
+    estudio, la tabla agrupada simplemente no se emite y queda la tabla por
+    imagen, que siempre se puede construir.
+    """
+    stem = Path(ruta).stem.split("__")[0]
+    m = _RE_PLACA.match(stem)
+    if not m:
+        return None
+    tramo, testigo, sufijo = m.group(1), m.group(2), m.group(3)
+    return (_ESTACION.get(testigo, f"Testigo {testigo}"),
+            int(tramo), _PLACA.get(sufijo, sufijo))
+
+
+def _clave_orden(ruta) -> tuple:
+    """Ordena por estación/tramo/placa cuando el nombre lo permite."""
+    m = _muestra_de(ruta)
+    if m is None:
+        return (1, 0, 0, "", Path(ruta).name)
+    estacion, tramo, placa = m
+    idx = _ORDEN_ESTACION.index(estacion) if estacion in _ORDEN_ESTACION else 99
+    return (0, idx, tramo, placa, Path(ruta).name)
+
+
+def _tabla_conteo(manual: Optional[Counter], detectado: Counter,
+                  clases: List[str]) -> str:
+    """Tabla de una foto: partículas por polímero, contadas a mano y por el modelo.
+
+    Es conteo, no evaluación: la columna del modelo son **todas** sus
+    detecciones de ese polímero, sin descontar falsos positivos ni emparejar
+    caja a caja. Para eso está el análisis de errores.
+    """
+    hay_manual = manual is not None
+    filas = ""
+    for c in clases:
+        det = detectado.get(c, 0)
+        if hay_manual:
+            man = manual.get(c, 0)
+            dif = det - man
+            css = "dif-pos" if dif > 0 else ("dif-neg" if dif < 0 else "")
+            filas += (f"<tr><td>{c}</td><td>{man}</td><td>{det}</td>"
+                      f"<td class='{css}'>{dif:+d}</td></tr>")
+        else:
+            filas += f"<tr><td>{c}</td><td>{det}</td></tr>"
+
+    tot_det = sum(detectado.get(c, 0) for c in clases)
+    if hay_manual:
+        tot_man = sum(manual.get(c, 0) for c in clases)
+        dif = tot_det - tot_man
+        css = "dif-pos" if dif > 0 else ("dif-neg" if dif < 0 else "")
+        filas += (f"<tr class='tot'><td>Total</td><td>{tot_man}</td>"
+                  f"<td>{tot_det}</td><td class='{css}'>{dif:+d}</td></tr>")
+        cabecera = ("<tr><th>Polímero</th><th>Conteo manual</th>"
+                    "<th>Detectadas por el modelo</th><th>Diferencia</th></tr>")
+    else:
+        filas += f"<tr class='tot'><td>Total</td><td>{tot_det}</td></tr>"
+        cabecera = "<tr><th>Polímero</th><th>Detectadas por el modelo</th></tr>"
+
+    return f"<table class='conteo'>{cabecera}{filas}</table>"
 
 
 # Ancho máximo de las imágenes de galería, en píxeles. Se incrustan en base64
@@ -487,6 +602,172 @@ def _fig_confusion_matrix(cm: np.ndarray, class_names: List[str]) -> str:
     return _fig_to_b64(fig)
 
 
+def _tabla_ancha(filas: List[tuple], clases: List[str], titulo_col: str,
+                hay_manual: bool, totales: bool = True) -> str:
+    """Tabla Muestra x polimero con las columnas manual y modelo lado a lado.
+
+    ``filas`` es una lista de (etiqueta, Counter manual, Counter modelo).
+    """
+    if hay_manual:
+        cab = (f"<tr><th rowspan='2'>{titulo_col}</th>"
+               + "".join(f"<th colspan='2' style='text-align:center'>{c}</th>"
+                         for c in clases)
+               + "<th colspan='2' style='text-align:center'>Total</th></tr><tr>"
+               + "".join("<th class='r'>manual</th><th class='r'>modelo</th>"
+                         for _ in clases + ["total"]) + "</tr>")
+    else:
+        cab = (f"<tr><th>{titulo_col}</th>"
+               + "".join(f"<th class='r'>{c}</th>" for c in clases)
+               + "<th class='r'>Total</th></tr>")
+
+    cuerpo = ""
+    acum_man, acum_det = Counter(), Counter()
+    for etiqueta, man, det in filas:
+        acum_man.update(man)
+        acum_det.update(det)
+        celdas = ""
+        for c in clases:
+            if hay_manual:
+                celdas += f"<td class='r'>{man.get(c, 0)}</td><td class='r'>{det.get(c, 0)}</td>"
+            else:
+                celdas += f"<td class='r'>{det.get(c, 0)}</td>"
+        t_det = sum(det.get(c, 0) for c in clases)
+        if hay_manual:
+            t_man = sum(man.get(c, 0) for c in clases)
+            celdas += f"<td class='r'><strong>{t_man}</strong></td><td class='r'><strong>{t_det}</strong></td>"
+        else:
+            celdas += f"<td class='r'><strong>{t_det}</strong></td>"
+        cuerpo += f"<tr><td>{etiqueta}</td>{celdas}</tr>"
+
+    if totales and filas:
+        celdas = ""
+        for c in clases:
+            if hay_manual:
+                celdas += (f"<td class='r'>{acum_man.get(c, 0)}</td>"
+                           f"<td class='r'>{acum_det.get(c, 0)}</td>")
+            else:
+                celdas += f"<td class='r'>{acum_det.get(c, 0)}</td>"
+        t_det = sum(acum_det.get(c, 0) for c in clases)
+        if hay_manual:
+            t_man = sum(acum_man.get(c, 0) for c in clases)
+            celdas += f"<td class='r'>{t_man}</td><td class='r'>{t_det}</td>"
+        else:
+            celdas += f"<td class='r'>{t_det}</td>"
+        cuerpo += (f"<tr style='font-weight:700;background:var(--bg_soft)'>"
+                   f"<td>TOTAL</td>{celdas}</tr>")
+
+    return f"<table class='data'>{cab}{cuerpo}</table>"
+
+
+def _seccion_conteo(resultados: Dict[int, list], state, active,
+                    clases: List[str]) -> str:
+    """Seccion 8: cuantas particulas de cada polimero hay en cada muestra.
+
+    Es la tabla que se pide para el manuscrito: conteo por tipo de plastico y
+    muestra, con el conteo manual y el del modelo uno junto al otro. **No** es
+    evaluacion del detector: la columna del modelo son todas sus detecciones,
+    sin descontar falsos positivos. Esa lectura esta en la seccion de errores.
+
+    Con varios modelos cargados se usa el primero activo. Poner dos modelos en
+    la misma celda haria la tabla ilegible, y el informe ya compara modelos en
+    su propia seccion.
+    """
+    if not active:
+        return ""
+    main_mi = state.model_slots.index(active[0])
+    rs = resultados.get(main_mi, [])
+    if not rs:
+        return ""
+
+    rs = sorted(rs, key=lambda r: _clave_orden(r.image_path))
+    hay_manual = any(r.has_gt for r in rs)
+
+    # -- Por imagen --
+    filas_img = []
+    for r in rs:
+        muestra = _muestra_de(r.image_path)
+        etiqueta = r.image_path.name
+        if muestra:
+            estacion, tramo, placa = muestra
+            etiqueta = (f"{r.image_path.name}<br>"
+                        f"<span style='font-size:8.5pt;color:var(--ink3)'>"
+                        f"{estacion} &middot; tramo {tramo} &middot; placa {placa}</span>")
+        filas_img.append((etiqueta,
+                          _conteo_por_clase(r.gt) if r.has_gt else Counter(),
+                          _conteo_por_clase(r.predictions)))
+    tabla_img = _tabla_ancha(filas_img, clases, "Muestra (imagen)", hay_manual)
+
+    # -- Por tramo y por estacion, si los nombres siguen la pauta --
+    agrupadas = [(r, _muestra_de(r.image_path)) for r in rs]
+    parseables = [(r, m) for r, m in agrupadas if m is not None]
+    tabla_tramo = tabla_estacion = ""
+    nota_agrupacion = ""
+    if parseables:
+        por_tramo: Dict[tuple, list] = {}
+        por_estacion: Dict[str, list] = {}
+        for r, (estacion, tramo, _placa) in parseables:
+            por_tramo.setdefault((estacion, tramo), []).append(r)
+            por_estacion.setdefault(estacion, []).append(r)
+
+        def _sumar(lista):
+            man, det = Counter(), Counter()
+            for r in lista:
+                if r.has_gt:
+                    man.update(_conteo_por_clase(r.gt))
+                det.update(_conteo_por_clase(r.predictions))
+            return man, det
+
+        def _orden_est(e):
+            return _ORDEN_ESTACION.index(e) if e in _ORDEN_ESTACION else 99
+
+        filas_t = []
+        for clave in sorted(por_tramo, key=lambda k: (_orden_est(k[0]), k[1])):
+            estacion, tramo = clave
+            lista = por_tramo[clave]
+            man, det = _sumar(lista)
+            palabra = "imágenes" if len(lista) != 1 else "imagen"
+            filas_t.append((f"{estacion} &middot; tramo {tramo} "
+                            f"<span style='font-size:8.5pt;color:var(--ink3)'>"
+                            f"({len(lista)} {palabra})</span>",
+                            man, det))
+        tabla_tramo = ("<h3>8.2 Por tramo de profundidad</h3>"
+                       "<p>Las placas del mismo tramo se <strong>suman</strong>: son "
+                       "submuestras de la misma masa de sedimento, no repeticiones "
+                       "fotográficas. El tramo es la unidad de análisis.</p>"
+                       + _tabla_ancha(filas_t, clases, "Tramo", hay_manual))
+
+        filas_e = []
+        for estacion in sorted(por_estacion, key=_orden_est):
+            man, det = _sumar(por_estacion[estacion])
+            filas_e.append((estacion, man, det))
+        tabla_estacion = ("<h3>8.3 Por estación</h3>"
+                          + _tabla_ancha(filas_e, clases, "Estación", hay_manual,
+                                         totales=False))
+
+        fuera = len(agrupadas) - len(parseables)
+        if fuera:
+            nota_agrupacion = (f"<p class='caption'>{fuera} imagen(es) no siguen la "
+                               f"nomenclatura <code>tramo.testigo</code> y quedan fuera "
+                               f"de las tablas agrupadas; sí están en la tabla por "
+                               f"imagen.</p>")
+
+    coletilla = ", el primer modelo activo." if len(active) > 1 else "."
+    intro = (
+        "<h2 id='conteo'>8. Conteo por muestra y tipo de pl&aacute;stico</h2>"
+        "<p>Part&iacute;culas contadas en cada muestra, desglosadas por pol&iacute;mero. "
+        "La columna <em>manual</em> es la anotaci&oacute;n humana (Ground Truth) y la "
+        "columna <em>modelo</em> son todas las detecciones de "
+        f"<strong>{active[0].alias}</strong>{coletilla}</p>"
+        "<p><strong>L&eacute;ase como conteo, no como evaluaci&oacute;n.</strong> La "
+        "columna del modelo no descuenta falsos positivos ni empareja caja a caja: es "
+        "cu&aacute;ntas part&iacute;culas de cada pol&iacute;mero report&oacute;. "
+        "Coincidir en el total no implica haber acertado part&iacute;cula por "
+        "part&iacute;cula; para eso est&aacute; el an&aacute;lisis de errores.</p>"
+        "<h3>8.1 Por imagen</h3>"
+    )
+    return intro + tabla_img + nota_agrupacion + tabla_tramo + tabla_estacion
+
+
 # ────────────────────────────────────────────────────────────────────
 def generate_report(state, output_path: Path,
                     include_refs: bool = True,
@@ -526,6 +807,8 @@ def generate_report(state, output_path: Path,
     avg_conf = sum(confs)/len(confs) if confs else 0
     avg_size = sum(sizes)/len(sizes) if sizes else 0
     any_gt = any(r.has_gt for r in all_results)
+
+    clases_lote = _clases_vistas(all_results)
 
     # ── Distribución por clase ──
     per_class = Counter()
@@ -852,9 +1135,13 @@ def generate_report(state, output_path: Path,
         for mi in sorted(resultados):
             for r in resultados[mi]:
                 por_imagen.setdefault(r.image_path, []).append((mi, r))
+        # Orden por estación/tramo/placa cuando el nombre de la placa lo
+        # permite: el informe se lee siguiendo el testigo hacia abajo, no en el
+        # orden arbitrario en que se cargaron los archivos.
+        orden_imgs = sorted(por_imagen, key=_clave_orden)
         candidatas = []
-        for grupo in list(por_imagen.values())[:max_gallery]:
-            candidatas.extend(grupo)
+        for ruta in orden_imgs[:max_gallery]:
+            candidatas.extend(por_imagen[ruta])
         omitidas = max(0, len(por_imagen) - max_gallery)
         for mi, r in candidatas:
             slot = state.model_slots[mi]
@@ -886,25 +1173,27 @@ def generate_report(state, output_path: Path,
                         "<span class='sub'>no disponible</span></figcaption></figure>"
                     )
 
-                # Métricas por imagen (con nombres completos en español)
-                if r.has_gt:
-                    meta = (
-                        f"<strong>{r.image_path.name}</strong> &nbsp; "
-                        f"<span class='tag'>{LABEL_TP}: {r.tp}</span>"
-                        f"<span class='tag'>{LABEL_FP}: {r.fp}</span>"
-                        f"<span class='tag'>{LABEL_FN}: {r.fn}</span>"
-                        f"<span class='tag'>{LABEL_MISCLS}: {r.miscls}</span>"
-                    )
-                else:
-                    meta = (
-                        f"<strong>{r.image_path.name}</strong> &nbsp; "
-                        f"<span class='tag'>{len(r.predictions)} detección(es)</span>"
-                        f"<span class='tag'>sin Ground Truth</span>"
-                    )
+                # Encabezado de la foto: nombre y, si el nombre lo permite,
+                # de qué tramo y placa viene.
+                muestra = _muestra_de(r.image_path)
+                donde = ""
+                if muestra:
+                    estacion, tramo, placa = muestra
+                    donde = (f" &nbsp;<span class='tag'>{estacion} · tramo {tramo} "
+                             f"· placa {placa}</span>")
+                meta = (f"<strong>{r.image_path.name}</strong>{donde}"
+                        f"&nbsp;<span class='tag'>modelo: {slot.alias}</span>")
+
+                # Tabla de la foto: partículas por polímero. Los aciertos y
+                # fallos emparejados caja a caja son otra pregunta y viven en
+                # la sección de análisis de errores.
+                tabla = _tabla_conteo(_conteo_por_clase(r.gt) if r.has_gt else None,
+                                      _conteo_por_clase(r.predictions),
+                                      clases_lote)
 
                 blocks.append(
                     f"<div class='compare'><div class='compare-pair'>{left}{right}</div>"
-                    f"<div class='compare-meta'>{meta}</div></div>"
+                    f"<div class='compare-meta'>{meta}</div>{tabla}</div>"
                 )
 
         if blocks:
@@ -978,10 +1267,12 @@ def generate_report(state, output_path: Path,
         "</blockquote>"
     )
 
+    conteo_html = _seccion_conteo(resultados, state, active, clases_lote)
+
     refs_html = ""
     if include_refs:
         refs_html = """
-        <h2 id='refs'>8. Referencias bibliográficas</h2>
+        <h2 id='refs'>9. Referencias bibliográficas</h2>
         <ol>
           <li>Pérez M, Parra S, Ferrada C, Bravo M, Pérez PA, Quiroz W (2024).
               Development of a new methodology for the determination of PET microplastics in sediment,
@@ -1020,6 +1311,7 @@ def generate_report(state, output_path: Path,
     {"<li><a href='#errors'>Análisis de errores</a></li>" if any_gt else ""}
     <li><a href='#compare'>Comparación entre modelos</a></li>
     {"<li><a href='#gallery'>Galería por imagen</a></li>" if gallery_html else ""}
+    {"<li><a href='#conteo'>Conteo por muestra y tipo de plástico</a></li>" if conteo_html else ""}
     {"<li><a href='#refs'>Referencias</a></li>" if include_refs else ""}
   </ol>
 </div>
@@ -1060,6 +1352,8 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 {compare_html}
 
 {gallery_html}
+
+{conteo_html}
 
 {refs_html}
 

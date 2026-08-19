@@ -1,6 +1,7 @@
 """Página 9 — Informe de detección en HTML."""
 from __future__ import annotations
 import os
+import shutil
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -23,8 +24,9 @@ class ReportePage(DetectorPage):
     STEP_DESCRIPTION = (
         tr("Genera un informe HTML autocontenido (todas las imágenes embebidas en base64, "
         "así no se rompen al enviarlo a otra persona) con métodos, métricas, gráficos, "
-        "galería comparativa y análisis de errores. Puedes exportarlo directamente a PDF "
-        "para enviarlo.")
+        "galería comparativa, conteo por muestra y análisis de errores. Puedes exportarlo "
+        "directamente a PDF para enviarlo, o guardar aparte cada foto con sus etiquetas "
+        "dibujadas.")
     )
 
     def __init__(self, state, parent=None):
@@ -86,6 +88,9 @@ class ReportePage(DetectorPage):
         l1.addWidget(self.lbl_status)
         self.body.addWidget(c1)
 
+        # ── Guardar las fotos con las etiquetas dibujadas ──
+        self.body.addWidget(self._card_fotos())
+
         # ── Contenido del reporte ──
         c2, l2 = self.card(tr("Contenido del reporte"), "📋")
         contents = QLabel(
@@ -106,7 +111,10 @@ class ReportePage(DetectorPage):
             "<li>Precisión / Recall / F1 por clase</li>"
             "<li>Galería de imágenes con más errores</li>"
             "</ul></li>"
-            "<li><b>Galería comparativa</b> Predicción vs Ground Truth (lado a lado)</li>"
+            "<li><b>Galería comparativa</b> Predicción vs Ground Truth (lado a lado), "
+            "cada foto con su tabla de partículas por polímero</li>"
+            "<li><b>Conteo por muestra y tipo de plástico</b> — conteo manual y del "
+            "modelo, por imagen, por tramo y por estación</li>"
             "<li><b>Referencias bibliográficas</b></li>"
             "</ol>"
         )
@@ -114,6 +122,146 @@ class ReportePage(DetectorPage):
         contents.setTextFormat(Qt.RichText)
         l2.addWidget(contents)
         self.body.addWidget(c2)
+
+    # ── Fotos etiquetadas ───────────────────────────────────────
+    def _card_fotos(self):
+        """Tarjeta para guardar cada foto con sus etiquetas como archivo suelto.
+
+        El informe ya las lleva embebidas, pero ahí van recomprimidas y a 1100 px
+        de ancho para que el archivo sea manejable. Quien quiera la imagen para
+        una figura del paper o para revisarla con lupa necesita el original, y
+        eso es lo que copia esta tarjeta.
+        """
+        c, l = self.card(tr("Guardar las fotos con las etiquetas"), "🖼️")
+
+        ayuda = QLabel(tr(
+            "Guarda cada foto analizada con sus cajas dibujadas, como archivos "
+            "sueltos en la carpeta que elijas. Son las mismas imágenes que el "
+            "informe muestra, pero en su resolución original. Respeta el "
+            "<b>alcance</b> elegido arriba: si marcaste fotos concretas, solo se "
+            "guardan esas."))
+        ayuda.setWordWrap(True)
+        ayuda.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l.addWidget(ayuda)
+
+        self.chk_f_manual = QCheckBox(tr("Etiquetas manuales (Ground Truth)"))
+        self.chk_f_modelo = QCheckBox(tr("Detecciones del modelo"))
+        self.chk_f_ambas = QCheckBox(tr("Las dos superpuestas en la misma foto"))
+        self.chk_f_manual.setChecked(True)
+        self.chk_f_modelo.setChecked(True)
+        for chk in (self.chk_f_manual, self.chk_f_modelo, self.chk_f_ambas):
+            chk.setStyleSheet(f"color: {T.INK2}; border: none;")
+            l.addWidget(chk)
+
+        fila = QHBoxLayout()
+        self.btn_fotos = QPushButton(tr("🖼️  Guardar fotos etiquetadas"))
+        self.btn_fotos.setStyleSheet(
+            f"background: {T.VIO}; color: white; border: none; "
+            f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
+        )
+        self.btn_fotos.setCursor(Qt.PointingHandCursor)
+        self.btn_fotos.clicked.connect(self._guardar_fotos)
+        fila.addWidget(self.btn_fotos)
+        fila.addStretch(1)
+        l.addLayout(fila)
+
+        self.lbl_fotos = QLabel("")
+        self.lbl_fotos.setWordWrap(True)
+        self.lbl_fotos.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
+        l.addWidget(self.lbl_fotos)
+        return c
+
+    def _fotos_a_exportar(self):
+        """[(ruta_origen, nombre_destino)] segun las casillas y el alcance."""
+        marcadas = self._fotos_marcadas()
+        # Con "solo las marcadas" se filtra; con "completo" o "ambos" entra todo,
+        # porque "ambos" incluye el trabajo completo.
+        solo_marcadas = self.rb_elegidas.isChecked()
+
+        tareas, vistos = [], set()
+        for mi, resultados in self.state.results.items():
+            alias = self.state.model_slots[mi].alias
+            for r in resultados:
+                if solo_marcadas and Path(r.image_path) not in marcadas:
+                    continue
+                stem = Path(r.image_path).stem
+                candidatos = []
+                if self.chk_f_manual.isChecked() and r.gt_path:
+                    # El GT no depende del modelo: sin alias en el nombre, y
+                    # deduplicado para no escribir el mismo archivo N veces.
+                    candidatos.append((r.gt_path, f"{stem}__manual"))
+                if self.chk_f_modelo.isChecked() and r.pred_path:
+                    candidatos.append((r.pred_path, f"{stem}__modelo-{alias}"))
+                if self.chk_f_ambas.isChecked() and r.annotated_path:
+                    candidatos.append((r.annotated_path, f"{stem}__ambas-{alias}"))
+                for origen, nombre in candidatos:
+                    if origen is None or nombre in vistos:
+                        continue
+                    origen = Path(origen)
+                    if not origen.exists():
+                        continue
+                    vistos.add(nombre)
+                    tareas.append((origen, nombre + origen.suffix))
+        return tareas
+
+    def _guardar_fotos(self):
+        if not self._check_results():
+            return
+        if not any(c.isChecked() for c in (self.chk_f_manual, self.chk_f_modelo,
+                                           self.chk_f_ambas)):
+            QMessageBox.warning(
+                self, tr("Nada que guardar"),
+                tr("Marca al menos una de las tres opciones: etiquetas manuales, "
+                   "detecciones del modelo, o las dos superpuestas."))
+            return
+        if self.rb_elegidas.isChecked() and not self._fotos_marcadas():
+            QMessageBox.warning(
+                self, tr("Sin fotos marcadas"),
+                tr("El alcance está en 'solo las fotos que marque' y no hay "
+                   "ninguna marcada."))
+            return
+
+        tareas = self._fotos_a_exportar()
+        if not tareas:
+            QMessageBox.warning(
+                self, tr("Nada que guardar"),
+                tr("No se encontró ninguna imagen anotada en disco para lo que "
+                   "pediste.\n\nSi marcaste 'etiquetas manuales', recuerda que "
+                   "solo existen para las fotos que tienen Ground Truth."))
+            return
+
+        base = self.state.run_dir if (self.state.run_dir and self.state.run_dir.exists()) else Path.home()
+        destino = QFileDialog.getExistingDirectory(
+            self, tr("Carpeta donde guardar las fotos etiquetadas"), str(base))
+        if not destino:
+            return
+        destino = Path(destino)
+
+        self.btn_fotos.setEnabled(False)
+        self.lbl_fotos.setText(tr("Guardando {} imagen(es)…").format(len(tareas)))
+        QApplication.processEvents()
+        copiadas, fallos = 0, []
+        try:
+            for origen, nombre in tareas:
+                try:
+                    shutil.copy2(origen, destino / nombre)
+                    copiadas += 1
+                except OSError as e:
+                    fallos.append(f"{nombre}: {e}")
+            msg = "✓ " + tr("{} imagen(es) guardada(s) en {}").format(copiadas, destino)
+            if fallos:
+                msg += " · " + tr("{} fallaron").format(len(fallos))
+            self.lbl_fotos.setText(msg)
+            if copiadas and not fallos:
+                try:
+                    os.startfile(str(destino))
+                except Exception:
+                    pass
+            if fallos:
+                QMessageBox.warning(self, tr("Algunas no se pudieron guardar"),
+                                    "\n".join(fallos[:12]))
+        finally:
+            self.btn_fotos.setEnabled(True)
 
     # ── Alcance ─────────────────────────────────────────────────
     def _card_alcance(self):
