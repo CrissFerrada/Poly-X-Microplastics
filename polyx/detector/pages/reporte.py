@@ -135,11 +135,12 @@ class ReportePage(DetectorPage):
         c, l = self.card(tr("Guardar las fotos con las etiquetas"), "🖼️")
 
         ayuda = QLabel(tr(
-            "Guarda cada foto analizada con sus cajas dibujadas, como archivos "
-            "sueltos en la carpeta que elijas. Son las mismas imágenes que el "
-            "informe muestra, pero en su resolución original. Respeta el "
-            "<b>alcance</b> elegido arriba: si marcaste fotos concretas, solo se "
-            "guardan esas."))
+            "Guarda cada foto analizada con sus cajas dibujadas, en su resolución "
+            "original. Eliges una carpeta y dentro se crea una subcarpeta por cada "
+            "opción que marques (<code>conteo_manual</code>, "
+            "<code>deteccion_modelo</code>, <code>ambas_superpuestas</code>), así "
+            "no se mezclan. Respeta el <b>alcance</b> elegido arriba: si marcaste "
+            "fotos concretas, solo se guardan esas."))
         ayuda.setWordWrap(True)
         ayuda.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         l.addWidget(ayuda)
@@ -171,16 +172,26 @@ class ReportePage(DetectorPage):
         l.addWidget(self.lbl_fotos)
         return c
 
+    # Una subcarpeta por tipo de imagen: mezclarlas obliga a leer el nombre de
+    # cada archivo para saber cual es cual, y son cientos.
+    CARPETA_MANUAL = "conteo_manual"
+    CARPETA_MODELO = "deteccion_modelo"
+    CARPETA_AMBAS = "ambas_superpuestas"
+
     def _fotos_a_exportar(self):
-        """[(ruta_origen, nombre_destino)] segun las casillas y el alcance."""
+        """[(ruta_origen, subcarpeta, nombre_destino)] segun casillas y alcance."""
         marcadas = self._fotos_marcadas()
         # Con "solo las marcadas" se filtra; con "completo" o "ambos" entra todo,
         # porque "ambos" incluye el trabajo completo.
         solo_marcadas = self.rb_elegidas.isChecked()
+        # El alias solo estorba cuando hay un unico modelo: sin el, el archivo
+        # se llama igual que la foto original, que es lo comodo para una figura.
+        varios = len(self.state.results) > 1
 
         tareas, vistos = [], set()
         for mi, resultados in self.state.results.items():
             alias = self.state.model_slots[mi].alias
+            marca = f"__{alias}" if varios else ""
             for r in resultados:
                 if solo_marcadas and Path(r.image_path) not in marcadas:
                     continue
@@ -189,19 +200,19 @@ class ReportePage(DetectorPage):
                 if self.chk_f_manual.isChecked() and r.gt_path:
                     # El GT no depende del modelo: sin alias en el nombre, y
                     # deduplicado para no escribir el mismo archivo N veces.
-                    candidatos.append((r.gt_path, f"{stem}__manual"))
+                    candidatos.append((r.gt_path, self.CARPETA_MANUAL, stem))
                 if self.chk_f_modelo.isChecked() and r.pred_path:
-                    candidatos.append((r.pred_path, f"{stem}__modelo-{alias}"))
+                    candidatos.append((r.pred_path, self.CARPETA_MODELO, stem + marca))
                 if self.chk_f_ambas.isChecked() and r.annotated_path:
-                    candidatos.append((r.annotated_path, f"{stem}__ambas-{alias}"))
-                for origen, nombre in candidatos:
-                    if origen is None or nombre in vistos:
+                    candidatos.append((r.annotated_path, self.CARPETA_AMBAS, stem + marca))
+                for origen, carpeta, nombre in candidatos:
+                    if origen is None or (carpeta, nombre) in vistos:
                         continue
                     origen = Path(origen)
                     if not origen.exists():
                         continue
-                    vistos.add(nombre)
-                    tareas.append((origen, nombre + origen.suffix))
+                    vistos.add((carpeta, nombre))
+                    tareas.append((origen, carpeta, nombre + origen.suffix))
         return tareas
 
     def _guardar_fotos(self):
@@ -241,14 +252,19 @@ class ReportePage(DetectorPage):
         self.lbl_fotos.setText(tr("Guardando {} imagen(es)…").format(len(tareas)))
         QApplication.processEvents()
         copiadas, fallos = 0, []
+        usadas = set()
         try:
-            for origen, nombre in tareas:
+            for origen, carpeta, nombre in tareas:
                 try:
-                    shutil.copy2(origen, destino / nombre)
+                    sub_dir = destino / carpeta
+                    sub_dir.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(origen, sub_dir / nombre)
+                    usadas.add(carpeta)
                     copiadas += 1
                 except OSError as e:
-                    fallos.append(f"{nombre}: {e}")
-            msg = "✓ " + tr("{} imagen(es) guardada(s) en {}").format(copiadas, destino)
+                    fallos.append(f"{carpeta}/{nombre}: {e}")
+            msg = "✓ " + tr("{} imagen(es) en {} carpeta(s) dentro de {}").format(
+                copiadas, len(usadas), destino)
             if fallos:
                 msg += " · " + tr("{} fallaron").format(len(fallos))
             self.lbl_fotos.setText(msg)
