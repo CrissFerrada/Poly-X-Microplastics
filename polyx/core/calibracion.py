@@ -31,6 +31,10 @@ import numpy as np
 # suficientes para que el ajuste sobreviva a reflejos y oclusiones parciales.
 N_ANGULOS = 720
 
+# Diametro externo de la placa Petri del estudio. NO es un supuesto: el autor lo
+# tiene medido fisicamente y de forma repetida sobre las placas reales. Se anota
+# porque las Petri estandar vienen en 90 y en 100 mm, y confundirlas metaria un
+# 11% en todas las tallas del estudio sin dar ningun sintoma.
 DIAMETRO_PLACA_MM = 100.0
 
 # De donde salio la escala, de mas fiable a menos. Va al informe: una medida sin
