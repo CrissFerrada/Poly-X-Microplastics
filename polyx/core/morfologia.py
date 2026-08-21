@@ -79,6 +79,10 @@ class Morfologia:
     morfotipo: str = INDETERMINADO
     metodo: str = ""             # de donde salio el largo
     aviso: str = ""
+    # La medida sale, pero pide un vistazo humano. Se marca en vez de descartar:
+    # descartar en silencio pierde particulas reales del conteo, y dar el numero
+    # sin avisar mete en la tabla tallas que no se sostienen.
+    revisar: bool = False
 
     @property
     def curva(self) -> bool:
@@ -151,7 +155,27 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
         idx = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
     if stats[idx, cv2.CC_STAT_AREA] < 4:
         return None
-    return (etiquetas == idx).astype(np.uint8) * 255
+    mascara = (etiquetas == idx).astype(np.uint8) * 255
+
+    # Recortar a la caja. El margen existe para que Otsu tenga fondo con que
+    # comparar, no para medir en el: sin este recorte, una particula pegada a
+    # otra forma con ella una sola componente conexa y se mide el conjunto. Se
+    # observo en placas reales una mascara 1.71 veces mas ancha que su caja, y
+    # de ahi salian tallas de 8.9 mm que ninguna caja de 97 px puede contener.
+    #
+    # Se deja una holgura: el detector suele ajustar la caja algo por dentro del
+    # borde real, y cortar a ras amputaria la punta de la particula.
+    holgura = max(2, int(round(0.10 * min(ancho_caja, alto_caja))))
+    hx1 = max(0, int(x1) - ox - holgura)
+    hy1 = max(0, int(y1) - oy - holgura)
+    hx2 = min(mascara.shape[1], int(np.ceil(x2)) - ox + holgura)
+    hy2 = min(mascara.shape[0], int(np.ceil(y2)) - oy + holgura)
+    fuera = np.ones_like(mascara, dtype=bool)
+    fuera[hy1:hy2, hx1:hx2] = False
+    mascara[fuera] = 0
+    if not mascara.any():
+        return None
+    return mascara
 
 
 def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
@@ -171,6 +195,13 @@ def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
     # El area se cuenta sobre la mascara y no con contourArea: la formula del
     # poligono subestima en particulas de pocos pixeles, que son la mayoria aqui.
     area = float(np.count_nonzero(mascara))
+    # El contorno se recorre pixel a pixel, SIN suavizar. Se probo suavizarlo
+    # con approxPolyDP para quitar la escalera de digitalizacion, contra formas
+    # sinteticas de talla conocida, y empeora: con epsilon 1 px el error mediano
+    # sube de 1.0% a 2.4% y el peor de 3.1% a 7.8%, porque recorta los recodos
+    # reales de la particula junto con la escalera. Tambien se probo estimar el
+    # largo como area/grosor con la transformada de distancia, inmune al
+    # perimetro, y es peor todavia: 26.6% de error mediano.
     perim = float(cv2.arcLength(c, True))
     if area < 4 or perim <= 0:
         m.aviso = "particula demasiado pequena para medir su forma"
@@ -194,16 +225,32 @@ def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
         ancho = grosor_recto
         metodo = "cuerda (particula compacta)"
 
-    # El modelo puede dispararse si el contorno viene dentado: el perimetro
-    # crece y con el el largo. Si supera mucho a la cuerda no es curvatura real.
-    if largo > 0 and cuerda > 0:
-        curvatura = largo / cuerda
-        if curvatura > 4.0:
-            largo, ancho = cuerda, grosor_recto
-            metodo = "cuerda (el modelo de rectangulo se disparo)"
-            m.aviso = "contorno irregular; el modelo de rectangulo no era fiable"
-            curvatura = 1.0
-    else:
+    # ¿Es de verdad una cinta? El modelo supone ancho constante, y a un grumo de
+    # borde rugoso le atribuye un perimetro grande, que traduce en "cinta larga y
+    # fina". Distinguirlos: una fibra enrollada es delgada en TODO su recorrido,
+    # mientras que un grumo es grueso por dentro. El radio del mayor circulo que
+    # cabe dentro de la mascara mide exactamente eso, y no depende del perimetro.
+    #
+    # Sin esta comprobacion, una particula real de este material daba 8595 um de
+    # largo dentro de una mascara cuya diagonal era 3900: el modelo la describia
+    # como una cinta de 260 px enrollada, y era un grumo.
+    dt = cv2.distanceTransform(mascara, cv2.DIST_L2, 5)
+    grosor_real = 2.0 * float(dt.max())
+    curvatura = largo / cuerda if largo > 0 and cuerda > 0 else 1.0
+
+    if disc > 0 and ancho > 0 and grosor_real > 2.0 * ancho:
+        # El modelo dice que es el doble de fina de lo que realmente es en su
+        # punto mas grueso: no es una cinta.
+        largo, ancho = cuerda, grosor_recto
+        metodo = "cuerda (no es una cinta: el interior es grueso)"
+        m.aviso = (f"el modelo de rectangulo daba un ancho de {ancho:.0f} px pero la "
+                   f"particula mide {grosor_real:.0f} px en su punto mas grueso")
+        curvatura = 1.0
+    elif curvatura > 4.0:
+        # Curvatura implausible aunque el grosor cuadre.
+        largo, ancho = cuerda, grosor_recto
+        metodo = "cuerda (el modelo de rectangulo se disparo)"
+        m.aviso = "contorno irregular; el modelo de rectangulo no era fiable"
         curvatura = 1.0
 
     m.ok = True
@@ -240,7 +287,19 @@ def medir_deteccion(bgr: np.ndarray, det, um_por_px: Optional[float] = None,
             m = Morfologia()
             m.aviso = "no se pudo separar la particula del fondo"
             return m
-        return medir(mascara, um_por_px)
+        m = medir(mascara, um_por_px)
+        # Una particula solo puede ser mas larga que la diagonal de su caja si
+        # esta muy enrollada. Pasado 1.5x, lo mas frecuente en este material no
+        # es una fibra enrollada sino DOS particulas que se tocan y que la
+        # componente conexa unio en una: se comprobo a ojo sobre las mayores del
+        # lote. La medida se entrega marcada para revisar, no se descarta.
+        diagonal = float(np.hypot(det.x2 - det.x1, det.y2 - det.y1))
+        if m.ok and diagonal > 0 and m.largo_px > 1.5 * diagonal:
+            m.revisar = True
+            m.aviso = (m.aviso + " | " if m.aviso else "") + (
+                f"largo {m.largo_px / diagonal:.1f}x la diagonal de su caja: "
+                f"comprobar que no sean dos particulas pegadas")
+        return m
     except cv2.error as e:
         m = Morfologia()
         m.aviso = f"error de OpenCV al segmentar: {e}"
