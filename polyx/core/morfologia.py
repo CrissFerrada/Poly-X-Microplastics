@@ -75,6 +75,18 @@ INDETERMINADO = "indeterminado"
 
 ASPECTO_FIBRA = 3.0
 
+# El diametro geodesico solo se usa si la particula es al menos asi de delgada,
+# medida como largo/grosor. En una particula gruesa cualquier concavidad hace
+# que el camino geodesico la RODEE en vez de atravesarla, y entonces infla: se
+# vio en una particula real de 44 px de extension y 22 de grosor a la que el
+# geodesico le daba 73 px por bordear una muesca.
+#
+# El umbral no es delicado: sobre formas de talla conocida, los grumos quedan en
+# 1.05 y 1.64 de delgadez y la fibra mas gorda en 6.7, asi que cualquier valor
+# entre 3 y 6 separa igual. Con el, el error mediano del largo baja de 3.1% a
+# 0.8% -- un circulo pasa de 104 a 100 exacto -- sin tocar ninguna fibra.
+DELGADEZ_PARA_GEODESICO = 4.0
+
 # Por encima de esto la particula se considera curva y el largo de la cuerda
 # deja de servir como talla. 1.15 = el contorno recorre un 15% mas que la recta.
 CURVA_DESDE = 1.15
@@ -373,19 +385,26 @@ def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
     # peor caso es 4.7% en vez de 22.5%, y aqui importa mas no fallar feo.
     feret = feret_maximo(c)
     geo = largo_geodesico(mascara)
-    largo = max(feret, geo)
-    metodo = "geodesico" if geo >= feret else "Feret maximo"
 
-    # El ancho es el grosor maximo inscrito: el diametro del mayor circulo que
-    # cabe dentro de la particula, que da la transformada de distancia.
+    # El grosor decide cual de los dos vale. Solo en una particula delgada el
+    # camino geodesico sigue su forma; en una gruesa rodea las concavidades y
+    # devuelve un numero mayor que su extension real.
+    dt = cv2.distanceTransform(mascara, cv2.DIST_L2, 5)
+    grosor = 2.0 * float(dt.max())
+    delgadez = geo / grosor if grosor > 0 else 0.0
+    if delgadez >= DELGADEZ_PARA_GEODESICO and geo >= feret:
+        largo, metodo = geo, "geodesico"
+    else:
+        largo, metodo = feret, "Feret maximo"
+
+    # El ancho es ese mismo grosor maximo inscrito: el diametro del mayor
+    # circulo que cabe dentro de la particula.
     #
     # No se usa area/largo, que seria el ancho medio de una cinta, porque en una
     # particula compacta no da su diametro: un disco tiene A/L = pi*d/4 = 0.785d,
     # con lo que un circulo perfecto salia con aspecto 1.27 en vez de 1.0 y la
-    # clasificacion fibra/fragmento arrancaba sesgada. Con el grosor inscrito el
-    # circulo da 1.04 y una fibra recta de 200x10 da 20, que es lo esperado.
-    dt = cv2.distanceTransform(mascara, cv2.DIST_L2, 5)
-    ancho = 2.0 * float(dt.max())
+    # clasificacion fibra/fragmento arrancaba sesgada.
+    ancho = grosor
 
     # Cuanto se aparta de una recta. Con el geodesico esto ya no depende del
     # perimetro: es cuanto mas largo es el camino por dentro que la cuerda.
