@@ -164,8 +164,26 @@ def corregir_paralaje(um_por_px: float, altura_placa_mm: float,
     Con D la distancia de la camara a la base y h la altura de la placa, el aro
     esta a D-h y el factor entre ambas escalas es D/(D-h).
 
-    El error no es despreciable cuando se dispara cerca: con una placa de 15 mm
-    a 100 mm de distancia son casi 16 puntos porcentuales; a 500 mm, un 3%.
+    MEDIDO SOBRE ESTE MATERIAL, EL EFECTO ES DESPRECIABLE Y NO HACE FALTA
+    CORREGIR. El razonamiento vale en general -- disparando cerca el error si
+    seria grande, un 16% con la placa a 15 mm y la camara a 100 mm -- pero aqui
+    se comprobo asi: el borde del suelo de la placa se ve, y su radio es 0.863
+    veces el del aro. Ese encogimiento podria ser perspectiva o podria ser la
+    forma de la placa (el suelo va rehundido). Se distinguen porque la
+    perspectiva depende de la distancia de disparo y la forma no, y hay placas
+    fotografiadas a dos distancias que difieren 1.43x:
+
+        cerca (n=14):  base/aro = 0.8634 +- 0.0058
+        lejos (n=14):  base/aro = 0.8643 +- 0.0077
+        cociente entre grupos: 1.0010 +- 0.0030  ->  indistinguible de 1.0
+
+    Al no cambiar con la distancia, el encogimiento es la forma de la placa y la
+    perspectiva queda acotada por debajo del 1.3% incluso en el borde de la
+    incertidumbre. Por eso los dos parametros vienen en 0 y no se corrige nada.
+
+    Se deja implementado porque otro montaje -- una camara mas cerca, o placas
+    mas altas -- si lo necesitaria, y porque conviene que quede escrito como se
+    descarto en vez de repetir la duda.
 
     Devuelve (um_por_px_corregido, factor). Sin datos suficientes devuelve el
     valor sin tocar y factor 1.0: es preferible una escala sin corregir y
@@ -223,9 +241,9 @@ def calibrar_desde_placa(bgr: np.ndarray,
     um_aro = (diametro_mm * 1000.0) / (2 * r)
     um_base, factor = corregir_paralaje(um_aro, altura_placa_mm,
                                         distancia_camara_mm)
-    if factor == 1.0 and not aviso:
-        aviso = ("escala medida sobre el aro, sin corregir al plano de la base: "
-                 "las tallas quedan subestimadas")
+    # Sin aviso cuando no se corrige: se midio sobre este material y el efecto
+    # es indetectable (ver corregir_paralaje). Advertirlo en cada foto seria
+    # alarmar por un sesgo que los datos acotan por debajo del 1.3%.
     return Calibracion(um_por_px=um_base,
                        origen=ORIGEN_PLACA, cx=cx, cy=cy, radio_px=r,
                        n_puntos=n, desvio_hough_pct=desvio,
