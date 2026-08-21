@@ -13,6 +13,7 @@ from ..core.yolo_wrap import (
     YoloModel, Detection, find_gt_for_image, read_yolo_txt, compute_box_size_um,
 )
 from ..core.metrics import match_image
+from ..core.procedencia import procedencia, sha256_archivo
 from ..core import theme as T
 from .state import DetectorState, ImageResult
 
@@ -93,6 +94,13 @@ class DetectorRunner(QThread):
             state = self.state
             params = state.params
             slots = state.active_models()
+            inicio = datetime.now()
+            # Lo que de verdad se uso, imagen por imagen, frente a lo que se
+            # pidio en Parametros: el auto-fallback puede haber bajado el imgsz
+            # por falta de VRAM y el troceado depende del tamano de cada foto.
+            # Sin registrarlo, el informe declara una resolucion que quiza no
+            # fue la que produjo esas cajas.
+            ejecucion: dict[str, dict] = {}
             if not slots:
                 self.failed.emit("No hay modelos cargados.")
                 return
@@ -169,6 +177,25 @@ class DetectorRunner(QThread):
                         )
                     else:
                         troceo_desc = ""
+
+                    reg = ejecucion.setdefault(
+                        slot.alias,
+                        {"imagenes": 0, "troceadas": 0, "imgsz_usados": set(),
+                         "fallback_en": []})
+                    reg["imagenes"] += 1
+                    if plan_troceo.get("troceado"):
+                        reg["troceadas"] += 1
+                        # El tile entra a la red a su resolucion nativa; el
+                        # imgsz pedido no se le aplica a la foto completa.
+                        reg["imgsz_usados"].add(int(plan_troceo["plan"]["tile"]))
+                    else:
+                        # last_imgsz/last_fallback solo los escribe predict(),
+                        # que es justo el camino sin trocear.
+                        usado = getattr(slot.loaded, "last_imgsz", 0)
+                        if usado:
+                            reg["imgsz_usados"].add(int(usado))
+                        if getattr(slot.loaded, "last_fallback", False):
+                            reg["fallback_en"].append(img_path.name)
 
                     # Calcular tamaño de las predicciones (el GT ya se calculó arriba)
                     for d in preds:
@@ -272,20 +299,30 @@ class DetectorRunner(QThread):
                     done += 1
                     self.progress.emit(done, total, img_path.name)
 
-            self._escribir_resumen(state, slots)
+            self._escribir_resumen(state, slots, inicio, ejecucion)
             self.finished_ok.emit()
         except Exception as e:
             self.failed.emit(f"{type(e).__name__}: {e}")
 
-    def _escribir_resumen(self, state, slots) -> None:
-        """Deja el run autodescrito: parametros y totales por modelo.
+    def _escribir_resumen(self, state, slots, inicio=None, ejecucion=None) -> None:
+        """Deja el run autodescrito: procedencia, parametros y totales por modelo.
 
         Sin esto una carpeta de run son PNGs sueltos y no se puede saber con que
         confianza ni con que peso salieron. No se falla la corrida si el volcado
         no se puede escribir: los resultados ya estan en memoria y en disco.
         """
         p = state.params
+        ejecucion = ejecucion or {}
+        fin = datetime.now()
         datos = {
+            # Quien produjo esto: version, commit y librerias. Va primero porque
+            # es lo que se mira al intentar rehacer una tabla del paper.
+            "procedencia": procedencia(),
+            "cuando": {
+                "inicio": inicio.isoformat(timespec="seconds") if inicio else "",
+                "fin": fin.isoformat(timespec="seconds"),
+                "duracion_s": round((fin - inicio).total_seconds(), 1) if inicio else 0.0,
+            },
             "parametros": {
                 "confianza": p.conf, "iou_nms": p.iou_nms, "iou_tp": p.iou_tp,
                 "imgsz": p.imgsz, "device": p.device, "um_por_px": p.um_per_px,
@@ -300,12 +337,21 @@ class DetectorRunner(QThread):
             con_gt = [r for r in rs if r.has_gt]
             tp = sum(r.tp for r in con_gt); fp = sum(r.fp for r in con_gt)
             fn = sum(r.fn for r in con_gt); mc = sum(r.miscls for r in con_gt)
+            reg = ejecucion.get(slot.alias, {})
             datos["modelos"].append({
                 "alias": slot.alias,
                 "peso": str(slot.path) if slot.path else "",
+                # Dos best.pt de dos entrenamientos distintos se llaman igual;
+                # la huella es lo unico que los distingue de verdad.
+                "sha256": sha256_archivo(slot.path) if slot.path else "",
                 "detecciones": sum(len(r.predictions) for r in rs),
                 "imagenes_con_gt": len(con_gt),
                 "tp": tp, "fp": fp, "fn": fn, "mal_clasificados": mc,
+                "imgsz_usados": sorted(reg.get("imgsz_usados", ())),
+                "imagenes_troceadas": reg.get("troceadas", 0),
+                # Si esta lista no viene vacia, esas fotos se infirieron a menos
+                # resolucion que la pedida porque la GPU se quedo sin memoria.
+                "fallback_por_memoria": reg.get("fallback_en", []),
             })
             # classes.txt junto a los labels, para poder reabrirlos como
             # pre-anotacion en el Etiquetador sin adivinar el orden de clases.
