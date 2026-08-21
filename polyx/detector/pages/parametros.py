@@ -4,7 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QDoubleSpinBox, QSpinBox,
-    QLineEdit, QFrame, QPushButton, QMessageBox, QComboBox,
+    QLineEdit, QFrame, QPushButton, QMessageBox, QComboBox, QCheckBox,
 )
 
 from ._base import DetectorPage
@@ -232,14 +232,44 @@ class ParametrosPage(DetectorPage):
         g3.setHorizontalSpacing(24); g3.setVerticalSpacing(10)
         g3.addWidget(QLabel(tr("μm por píxel:")), 0, 0)
         self.sb_umpx = QDoubleSpinBox()
-        self.sb_umpx.setRange(0.0, 10.0); self.sb_umpx.setSingleStep(0.01)
+        # Hasta 1000 y no 10: las placas de este estudio van de 31 a 49 µm/px, de
+        # modo que el tope anterior recortaba en silencio la calibracion real y
+        # dejaba el valor en 10 sin avisar de nada.
+        self.sb_umpx.setRange(0.0, 1000.0); self.sb_umpx.setSingleStep(0.01)
         self.sb_umpx.setDecimals(4); self.sb_umpx.setValue(state.params.um_per_px)
         self.sb_umpx.valueChanged.connect(self._on_change)
         g3.addWidget(self.sb_umpx, 0, 1)
         g3.addWidget(_hint(
-            tr("0 = sin medición. Ej: objetivo 40× y CMOS calibrado → ~0.244 μm/px.")
+            tr("Respaldo: se usa solo si no se puede medir la placa. 0 = sin medición.")
         ), 0, 2)
         l3.addLayout(g3)
+
+        # ── Calibración automática contra la placa ──
+        self.chk_placa = QCheckBox(
+            tr("Medir la placa en cada foto y usar su escala (recomendado)"))
+        self.chk_placa.setChecked(state.params.medir_placa)
+        self.chk_placa.setStyleSheet(f"color: {T.INK2}; border: none;")
+        self.chk_placa.toggled.connect(self._on_change)
+        l3.addWidget(self.chk_placa)
+
+        g4 = QGridLayout()
+        g4.setHorizontalSpacing(24); g4.setVerticalSpacing(10)
+        g4.addWidget(QLabel(tr("Diámetro real de la placa (mm):")), 0, 0)
+        self.sb_placa_mm = QDoubleSpinBox()
+        self.sb_placa_mm.setRange(1.0, 1000.0); self.sb_placa_mm.setDecimals(2)
+        self.sb_placa_mm.setValue(state.params.diametro_placa_mm)
+        self.sb_placa_mm.valueChanged.connect(self._on_change)
+        g4.addWidget(self.sb_placa_mm, 0, 1)
+        g4.addWidget(_hint(tr("Diámetro externo nominal. La placa Petri del estudio mide 100 mm.")),
+                     0, 2)
+        l3.addLayout(g4)
+
+        l3.addWidget(_hint(tr(
+            "No hay que marcar nada: el borde de la placa se encuentra solo. El radio se "
+            "obtiene ajustando un círculo al anillo muestreado en 720 direcciones, con "
+            "rechazo de atípicos; Hough solo aporta el centro aproximado porque su radio "
+            "llega a errar un 12 %. En los recortes la placa no aparece, así que ahí la "
+            "escala se hereda del índice de calibración que dejó el recorte.")))
         l3.addWidget(_hint(
             tr("El detector calcula área y diámetro equivalente (de círculo con misma área) "
             "para cada partícula detectada. Si hay calibración, también en μm y μm².")
@@ -335,6 +365,8 @@ class ParametrosPage(DetectorPage):
         p.imgsz = int(self.sb_imgsz.value())
         p.device = self.ed_device.text().strip() or "0"
         p.um_per_px = float(self.sb_umpx.value())
+        p.medir_placa = self.chk_placa.isChecked()
+        p.diametro_placa_mm = float(self.sb_placa_mm.value())
         p.size_min_um = float(self.sb_min.value())
         p.size_max_um = float(self.sb_max.value())
         p.troceo = self.combo_troceo.currentData() or "auto"

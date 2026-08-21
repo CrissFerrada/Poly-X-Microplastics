@@ -32,9 +32,20 @@ class InferenceParams:
     # Coincide con el perfil «Rápido» de la página de Parámetros.
     imgsz: int = 1280
     device: str = "0"               # "0", "cpu", ...
-    um_per_px: float = 0.0          # 0 = no hay calibración
+    um_per_px: float = 0.0          # 0 = no hay calibración; respaldo manual
     size_min_um: float = 0.0        # 0 = sin filtro inferior
     size_max_um: float = 0.0        # 0 = sin filtro superior
+    # ── Calibración automática contra la placa Petri ──
+    # Con esto activo cada foto obtiene SU escala midiendo el anillo de la placa,
+    # sin marcar nada a mano. Importa porque la distancia de disparo varía entre
+    # tomas: en este material la escala va de 31 a 49 µm/px, un factor 1.5, y un
+    # valor único para todo el lote daría tamaños con hasta 50 % de error.
+    medir_placa: bool = False
+    diametro_placa_mm: float = 100.0
+    # CSV que asocia nombre de imagen con µm/px ya calibrado. Es la única vía
+    # para los recortes, donde el borde de la placa no aparece y por tanto no se
+    # puede volver a medir: la escala se hereda de la foto de la que salieron.
+    indice_calibracion: str = ""
     # ── Troceado automático ──
     # "auto" trocea sola la foto cuyo lado mayor pase de troceo_umbral_px, infiere
     # cada tile a resolución nativa y fusiona con NMS global. El umbral va a 2000
@@ -132,6 +143,10 @@ class DetectorState(QObject):
         self.params = InferenceParams()
         # results[model_idx] -> List[ImageResult]
         self.results: Dict[int, List[ImageResult]] = {}
+        # Escala de cada imagen y de donde salio, por nombre de archivo. La
+        # llena el runner; el informe la reporta. Sin esto los tamanos en um
+        # aparecerian sin decir contra que patron se midieron.
+        self.calibraciones: Dict[str, object] = {}
         # run timestamp/folder
         self.run_dir: Optional[Path] = None
         self._running = False
@@ -164,4 +179,5 @@ class DetectorState(QObject):
 
     def reset_results(self):
         self.results = {}
+        self.calibraciones = {}
         self.run_dir = None

@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 from ._base import DetectorPage
 from ...core import theme as T
 from ...core import pdf_export
-from ...core.report_html import generate_report
+from ...core.report_html import generate_report, SECCIONES, PRESETS
 from ...core.i18n import tr
 
 
@@ -44,16 +44,8 @@ class ReportePage(DetectorPage):
         info.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         l1.addWidget(info)
 
-        # Opciones
-        self.chk_refs = QCheckBox(tr("Incluir referencias bibliográficas del autor en el reporte"))
-        self.chk_refs.setChecked(True)
-        self.chk_refs.setStyleSheet(f"color: {T.INK2}; border: none;")
-        l1.addWidget(self.chk_refs)
-
-        self.chk_gallery = QCheckBox(tr("Incluir galería comparativa (Predicción vs Ground Truth)"))
-        self.chk_gallery.setChecked(True)
-        self.chk_gallery.setStyleSheet(f"color: {T.INK2}; border: none;")
-        l1.addWidget(self.chk_gallery)
+        # ── Qué secciones entran ──
+        self.body.addWidget(self._card_secciones())
 
         # ── Alcance del informe ──
         self.body.addWidget(self._card_alcance())
@@ -385,12 +377,64 @@ class ReportePage(DetectorPage):
             return False
         return True
 
+    def _card_secciones(self):
+        """Casillas para elegir qué secciones entran en el informe.
+
+        Se dibujan leyendo ``SECCIONES`` del generador, no una lista repetida
+        aquí: si mañana se añade una sección al informe aparece sola su casilla,
+        y no puede quedar una sección imposible de desmarcar.
+        """
+        c, l = self.card(tr("Qué incluir en el informe"), "🧾")
+        ayuda = QLabel(tr(
+            "El informe completo es largo. Desmarca lo que no necesites: las secciones "
+            "se renumeran solas y el índice se ajusta. Una sección marcada que no tenga "
+            "datos —errores sin ground truth, por ejemplo— se omite igualmente."))
+        ayuda.setWordWrap(True)
+        ayuda.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l.addWidget(ayuda)
+
+        fila = QHBoxLayout()
+        fila.setSpacing(8)
+        for clave, etiqueta in (("completo", tr("Completo")),
+                                ("resumen", tr("Resumen breve")),
+                                ("metodologico", tr("Metodológico"))):
+            b = QPushButton(etiqueta)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setStyleSheet(
+                f"background: white; color: {T.INK2}; border: 1px solid #d0d7de; "
+                f"border-radius: 6px; padding: 5px 12px;")
+            b.clicked.connect(lambda _=False, k=clave: self._aplicar_preset(k))
+            fila.addWidget(b)
+        fila.addStretch(1)
+        l.addLayout(fila)
+
+        self.chk_secciones = {}
+        for sid, titulo in SECCIONES:
+            chk = QCheckBox(titulo)
+            chk.setChecked(True)
+            chk.setStyleSheet(f"color: {T.INK2}; border: none;")
+            l.addWidget(chk)
+            self.chk_secciones[sid] = chk
+
+        # La galería es lo que hace que el archivo pese: cada foto va embebida en
+        # base64 dentro del propio HTML.
+        self.chk_secciones["galeria"].setText(
+            tr("Galería por imagen  (es lo que más pesa)"))
+        return c
+
+    def _aplicar_preset(self, clave: str):
+        elegidas = set(PRESETS.get(clave, []))
+        for sid, chk in self.chk_secciones.items():
+            chk.setChecked(sid in elegidas)
+
+    def _secciones_marcadas(self) -> list:
+        return [sid for sid, chk in self.chk_secciones.items() if chk.isChecked()]
+
     def _write_html(self, out_path: Path, solo_imagenes=None) -> Path:
         """Genera el HTML autocontenido (imágenes en base64) en `out_path`."""
         generate_report(
             self.state, out_path,
-            include_refs=self.chk_refs.isChecked(),
-            include_gallery=self.chk_gallery.isChecked(),
+            secciones=self._secciones_marcadas(),
             solo_imagenes=solo_imagenes,
         )
         return out_path

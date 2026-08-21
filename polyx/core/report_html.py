@@ -332,7 +332,7 @@ def _entrenamiento_de(peso: Path) -> Optional[Dict]:
 def _seccion_equipo(active) -> str:
     """Tabla de componentes y de como se entreno cada modelo cargado."""
     filas_eq = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in _equipo())
-    html = ("<h3>2.1 Equipo de cómputo</h3>"
+    html = ("<h3>@@N@@.1 Equipo de cómputo</h3>"
             f"<table class='data'><tr><th>Componente</th><th>Detalle</th></tr>"
             f"{filas_eq}</table>")
 
@@ -359,7 +359,7 @@ def _seccion_equipo(active) -> str:
             f"<td class='r'>{_n(i['map50'])}</td><td class='r'>{_n(i['map'])}</td></tr>")
 
     html += (
-        "<h3>2.2 Entrenamiento de cada modelo</h3>"
+        "<h3>@@N@@.2 Entrenamiento de cada modelo</h3>"
         "<p>Configuración y métricas de validación con que se entrenó cada peso, "
         "leídas del propio archivo <code>.pt</code>.</p>"
         "<table class='data'>"
@@ -730,7 +730,7 @@ def _seccion_conteo(resultados: Dict[int, list], state, active,
                             f"<span style='font-size:8.5pt;color:var(--ink3)'>"
                             f"({len(lista)} {palabra})</span>",
                             man, det))
-        tabla_tramo = ("<h3>8.2 Por tramo de profundidad</h3>"
+        tabla_tramo = ("<h3>@@N@@.2 Por tramo de profundidad</h3>"
                        "<p>Las placas del mismo tramo se <strong>suman</strong>: son "
                        "submuestras de la misma masa de sedimento, no repeticiones "
                        "fotográficas. El tramo es la unidad de análisis.</p>"
@@ -740,7 +740,7 @@ def _seccion_conteo(resultados: Dict[int, list], state, active,
         for estacion in sorted(por_estacion, key=_orden_est):
             man, det = _sumar(por_estacion[estacion])
             filas_e.append((estacion, man, det))
-        tabla_estacion = ("<h3>8.3 Por estación</h3>"
+        tabla_estacion = ("<h3>@@N@@.3 Por estación</h3>"
                           + _tabla_ancha(filas_e, clases, "Estación", hay_manual,
                                          totales=False))
 
@@ -753,7 +753,7 @@ def _seccion_conteo(resultados: Dict[int, list], state, active,
 
     coletilla = ", el primer modelo activo." if len(active) > 1 else "."
     intro = (
-        "<h2 id='conteo'>8. Conteo por muestra y tipo de pl&aacute;stico</h2>"
+        ""
         "<p>Part&iacute;culas contadas en cada muestra, desglosadas por pol&iacute;mero. "
         "La columna <em>manual</em> es la anotaci&oacute;n humana (Ground Truth) y la "
         "columna <em>modelo</em> son todas las detecciones de "
@@ -763,17 +763,57 @@ def _seccion_conteo(resultados: Dict[int, list], state, active,
         "cu&aacute;ntas part&iacute;culas de cada pol&iacute;mero report&oacute;. "
         "Coincidir en el total no implica haber acertado part&iacute;cula por "
         "part&iacute;cula; para eso est&aacute; el an&aacute;lisis de errores.</p>"
-        "<h3>8.1 Por imagen</h3>"
+        "<h3>@@N@@.1 Por imagen</h3>"
     )
     return intro + tabla_img + nota_agrupacion + tabla_tramo + tabla_estacion
 
 
 # ────────────────────────────────────────────────────────────────────
+# ── Secciones del informe ────────────────────────────────────────────────────
+# El orden de esta lista es el orden del informe, y la numeracion sale de aqui:
+# si se desmarca una seccion las siguientes se renumeran solas, en vez de dejar
+# un hueco ("4, 6, 7") que en un documento entregable se lee como un error.
+#
+# Anadir una seccion nueva es anadir una tupla: la interfaz dibuja sus casillas
+# leyendo esta lista, de modo que no hay una segunda lista que mantener en
+# sincronia.
+SECCIONES = [
+    ("resumen",     "Resumen"),
+    ("metodos",     "Métodos"),
+    ("calibracion", "Calibración de escala"),
+    ("resultados",  "Resultados generales"),
+    ("modelos",     "Resumen por modelo"),
+    ("errores",     "Análisis de errores"),
+    ("comparacion", "Comparación entre modelos"),
+    ("galeria",     "Galería por imagen"),
+    ("conteo",      "Conteo por muestra y tipo de plástico"),
+    ("referencias", "Referencias bibliográficas"),
+]
+
+IDS_SECCIONES = [s[0] for s in SECCIONES]
+
+# Combinaciones de uso frecuente. Existen porque el problema real no era que no
+# se pudiera elegir, sino que elegir diez casillas una por una es tedioso y
+# nadie lo hace: con un preset el informe corto queda a un clic.
+PRESETS = {
+    "completo": IDS_SECCIONES,
+    "resumen": ["resumen", "calibracion", "conteo", "galeria"],
+    "metodologico": ["resumen", "metodos", "calibracion", "modelos",
+                     "errores", "comparacion", "referencias"],
+}
+
+# Marca que se sustituye por el numero definitivo de la seccion al ensamblar.
+# Los numeros no se pueden escribir a mano en los titulos porque dependen de que
+# otras secciones se hayan pedido.
+NUM = "@@N@@"
+
+
 def generate_report(state, output_path: Path,
                     include_refs: bool = True,
                     include_gallery: bool = True,
                     max_gallery: int = 60,
-                    solo_imagenes=None) -> Path:
+                    solo_imagenes=None,
+                    secciones=None) -> Path:
     """Genera el reporte HTML. `state` es un DetectorState con resultados.
 
     ``max_gallery`` limita cuántas imágenes se incrustan en la galería. Las
@@ -785,7 +825,19 @@ def generate_report(state, output_path: Path,
     los totales, los gráficos y la matriz de confusión describan exactamente el
     mismo subconjunto que se muestra; si se filtrara solo la galería, las cifras
     de arriba hablarían de un lote y las imágenes de otro.
+
+    ``secciones`` es el conjunto de identificadores de :data:`SECCIONES` que se
+    quieren incluir; ``None`` las incluye todas. Una sección pedida que no tenga
+    contenido -- errores sin ground truth, por ejemplo -- se omite igualmente:
+    marcarla no inventa datos que no existen.
     """
+    pedidas = set(IDS_SECCIONES if secciones is None else secciones)
+    # Las dos casillas antiguas siguen mandando si se pasan en False, para no
+    # cambiar el significado de las llamadas que ya existian.
+    if not include_refs:
+        pedidas.discard("referencias")
+    if not include_gallery:
+        pedidas.discard("galeria")
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -857,11 +909,11 @@ def generate_report(state, output_path: Path,
                 f"que informar. El modelo sí está entrenado para esa clase.</p>")
 
         err_section = f"""
-        <h2 id='errors'>5. Análisis de errores</h2>
-        <h3>5.1 Matriz de confusión</h3>
+        
+        <h3>@@N@@.1 Matriz de confusión</h3>
         <div class='fig'><img src='data:image/png;base64,{cm_img}' />
             <div class='caption'>Figura. Matriz de confusión (modelo principal: {active[0].alias}, IoU = {state.params.iou_tp}).</div></div>
-        <h3>5.2 Precisión / Recall / F1 por clase</h3>
+        <h3>@@N@@.2 Precisión / Recall / F1 por clase</h3>
         <table class='data'><tr><th>Clase</th><th>{LABEL_TP}</th><th>{LABEL_FP}</th><th>{LABEL_FN}</th>
         <th>Precisión</th><th>Recall</th><th>F1</th></tr>{rows}</table>
         {nota_ausentes}
@@ -1206,7 +1258,7 @@ def generate_report(state, output_path: Path,
                         f"archivo siga siendo manejable. Las métricas de las "
                         f"secciones anteriores sí incluyen todas.</p>")
             gallery_html = (
-                "<h2 id='gallery'>7. Galería comparativa: Predicción vs Ground Truth</h2>"
+                ""
                 "<p>Cada bloque muestra, a la izquierda, las detecciones del modelo "
                 "(<em>bounding boxes</em> dibujadas por YOLO con su clase y confianza) y, a la "
                 "derecha, las etiquetas reales de control (<em>Ground Truth</em>). Esta vista "
@@ -1272,7 +1324,7 @@ def generate_report(state, output_path: Path,
     refs_html = ""
     if include_refs:
         refs_html = """
-        <h2 id='refs'>9. Referencias bibliográficas</h2>
+        
         <ol>
           <li>Pérez M, Parra S, Ferrada C, Bravo M, Pérez PA, Quiroz W (2024).
               Development of a new methodology for the determination of PET microplastics in sediment,
@@ -1287,7 +1339,108 @@ def generate_report(state, output_path: Path,
         </ol>
         """
 
+    # ── Calibración de escala ──
+    # Se reporta la procedencia, no solo el número: un tamaño en µm sin decir
+    # contra qué patrón se midió no es verificable. Si no hay calibración la
+    # sección no se emite, en vez de mostrar un "—" que parece un dato.
+    calib_html = ""
+    cals = getattr(state, "calibraciones", None) or {}
+    if cals:
+        from .calibracion import resumen_lote, ORIGEN_PLACA
+        res = resumen_lote(list(cals.values()))
+        if res["n"]:
+            etiqueta = {"placa": "medida sobre la placa Petri de esta foto",
+                        "indice": "heredada del recorte (índice de calibración)",
+                        "manual": "introducida a mano en Parámetros"}
+            filas = "".join(
+                f"<tr><td>{etiqueta.get(o, o)}</td><td>{k} imagen{'es' if k != 1 else ''}</td></tr>"
+                for o, k in sorted(res["origenes"].items()))
+            aviso = ""
+            if res["variacion"] > 1.05:
+                aviso = (f"<p><strong>La escala no es común a todo el lote:</strong> varía "
+                         f"{res['variacion']:.2f}× entre la foto más cercana y la más lejana. "
+                         f"Por eso cada imagen se convierte con su propio factor; usar uno "
+                         f"solo para todas daría tamaños con hasta un "
+                         f"{100 * (res['variacion'] - 1):.0f}% de error.</p>")
+            calib_html = f"""
+<table class='data'><tr><th>Procedencia de la escala</th><th>Imágenes</th></tr>{filas}</table>
+<table class='data'>
+<tr><th>µm por píxel</th><th>Valor</th></tr>
+<tr><td>mínimo</td><td>{res['min']:.4f}</td></tr>
+<tr><td>mediana</td><td>{res['mediana']:.4f}</td></tr>
+<tr><td>máximo</td><td>{res['max']:.4f}</td></tr>
+</table>
+{aviso}
+<p>El patrón de longitud es el diámetro externo nominal de la placa Petri. El radio
+en píxeles se obtiene ajustando un círculo por mínimos cuadrados al borde del anillo
+muestreado en 720 direcciones, con rechazo de atípicos; la transformada de Hough solo
+aporta el centro aproximado, porque su radio llega a errar un 12&nbsp;% y ese error
+entraría entero en todos los tamaños reportados.</p>"""
+            if res["avisos"]:
+                items = "".join(f"<li>{a}</li>" for a in res["avisos"][:12] if a)
+                if items:
+                    calib_html += f"<p>Incidencias durante la calibración:</p><ul>{items}</ul>"
+    elif p.um_per_px > 0:
+        calib_html = (
+            f"<p>Escala única para todo el lote, introducida a mano: "
+            f"<strong>{p.um_per_px:g} µm/píxel</strong>. No se midió ninguna placa, "
+            f"de modo que este factor no está trazado a un patrón de longitud y "
+            f"cualquier variación en la distancia de disparo entre fotos queda sin "
+            f"corregir.</p>")
+
     # ── Ensamblar HTML ──
+    # Cada bloque es (id, cuerpo). El cuerpo NO lleva su <h2>: el titulo y el
+    # numero los pone el ensamblador, que es el unico que sabe que secciones
+    # sobrevivieron al filtro y por tanto que numero le toca a cada una.
+    cuerpos = {
+        "resumen": f"""
+<div class='kpis'>
+  <div class='kpi'><div class='l'>Imágenes</div><div class='v'>{total_imgs}</div><div class='b' style='background:var(--accent)'></div></div>
+  <div class='kpi'><div class='l'>Detecciones</div><div class='v'>{total_dets}</div><div class='b' style='background:var(--accent)'></div></div>
+  <div class='kpi'><div class='l'>Conf. media</div><div class='v'>{avg_conf:.3f}</div><div class='b' style='background:var(--vio)'></div></div>
+  <div class='kpi'><div class='l'>Tamaño medio (μm)</div><div class='v'>{(f"{avg_size:.1f}" if avg_size else "—")}</div><div class='b' style='background:var(--warn)'></div></div>
+</div>
+<p>Se analizaron <strong>{total_imgs} imágenes</strong> con
+<strong>{len(active)} modelo{'s' if len(active)!=1 else ''}</strong> YOLO entrenado para detectar
+microplásticos de PET, PP y LDPE bajo fluorescencia Nile Red (254 nm). El total de detecciones
+fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.3f}</strong>.
+{"Se incluyó análisis de errores con Ground Truth (Verdaderos Positivos, Falsos Positivos, Falsos Negativos y Mal Clasificados)." if any_gt else "No se aportó Ground Truth, por lo que no se reportan métricas de error."}
+</p>""",
+        "metodos": f"""
+<table class='data'><tr><th>Parámetro</th><th>Valor</th></tr>{methods_html}</table>
+{equipo_html}
+{methods_para}""",
+        "calibracion": calib_html,
+        "resultados": figures_html,
+        "modelos": f"""
+<table class='data'><tr><th>Modelo</th><th>Imágenes</th><th>Detecciones</th>
+<th>Conf. media</th><th>{LABEL_TP}</th><th>{LABEL_FP}</th><th>{LABEL_FN}</th>
+<th>{LABEL_MISCLS}</th><th>F1<br><span style='font-weight:400;font-size:8.5pt'>localización</span></th>
+<th>F1<br><span style='font-weight:400;font-size:8.5pt'>con clase</span></th></tr>{rows_models}</table>
+{nota_miscls}""",
+        "errores": err_section,
+        "comparacion": f"{veredicto_html}\n{compare_html}",
+        "galeria": gallery_html,
+        "conteo": conteo_html,
+        "referencias": refs_html,
+    }
+
+    # Un id en ``pedidas`` con cuerpo vacio se cae aqui: se marco la casilla pero
+    # no habia con que llenarla (errores sin ground truth, conteo sin muestras).
+    ancla = {"resumen": "abstract", "metodos": "methods", "calibracion": "calib",
+             "resultados": "results", "modelos": "models", "errores": "errors",
+             "comparacion": "compare", "galeria": "gallery", "conteo": "conteo",
+             "referencias": "refs"}
+    vivas = [(sid, titulo, cuerpos.get(sid, ""))
+             for sid, titulo in SECCIONES
+             if sid in pedidas and (cuerpos.get(sid) or "").strip()]
+
+    toc_html = "".join(
+        f"<li><a href='#{ancla[sid]}'>{titulo}</a></li>" for sid, titulo, _ in vivas)
+    secciones_html = "".join(
+        f"<h2 id='{ancla[sid]}'>{i}. {titulo}</h2>\n{cuerpo.replace(NUM, str(i))}\n"
+        for i, (sid, titulo, cuerpo) in enumerate(vivas, start=1))
+
     html = f"""<!doctype html>
 <html lang='es'><head><meta charset='utf-8'>
 <title>Informe de detección · Poly-X</title>
@@ -1303,60 +1456,10 @@ def generate_report(state, output_path: Path,
 
 <div class='toc'>
   <h3>📑 Índice</h3>
-  <ol>
-    <li><a href='#abstract'>Resumen</a></li>
-    <li><a href='#methods'>Métodos</a></li>
-    <li><a href='#results'>Resultados generales</a></li>
-    <li><a href='#models'>Resumen por modelo</a></li>
-    {"<li><a href='#errors'>Análisis de errores</a></li>" if any_gt else ""}
-    <li><a href='#compare'>Comparación entre modelos</a></li>
-    {"<li><a href='#gallery'>Galería por imagen</a></li>" if gallery_html else ""}
-    {"<li><a href='#conteo'>Conteo por muestra y tipo de plástico</a></li>" if conteo_html else ""}
-    {"<li><a href='#refs'>Referencias</a></li>" if include_refs else ""}
-  </ol>
+  <ol>{toc_html}</ol>
 </div>
 
-<h2 id='abstract'>1. Resumen</h2>
-<div class='kpis'>
-  <div class='kpi'><div class='l'>Imágenes</div><div class='v'>{total_imgs}</div><div class='b' style='background:var(--accent)'></div></div>
-  <div class='kpi'><div class='l'>Detecciones</div><div class='v'>{total_dets}</div><div class='b' style='background:var(--accent)'></div></div>
-  <div class='kpi'><div class='l'>Conf. media</div><div class='v'>{avg_conf:.3f}</div><div class='b' style='background:var(--vio)'></div></div>
-  <div class='kpi'><div class='l'>Tamaño medio (μm)</div><div class='v'>{(f"{avg_size:.1f}" if avg_size else "—")}</div><div class='b' style='background:var(--warn)'></div></div>
-</div>
-<p>Se analizaron <strong>{total_imgs} imágenes</strong> con
-<strong>{len(active)} modelo{'s' if len(active)!=1 else ''}</strong> YOLO entrenado para detectar
-microplásticos de PET, PP y LDPE bajo fluorescencia Nile Red (254 nm). El total de detecciones
-fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.3f}</strong>.
-{"Se incluyó análisis de errores con Ground Truth (Verdaderos Positivos, Falsos Positivos, Falsos Negativos y Mal Clasificados)." if any_gt else "No se aportó Ground Truth, por lo que no se reportan métricas de error."}
-</p>
-
-<h2 id='methods'>2. Métodos</h2>
-<table class='data'><tr><th>Parámetro</th><th>Valor</th></tr>{methods_html}</table>
-{equipo_html}
-{methods_para}
-
-<h2 id='results'>3. Resultados generales</h2>
-{figures_html}
-
-<h2 id='models'>4. Resumen por modelo</h2>
-<table class='data'><tr><th>Modelo</th><th>Imágenes</th><th>Detecciones</th>
-<th>Conf. media</th><th>{LABEL_TP}</th><th>{LABEL_FP}</th><th>{LABEL_FN}</th>
-<th>{LABEL_MISCLS}</th><th>F1<br><span style='font-weight:400;font-size:8.5pt'>localización</span></th>
-<th>F1<br><span style='font-weight:400;font-size:8.5pt'>con clase</span></th></tr>{rows_models}</table>
-{nota_miscls}
-
-{err_section}
-
-<h2 id='compare'>6. Comparación entre modelos</h2>
-{veredicto_html}
-{compare_html}
-
-{gallery_html}
-
-{conteo_html}
-
-{refs_html}
-
+{secciones_html}
 <footer>
   © Cristofher Ferrada · Generado por Poly-X<br>
   Suite de detección de microplásticos por fluorescencia Nile Red (254 nm) e IA (YOLO v8/v11).

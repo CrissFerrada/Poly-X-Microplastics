@@ -14,6 +14,8 @@ from ..core.yolo_wrap import (
 )
 from ..core.metrics import match_image
 from ..core.procedencia import procedencia, sha256_archivo
+from ..core.calibracion import (resolver, cargar_indice, buscar_indice,
+                                resumen_lote)
 from ..core import theme as T
 from .state import DetectorState, ImageResult
 
@@ -101,6 +103,14 @@ class DetectorRunner(QThread):
             # Sin registrarlo, el informe declara una resolucion que quiza no
             # fue la que produjo esas cajas.
             ejecucion: dict[str, dict] = {}
+
+            # La escala se resuelve por imagen, no una vez para el lote. El
+            # indice se lee una sola vez: son 552 filas y releerlo por foto seria
+            # tirar tiempo.
+            indice = cargar_indice(params.indice_calibracion) if params.indice_calibracion else {}
+            if not indice and state.images:
+                indice = buscar_indice(state.images[0])
+            state.calibraciones = {}
             if not slots:
                 self.failed.emit("No hay modelos cargados.")
                 return
@@ -139,6 +149,16 @@ class DetectorRunner(QThread):
                     continue
                 H, W = img_bgr.shape[:2]
 
+                # Escala de ESTA foto. Se le pasa la imagen ya leida para no
+                # volver a decodificar 12 MP solo para medir el anillo.
+                cal = resolver(img_path, indice=indice,
+                               um_por_px_manual=params.um_per_px,
+                               diametro_mm=params.diametro_placa_mm,
+                               medir_placa=params.medir_placa,
+                               bgr=img_bgr)
+                state.calibraciones[img_path.name] = cal
+                um_px = cal.um_por_px if cal.valida else None
+
                 # Cargar GT si existe (usa nombres del primer modelo si está disponible)
                 names_first = slots[0].loaded.names if slots[0].loaded else {}
                 gt_txt = find_gt_for_image(img_path, state.gt_folder)
@@ -147,7 +167,7 @@ class DetectorRunner(QThread):
                     gts = read_yolo_txt(gt_txt, W, H, names_first)
                     # El tamaño del GT no depende del modelo → se calcula una vez
                     for d in gts:
-                        compute_box_size_um(d, params.um_per_px if params.um_per_px > 0 else None)
+                        compute_box_size_um(d, um_px)
 
                 for mi_idx, slot in enumerate(slots):
                     # mi_idx es el orden dentro de active_models()
@@ -199,10 +219,10 @@ class DetectorRunner(QThread):
 
                     # Calcular tamaño de las predicciones (el GT ya se calculó arriba)
                     for d in preds:
-                        compute_box_size_um(d, params.um_per_px if params.um_per_px > 0 else None)
+                        compute_box_size_um(d, um_px)
 
                     # Filtro por tamaño
-                    if params.um_per_px > 0 and (params.size_min_um > 0 or params.size_max_um > 0):
+                    if um_px and (params.size_min_um > 0 or params.size_max_um > 0):
                         keep = []
                         for d in preds:
                             if d.diam_um is None:
@@ -328,6 +348,9 @@ class DetectorRunner(QThread):
                 "imgsz": p.imgsz, "device": p.device, "um_por_px": p.um_per_px,
                 "troceo": p.troceo, "troceo_umbral_px": p.troceo_umbral_px,
             },
+            # Contra que patron se midieron los tamanos. Un valor en um sin esto
+            # no se puede verificar ni reproducir.
+            "calibracion": resumen_lote(list(getattr(state, "calibraciones", {}).values())),
             "imagenes": len(state.images),
             "modelos": [],
         }

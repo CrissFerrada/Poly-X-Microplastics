@@ -35,6 +35,20 @@ def _mismas_cajas(a, b, tol: float = 0.5) -> bool:
     return True
 
 
+def _um_px_de(state, ruta, params):
+    """Escala de esa imagen segun la corrida, con el valor manual de respaldo.
+
+    Se lee de ``state.calibraciones`` y no de ``params.um_per_px`` porque la
+    escala es por foto: releer el GT no puede recalcular los tamanos con un
+    factor distinto del que uso la corrida, o el informe diria una cosa y las
+    cajas otra.
+    """
+    cal = (getattr(state, "calibraciones", None) or {}).get(Path(ruta).name)
+    if cal is not None and getattr(cal, "valida", False):
+        return cal.um_por_px
+    return params.um_per_px if params.um_per_px > 0 else None
+
+
 def recargar_gt(state, progreso=None) -> dict:
     """Relee el GT de cada imagen y recalcula metricas e imagenes anotadas.
 
@@ -89,7 +103,7 @@ def recargar_gt(state, progreso=None) -> dict:
             gts = read_yolo_txt(gt_txt, W, H, nombres)
             for d in gts:
                 compute_box_size_um(
-                    d, params.um_per_px if params.um_per_px > 0 else None)
+                    d, _um_px_de(state, r.image_path, params))
 
         primero = grupo[0][1]
         if has_gt == primero.has_gt and _mismas_cajas(gts, primero.gt):
