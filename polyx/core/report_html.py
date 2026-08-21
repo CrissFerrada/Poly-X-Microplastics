@@ -583,6 +583,107 @@ def _fig_size_hist(sizes_um: List[float]) -> str:
     return _fig_to_b64(fig)
 
 
+def _fig_tallas_por_tramo(largos_por_clase: Dict[str, List[float]]) -> str:
+    """Histograma apilado de tallas, en tramos, con una barra por clase.
+
+    Apilado y no superpuesto: la pregunta que responde es "cuantas particulas
+    hay en cada tramo de talla y de que polimero son", y con barras superpuestas
+    la de delante tapa a la de atras.
+    """
+    todos = [v for vals in largos_por_clase.values() for v in vals]
+    if not todos:
+        return ""
+    a = np.array(todos, dtype=float)
+    # Tramos en escala logaritmica: las tallas se reparten entre decenas y
+    # miles de micrometros, y en escala lineal todo se amontona en la primera
+    # barra y la cola queda ilegible.
+    lo, hi = max(a.min(), 1.0), a.max()
+    bordes = np.logspace(np.log10(lo), np.log10(hi * 1.02), 13)
+
+    fig, ax = plt.subplots(figsize=(7.6, 3.4), dpi=140)
+    abajo = np.zeros(len(bordes) - 1)
+    centros = np.sqrt(bordes[:-1] * bordes[1:])
+    anchos = np.diff(bordes) * 0.86
+    for cls in _ORDEN_CLASES + [c for c in largos_por_clase if c not in _ORDEN_CLASES]:
+        vals = largos_por_clase.get(cls)
+        if not vals:
+            continue
+        cuenta, _ = np.histogram(np.array(vals, dtype=float), bins=bordes)
+        ax.bar(centros, cuenta, width=anchos, bottom=abajo, label=cls,
+               color=T.CLASS_COLOR_HEX.get(cls, "#8b949e"), edgecolor="white",
+               linewidth=0.6)
+        abajo += cuenta
+    ax.set_xscale("log")
+    ax.set_xlabel("talla (µm, dimensión mayor siguiendo la curva)")
+    ax.set_ylabel("partículas")
+    ax.legend(frameon=False, fontsize=8)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", alpha=0.25)
+    fig.tight_layout()
+    return _fig_to_b64(fig)
+
+
+def _ficha_particula(det, ruta_imagen, um_por_px: Optional[float],
+                     titulo: str) -> str:
+    """Recorte de una particula con su mascara y la cuenta de px a µm.
+
+    Se muestra la conversion completa -- pixeles medidos, escala de ESA foto y
+    resultado -- porque una talla en µm sin la cuenta que la produjo no se puede
+    comprobar, y esta es la particula que mas peso tiene en cualquier conclusion
+    sobre tamano maximo.
+    """
+    if det is None or not ruta_imagen:
+        return ""
+    try:
+        # cv2 se importa aqui y no arriba: este modulo lo hace asi en el resto de
+        # funciones para no cargar OpenCV cuando solo se pide texto.
+        import cv2
+        from .calibracion import leer_imagen
+        from .morfologia import segmentar
+        bgr = leer_imagen(ruta_imagen)
+        if bgr is None:
+            return ""
+        mg = int(max(12, 0.35 * min(det.x2 - det.x1, det.y2 - det.y1)))
+        x1 = max(0, int(det.x1) - mg); y1 = max(0, int(det.y1) - mg)
+        x2 = min(bgr.shape[1], int(det.x2) + mg); y2 = min(bgr.shape[0], int(det.y2) + mg)
+        sub = bgr[y1:y2, x1:x2].copy()
+        if sub.size == 0:
+            return ""
+        mascara = segmentar(bgr, det.x1, det.y1, det.x2, det.y2)
+        ov = sub.copy()
+        if mascara is not None:
+            h = min(ov.shape[0], mascara.shape[0]); w = min(ov.shape[1], mascara.shape[1])
+            # Contorno y no relleno: tapar la particula con verde impide juzgar
+            # si la mascara la sigue de verdad, que es justo lo que se enseña.
+            cont, _ = cv2.findContours(mascara[:h, :w], cv2.RETR_EXTERNAL,
+                                       cv2.CHAIN_APPROX_NONE)
+            cv2.drawContours(ov[:h, :w], cont, -1, (0, 255, 0),
+                             max(1, min(ov.shape[:2]) // 90))
+        par = np.hstack([sub, ov])
+        escala = min(4.0, 620 / max(1, par.shape[1]))
+        if escala > 1:
+            par = cv2.resize(par, None, fx=escala, fy=escala,
+                             interpolation=cv2.INTER_NEAREST)
+        ok, buf = cv2.imencode(".png", par)
+        if not ok:
+            return ""
+        img = f"<img src='{_img_b64(buf.tobytes())}' style='max-width:100%'>"
+    except Exception:
+        # Una particula que no se deja recortar no puede tumbar el informe
+        # entero: la ficha es ilustrativa y las tablas ya estan calculadas.
+        return ""
+
+    largo_px = (det.largo_um / um_por_px) if (det.largo_um and um_por_px) else None
+    cuenta = ""
+    if largo_px and um_por_px:
+        cuenta = (f"<p style='font-family:monospace;font-size:10pt'>"
+                  f"{largo_px:.1f} px &times; {um_por_px:.4f} µm/px = "
+                  f"<strong>{det.largo_um:.0f} µm</strong></p>")
+    return (f"<h3>{NUM}.{titulo}</h3>"
+            f"<p>A la izquierda la partícula; a la derecha, en verde, el contorno que se "
+            f"midió sobre ella.</p>{img}{cuenta}")
+
+
 def _fig_confusion_matrix(cm: np.ndarray, class_names: List[str]) -> str:
     labels = list(class_names) + ["background"]
     fig, ax = plt.subplots(figsize=(5.5, 4.8))
@@ -1395,35 +1496,94 @@ entraría entero en todos los tamaños reportados.</p>"""
     # variables que la literatura de microplasticos reporta y que la caja del
     # detector no puede dar.
     forma_html = ""
-    formas = [p_ for r in all_results for p_ in r.predictions
+    # Cada particula con su imagen de origen, para poder ir a buscarla luego.
+    formas = [(p_, r.image_path) for r in all_results for p_ in r.predictions
               if getattr(p_, "aspecto", None)]
-    # Las que cayeron al tamano de la caja: su talla no es comparable y hay que
-    # decirlo, no promediarla en silencio con las medidas sobre mascara.
     n_sin_forma = sum(1 for r in all_results for p_ in r.predictions
                       if getattr(p_, "aspecto", None) is None)
     if formas:
-        largos = [f.largo_um for f in formas if f.largo_um]
-        curvas = [f.curvatura for f in formas if f.curvatura]
-        fibras = sum(1 for f in formas if f.morfotipo == "fibra")
-        n_curvas = sum(1 for c in curvas if c >= 1.15)
-        filas_t = ""
-        if largos:
-            a = np.array(largos, dtype=float)
-            filas_t = (f"<tr><td>Largo (µm)</td><td>{np.percentile(a,10):.0f}</td>"
-                       f"<td>{np.median(a):.0f}</td><td>{np.percentile(a,90):.0f}</td></tr>")
-            anchos = [f.ancho_um for f in formas if f.ancho_um]
-            if anchos:
-                b = np.array(anchos, dtype=float)
-                filas_t += (f"<tr><td>Ancho (µm)</td><td>{np.percentile(b,10):.0f}</td>"
-                            f"<td>{np.median(b):.0f}</td><td>{np.percentile(b,90):.0f}</td></tr>")
+        con_talla = [(d, ruta) for d, ruta in formas if d.largo_um]
+        fibras = sum(1 for d, _ in formas if d.morfotipo == "fibra")
+        curvas = sum(1 for d, _ in formas if d.curvatura and d.curvatura >= 1.15)
         pc_f = 100.0 * fibras / len(formas)
-        pc_c = 100.0 * n_curvas / len(curvas) if curvas else 0.0
+
+        # ── Reparto por morfotipo ──
         forma_html = f"""
 <table class='data'><tr><th>Morfotipo</th><th>Partículas</th><th>%</th></tr>
 <tr><td>Fibra (relación de aspecto ≥ 3)</td><td>{fibras}</td><td>{pc_f:.1f} %</td></tr>
 <tr><td>Fragmento</td><td>{len(formas) - fibras}</td><td>{100 - pc_f:.1f} %</td></tr>
+</table>"""
+
+        if con_talla:
+            largos = np.array([d.largo_um for d, _ in con_talla], dtype=float)
+            mayor, ruta_mayor = max(con_talla, key=lambda t: t[0].largo_um)
+            menor, ruta_menor = min(con_talla, key=lambda t: t[0].largo_um)
+
+            def _num(v, dec=0):
+                """Celda con el valor, o una raya si esa magnitud no se midio."""
+                return f"{v:.{dec}f}" if v else "—"
+
+            def _fila(rotulo, d, ruta):
+                return (f"<tr><td><strong>{rotulo}</strong></td><td>{d.class_name}</td>"
+                        f"<td>{_num(d.largo_um)}</td><td>{_num(d.ancho_um)}</td>"
+                        f"<td>{_num(d.area_um2)}</td><td>{_num(d.aspecto, 1)}</td>"
+                        f"<td>{_num(d.curvatura, 2)}</td><td>{d.morfotipo or '—'}</td>"
+                        f"<td style='font-size:9pt'>{Path(ruta).name}</td></tr>")
+
+            forma_html += f"""
+<h3>{NUM}.1 Partícula mayor y menor</h3>
+<table class='data'>
+<tr><th></th><th>Clase</th><th>Largo<br>(µm)</th><th>Ancho<br>(µm)</th>
+<th>Área<br>(µm²)</th><th>Aspecto</th><th>Curvatura</th><th>Morfotipo</th><th>Imagen</th></tr>
+{_fila("Mayor", mayor, ruta_mayor)}
+{_fila("Menor", menor, ruta_menor)}
 </table>
-<table class='data'><tr><th>Dimensión</th><th>p10</th><th>mediana</th><th>p90</th></tr>{filas_t}</table>
+
+<h3>{NUM}.2 Distribución de tallas</h3>
+<table class='data'>
+<tr><th>Estadístico</th><th>Largo (µm)</th></tr>
+<tr><td>mínimo</td><td>{largos.min():.0f}</td></tr>
+<tr><td>percentil 10</td><td>{np.percentile(largos, 10):.0f}</td></tr>
+<tr><td>mediana</td><td>{np.median(largos):.0f}</td></tr>
+<tr><td>percentil 90</td><td>{np.percentile(largos, 90):.0f}</td></tr>
+<tr><td>máximo</td><td>{largos.max():.0f}</td></tr>
+</table>"""
+
+            # ── Tallas por tramo, apiladas por clase ──
+            por_clase: Dict[str, List[float]] = {}
+            for d, _ruta in con_talla:
+                por_clase.setdefault(d.class_name, []).append(d.largo_um)
+            fig = _fig_tallas_por_tramo(por_clase)
+            if fig:
+                forma_html += f"<img src='{fig}' style='max-width:100%'>"
+
+            # ── Tabla por clase, con su mayor ──
+            filas_cls = ""
+            for cls in _ORDEN_CLASES + [c for c in por_clase if c not in _ORDEN_CLASES]:
+                v = sorted(por_clase.get(cls, []))
+                if not v:
+                    continue
+                nf = sum(1 for d, _r in con_talla
+                         if d.class_name == cls and d.morfotipo == "fibra")
+                filas_cls += (f"<tr><td>{cls}</td><td>{len(v)}</td>"
+                              f"<td>{v[0]:.0f}</td><td>{v[len(v) // 2]:.0f}</td>"
+                              f"<td>{v[-1]:.0f}</td><td>{nf}</td></tr>")
+            if filas_cls:
+                forma_html += (
+                    f"<h3>{NUM}.3 Talla por tipo de plástico</h3>"
+                    f"<table class='data'><tr><th>Clase</th><th>n</th>"
+                    f"<th>menor<br>(µm)</th><th>mediana<br>(µm)</th>"
+                    f"<th>mayor<br>(µm)</th><th>Fibras</th></tr>{filas_cls}</table>")
+
+            # ── Ficha de la mayor: como se midio y la cuenta de px a µm ──
+            cal_mayor = (getattr(state, "calibraciones", {}) or {}).get(
+                Path(ruta_mayor).name)
+            um_mayor = cal_mayor.um_por_px if cal_mayor and cal_mayor.valida else None
+            forma_html += _ficha_particula(
+                mayor, ruta_mayor, um_mayor,
+                "4 La partícula mayor, y cómo se midió")
+
+        forma_html += f"""
 <p>Las magnitudes se miden sobre la <strong>máscara de cada partícula</strong>, no sobre su
 caja. La caja de una partícula alargada está casi vacía y depende de cómo haya caído: una
 fibra tumbada en diagonal tiene caja cuadrada, de modo que medir sobre la caja la reportaría
@@ -1433,9 +1593,9 @@ como fragmento y con una talla equivocada.</p>
 cambia ni su área ni su perímetro, así que este largo sigue la curva sin necesidad de
 modelarla. En partículas compactas el discriminante es negativo —no existe tal rectángulo— y
 entonces se informa la extensión recta.</p>
-<p><strong>{n_curvas} partículas ({pc_c:.1f} %) están curvadas</strong>, entendiendo por tal que
-su largo supera en más de un 15 % su extensión en línea recta. En ellas la distancia entre
-extremos subestima la talla, y es la razón por la que no se usa.</p>"""
+<p><strong>{curvas} partículas ({100.0 * curvas / len(formas):.1f} %) están curvadas</strong>,
+entendiendo por tal que su largo supera en más de un 15 % su extensión en línea recta. En
+ellas la distancia entre extremos subestima la talla, y es la razón por la que no se usa.</p>"""
         if n_sin_forma:
             forma_html += (
                 f"<p>En {n_sin_forma} partículas no se pudo separar la partícula del fondo; "

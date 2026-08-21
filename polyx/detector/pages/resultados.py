@@ -458,18 +458,34 @@ class ResultadosPage(DetectorPage):
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f)
+                # Se exporta la forma real ademas del diametro equivalente: para
+                # una fibra el diametro equivalente no es la magnitud que se
+                # reporta en la literatura, que es su largo.
                 w.writerow(["modelo", "imagen", "clase", "conf",
-                             "x1", "y1", "x2", "y2", "diam_um"])
+                            "x1", "y1", "x2", "y2",
+                            "um_por_px", "origen_escala",
+                            "largo_um", "ancho_um", "area_um2", "diam_um",
+                            "aspecto", "curvatura", "morfotipo"])
+                cals = getattr(self.state, "calibraciones", None) or {}
                 for mi, rs in self.state.results.items():
                     alias = self.state.model_slots[mi].alias
                     for r in rs:
+                        cal = cals.get(r.image_path.name)
+                        um = f"{cal.um_por_px:.4f}" if cal and cal.valida else ""
+                        origen = cal.origen if cal and cal.valida else ""
                         for p in r.predictions:
+                            def _n(v, dec=2):
+                                return f"{v:.{dec}f}" if v else ""
                             w.writerow([
                                 alias, r.image_path.name,
                                 p.class_name, f"{p.conf:.4f}",
                                 f"{p.x1:.1f}", f"{p.y1:.1f}",
                                 f"{p.x2:.1f}", f"{p.y2:.1f}",
-                                f"{p.diam_um:.2f}" if p.diam_um else "",
+                                um, origen,
+                                _n(p.largo_um, 1), _n(p.ancho_um, 1),
+                                _n(p.area_um2, 1), _n(p.diam_um),
+                                _n(p.aspecto), _n(p.curvatura),
+                                p.morfotipo or "",
                             ])
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
