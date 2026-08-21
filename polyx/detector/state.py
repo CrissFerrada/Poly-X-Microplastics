@@ -46,6 +46,11 @@ class InferenceParams:
     # para los recortes, donde el borde de la placa no aparece y por tanto no se
     # puede volver a medir: la escala se hereda de la foto de la que salieron.
     indice_calibracion: str = ""
+    # ── Forma de la partícula ──
+    # Segmenta dentro de cada caja para medir área, largo y ancho reales en vez
+    # de los de la caja. Sin esto el área sale 1.87x de más y una fibra en
+    # diagonal se reporta como fragmento. Cuesta ~0.2 ms por partícula.
+    medir_forma: bool = True
     # ── Troceado automático ──
     # "auto" trocea sola la foto cuyo lado mayor pase de troceo_umbral_px, infiere
     # cada tile a resolución nativa y fusiona con NMS global. El umbral va a 2000

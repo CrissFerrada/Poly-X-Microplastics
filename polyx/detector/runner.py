@@ -16,6 +16,7 @@ from ..core.metrics import match_image
 from ..core.procedencia import procedencia, sha256_archivo
 from ..core.calibracion import (resolver, cargar_indice, buscar_indice,
                                 resumen_lote)
+from ..core.morfologia import aplicar_a_deteccion
 from ..core import theme as T
 from .state import DetectorState, ImageResult
 
@@ -111,6 +112,10 @@ class DetectorRunner(QThread):
             if not indice and state.images:
                 indice = buscar_indice(state.images[0])
             state.calibraciones = {}
+            # Particulas que no se pudieron segmentar, por modelo. Va al
+            # resumen: una talla medida sobre la caja no es comparable con
+            # una medida sobre la mascara, y hay que poder decir cuantas son.
+            sin_forma: dict[str, int] = {}
             if not slots:
                 self.failed.emit("No hay modelos cargados.")
                 return
@@ -168,6 +173,8 @@ class DetectorRunner(QThread):
                     # El tamaño del GT no depende del modelo → se calcula una vez
                     for d in gts:
                         compute_box_size_um(d, um_px)
+                        if params.medir_forma:
+                            aplicar_a_deteccion(d, img_bgr, um_px)
 
                 for mi_idx, slot in enumerate(slots):
                     # mi_idx es el orden dentro de active_models()
@@ -219,7 +226,12 @@ class DetectorRunner(QThread):
 
                     # Calcular tamaño de las predicciones (el GT ya se calculó arriba)
                     for d in preds:
+                        # La caja primero, como respaldo: si la segmentación no
+                        # logra aislar la partícula es preferible una talla
+                        # aproximada -- y anotada como tal -- a perderla.
                         compute_box_size_um(d, um_px)
+                        if params.medir_forma and not aplicar_a_deteccion(d, img_bgr, um_px):
+                            sin_forma[slot.alias] = sin_forma.get(slot.alias, 0) + 1
 
                     # Filtro por tamaño
                     if um_px and (params.size_min_um > 0 or params.size_max_um > 0):
@@ -319,12 +331,13 @@ class DetectorRunner(QThread):
                     done += 1
                     self.progress.emit(done, total, img_path.name)
 
-            self._escribir_resumen(state, slots, inicio, ejecucion)
+            self._escribir_resumen(state, slots, inicio, ejecucion, sin_forma)
             self.finished_ok.emit()
         except Exception as e:
             self.failed.emit(f"{type(e).__name__}: {e}")
 
-    def _escribir_resumen(self, state, slots, inicio=None, ejecucion=None) -> None:
+    def _escribir_resumen(self, state, slots, inicio=None, ejecucion=None,
+                          sin_forma=None) -> None:
         """Deja el run autodescrito: procedencia, parametros y totales por modelo.
 
         Sin esto una carpeta de run son PNGs sueltos y no se puede saber con que
@@ -375,6 +388,7 @@ class DetectorRunner(QThread):
                 # Si esta lista no viene vacia, esas fotos se infirieron a menos
                 # resolucion que la pedida porque la GPU se quedo sin memoria.
                 "fallback_por_memoria": reg.get("fallback_en", []),
+                "particulas_sin_forma": (sin_forma or {}).get(slot.alias, 0),
             })
             # classes.txt junto a los labels, para poder reabrirlos como
             # pre-anotacion en el Etiquetador sin adivinar el orden de clases.

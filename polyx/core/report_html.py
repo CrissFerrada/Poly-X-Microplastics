@@ -781,6 +781,7 @@ SECCIONES = [
     ("resumen",     "Resumen"),
     ("metodos",     "Métodos"),
     ("calibracion", "Calibración de escala"),
+    ("forma",       "Forma y talla de las partículas"),
     ("resultados",  "Resultados generales"),
     ("modelos",     "Resumen por modelo"),
     ("errores",     "Análisis de errores"),
@@ -797,8 +798,8 @@ IDS_SECCIONES = [s[0] for s in SECCIONES]
 # nadie lo hace: con un preset el informe corto queda a un clic.
 PRESETS = {
     "completo": IDS_SECCIONES,
-    "resumen": ["resumen", "calibracion", "conteo", "galeria"],
-    "metodologico": ["resumen", "metodos", "calibracion", "modelos",
+    "resumen": ["resumen", "calibracion", "forma", "conteo", "galeria"],
+    "metodologico": ["resumen", "metodos", "calibracion", "forma", "modelos",
                      "errores", "comparacion", "referencias"],
 }
 
@@ -1388,6 +1389,58 @@ entraría entero en todos los tamaños reportados.</p>"""
             f"cualquier variación en la distancia de disparo entre fotos queda sin "
             f"corregir.</p>")
 
+    # ── Forma y talla ──
+    # Se separa de "Resultados" porque responde otra pregunta: no cuantas
+    # particulas hay, sino que forma tienen. El morfotipo y la curvatura son
+    # variables que la literatura de microplasticos reporta y que la caja del
+    # detector no puede dar.
+    forma_html = ""
+    formas = [p_ for r in all_results for p_ in r.predictions
+              if getattr(p_, "aspecto", None)]
+    # Las que cayeron al tamano de la caja: su talla no es comparable y hay que
+    # decirlo, no promediarla en silencio con las medidas sobre mascara.
+    n_sin_forma = sum(1 for r in all_results for p_ in r.predictions
+                      if getattr(p_, "aspecto", None) is None)
+    if formas:
+        largos = [f.largo_um for f in formas if f.largo_um]
+        curvas = [f.curvatura for f in formas if f.curvatura]
+        fibras = sum(1 for f in formas if f.morfotipo == "fibra")
+        n_curvas = sum(1 for c in curvas if c >= 1.15)
+        filas_t = ""
+        if largos:
+            a = np.array(largos, dtype=float)
+            filas_t = (f"<tr><td>Largo (µm)</td><td>{np.percentile(a,10):.0f}</td>"
+                       f"<td>{np.median(a):.0f}</td><td>{np.percentile(a,90):.0f}</td></tr>")
+            anchos = [f.ancho_um for f in formas if f.ancho_um]
+            if anchos:
+                b = np.array(anchos, dtype=float)
+                filas_t += (f"<tr><td>Ancho (µm)</td><td>{np.percentile(b,10):.0f}</td>"
+                            f"<td>{np.median(b):.0f}</td><td>{np.percentile(b,90):.0f}</td></tr>")
+        pc_f = 100.0 * fibras / len(formas)
+        pc_c = 100.0 * n_curvas / len(curvas) if curvas else 0.0
+        forma_html = f"""
+<table class='data'><tr><th>Morfotipo</th><th>Partículas</th><th>%</th></tr>
+<tr><td>Fibra (relación de aspecto ≥ 3)</td><td>{fibras}</td><td>{pc_f:.1f} %</td></tr>
+<tr><td>Fragmento</td><td>{len(formas) - fibras}</td><td>{100 - pc_f:.1f} %</td></tr>
+</table>
+<table class='data'><tr><th>Dimensión</th><th>p10</th><th>mediana</th><th>p90</th></tr>{filas_t}</table>
+<p>Las magnitudes se miden sobre la <strong>máscara de cada partícula</strong>, no sobre su
+caja. La caja de una partícula alargada está casi vacía y depende de cómo haya caído: una
+fibra tumbada en diagonal tiene caja cuadrada, de modo que medir sobre la caja la reportaría
+como fragmento y con una talla equivocada.</p>
+<p>El largo se obtiene resolviendo el rectángulo de igual área y perímetro,
+<em>L</em> = (<em>P</em> + √(<em>P</em>²−16<em>A</em>))&nbsp;/&nbsp;4. Doblar una fibra no
+cambia ni su área ni su perímetro, así que este largo sigue la curva sin necesidad de
+modelarla. En partículas compactas el discriminante es negativo —no existe tal rectángulo— y
+entonces se informa la extensión recta.</p>
+<p><strong>{n_curvas} partículas ({pc_c:.1f} %) están curvadas</strong>, entendiendo por tal que
+su largo supera en más de un 15 % su extensión en línea recta. En ellas la distancia entre
+extremos subestima la talla, y es la razón por la que no se usa.</p>"""
+        if n_sin_forma:
+            forma_html += (
+                f"<p>En {n_sin_forma} partículas no se pudo separar la partícula del fondo; "
+                f"su talla proviene de la caja y no es comparable con el resto.</p>")
+
     # ── Ensamblar HTML ──
     # Cada bloque es (id, cuerpo). El cuerpo NO lleva su <h2>: el titulo y el
     # numero los pone el ensamblador, que es el unico que sabe que secciones
@@ -1411,6 +1464,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 {equipo_html}
 {methods_para}""",
         "calibracion": calib_html,
+        "forma": forma_html,
         "resultados": figures_html,
         "modelos": f"""
 <table class='data'><tr><th>Modelo</th><th>Imágenes</th><th>Detecciones</th>
@@ -1428,6 +1482,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
     # Un id en ``pedidas`` con cuerpo vacio se cae aqui: se marco la casilla pero
     # no habia con que llenarla (errores sin ground truth, conteo sin muestras).
     ancla = {"resumen": "abstract", "metodos": "methods", "calibracion": "calib",
+             "forma": "forma",
              "resultados": "results", "modelos": "models", "errores": "errors",
              "comparacion": "compare", "galeria": "gallery", "conteo": "conteo",
              "referencias": "refs"}

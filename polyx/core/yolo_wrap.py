@@ -22,6 +22,15 @@ class Detection:
     # tamaño equivalente (μm) si se calibró
     diam_um: Optional[float] = None
     area_um2: Optional[float] = None
+    # ── Forma real, medida sobre la máscara de la partícula ──
+    # La caja no describe la forma: en este material sobreestima el área 1.87x y
+    # el largo un 14%, y una fibra en diagonal tiene caja cuadrada. Estos campos
+    # los llena morfologia.medir_deteccion(); quedan en None si no se midió.
+    largo_um: Optional[float] = None      # dimensión mayor, siguiendo la curva
+    ancho_um: Optional[float] = None
+    aspecto: Optional[float] = None       # largo/ancho reales
+    curvatura: Optional[float] = None     # 1.0 = recta; >1.15 = curva
+    morfotipo: Optional[str] = None       # "fibra" | "fragmento"
 
     @property
     def w(self) -> float: return self.x2 - self.x1
@@ -422,7 +431,13 @@ def find_gt_for_image(image_path: Path, gt_folder: Optional[Path]) -> Optional[P
 
 
 def compute_box_size_um(det: Detection, um_per_px: Optional[float]) -> None:
-    """Asigna diam_um y area_um2 in-place si hay calibración."""
+    """Talla aproximada a partir de la CAJA, no de la partícula.
+
+    Es un respaldo: sobreestima el área 1.87x en la mediana de este material
+    porque la caja de una partícula alargada está casi vacía, y depende de la
+    orientación. Solo se usa cuando la segmentación no pudo aislar la partícula.
+    Lo bueno lo hace ``morfologia.medir_deteccion``.
+    """
     if um_per_px is None or um_per_px <= 0:
         return
     area_px2 = det.w * det.h

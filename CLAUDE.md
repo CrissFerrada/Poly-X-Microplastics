@@ -293,9 +293,35 @@ class Detection:
     class_name: str         # "PET", "PP", "LDPE"
     conf: float             # 0-1, confianza
     x1, y1, x2, y2: float   # Bbox píxeles (absolutos)
-    diam_um: Optional[float] # Diámetro equivalente (μm) con calibración
-    area_um2: Optional[float]
+    diam_um: Optional[float]  # Diámetro del círculo de igual área REAL
+    area_um2: Optional[float] # Área de la partícula, no de la caja
+    largo_um: Optional[float] # Dimensión mayor, siguiendo la curva
+    ancho_um: Optional[float]
+    aspecto: Optional[float]    # largo/ancho reales
+    curvatura: Optional[float]  # 1.0 = recta; ≥1.15 = curva
+    morfotipo: Optional[str]    # "fibra" | "fragmento"
 ```
+
+**La caja no describe la forma.** Medido sobre 7.129 partículas anotadas: la caja
+sobreestima el área **1.87×** y el largo un **14 %**, y una fibra tumbada en
+diagonal tiene caja **cuadrada** — con lo que se reportaba como fragmento. Por la
+caja el aspecto máximo parecía 3.4 y las fibras el 0 %; midiendo sobre la máscara
+son **aspecto 21.1** y **22 % de fibras**.
+
+`morfologia.py` segmenta dentro de cada caja (Otsu sobre el canal de mayor
+contraste, componente conexa del centro) y mide sobre el contorno. El largo sale
+de resolver el rectángulo de igual área y perímetro:
+
+```
+L = (P + √(P² − 16A)) / 4        W = (P − √(P² − 16A)) / 4
+```
+
+Doblar una fibra **no cambia su área ni su perímetro**, así que este largo sigue
+la curva sin modelarla — y a diferencia de una parábola aguanta fibras en ese o
+con varias curvaturas. Si el discriminante es negativo la partícula es compacta y
+se informa la extensión recta (`minAreaRect`). Validado con formas sintéticas:
+0.0 % de error en fibra recta a 45°, 0.4–3.1 % en arcos, −0.6 % en fibra en S.
+Coste 0.77 ms por partícula; 0 fallos en 7.129.
 
 ### `YoloModel` (yolo_wrap.py)
 Wrapper lazy-loading de Ultralytics YOLO:
