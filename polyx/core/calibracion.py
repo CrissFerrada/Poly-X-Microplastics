@@ -52,6 +52,10 @@ class Calibracion:
     n_puntos: int = 0
     desvio_hough_pct: float = 0.0
     diametro_mm: float = DIAMETRO_PLACA_MM
+    # Correccion de paralaje aro->base. 1.0 = no se aplico, y entonces las
+    # tallas quedan subestimadas en una cantidad que depende de la distancia de
+    # disparo. Se guarda para poder declararlo en el informe.
+    factor_paralaje: float = 1.0
     aviso: str = ""
 
     @property
@@ -147,8 +151,39 @@ def ajuste_robusto(pts: np.ndarray, iteraciones: int = 3) -> Optional[tuple]:
     return ajustar_circulo(pts) + (len(pts),)
 
 
+def corregir_paralaje(um_por_px: float, altura_placa_mm: float,
+                      distancia_camara_mm: float) -> tuple:
+    """Lleva la escala del ARO de la placa al PLANO DE LA BASE.
+
+    El aro esta mas cerca de la camara que el fondo donde reposan las
+    particulas, asi que se proyecta mas grande: 100 mm medidos sobre el aro
+    ocupan mas pixeles que 100 mm apoyados en la base. Como
+    ``um/px = 100000 / diametro_px``, un diametro inflado da un um/px pequeno, y
+    como ``talla = px * um/px``, **todas las tallas salen subestimadas**.
+
+    Con D la distancia de la camara a la base y h la altura de la placa, el aro
+    esta a D-h y el factor entre ambas escalas es D/(D-h).
+
+    El error no es despreciable cuando se dispara cerca: con una placa de 15 mm
+    a 100 mm de distancia son casi 16 puntos porcentuales; a 500 mm, un 3%.
+
+    Devuelve (um_por_px_corregido, factor). Sin datos suficientes devuelve el
+    valor sin tocar y factor 1.0: es preferible una escala sin corregir y
+    declarada que una corregida con numeros inventados.
+    """
+    if altura_placa_mm <= 0 or distancia_camara_mm <= 0:
+        return um_por_px, 1.0
+    if distancia_camara_mm <= altura_placa_mm:
+        # La camara estaria dentro de la placa; el dato es erroneo.
+        return um_por_px, 1.0
+    factor = distancia_camara_mm / (distancia_camara_mm - altura_placa_mm)
+    return um_por_px * factor, factor
+
+
 def calibrar_desde_placa(bgr: np.ndarray,
-                         diametro_mm: float = DIAMETRO_PLACA_MM) -> Calibracion:
+                         diametro_mm: float = DIAMETRO_PLACA_MM,
+                         altura_placa_mm: float = 0.0,
+                         distancia_camara_mm: float = 0.0) -> Calibracion:
     """Mide el anillo de la placa y devuelve la escala de esta foto.
 
     Devuelve una Calibracion sin validez -- con ``aviso`` explicando por que --
@@ -185,10 +220,17 @@ def calibrar_desde_placa(bgr: np.ndarray,
     if r <= 0:
         return Calibracion(diametro_mm=diametro_mm, aviso="radio ajustado nulo")
 
-    return Calibracion(um_por_px=(diametro_mm * 1000.0) / (2 * r),
+    um_aro = (diametro_mm * 1000.0) / (2 * r)
+    um_base, factor = corregir_paralaje(um_aro, altura_placa_mm,
+                                        distancia_camara_mm)
+    if factor == 1.0 and not aviso:
+        aviso = ("escala medida sobre el aro, sin corregir al plano de la base: "
+                 "las tallas quedan subestimadas")
+    return Calibracion(um_por_px=um_base,
                        origen=ORIGEN_PLACA, cx=cx, cy=cy, radio_px=r,
                        n_puntos=n, desvio_hough_pct=desvio,
-                       diametro_mm=diametro_mm, aviso=aviso)
+                       diametro_mm=diametro_mm, factor_paralaje=factor,
+                       aviso=aviso)
 
 
 def cargar_indice(ruta_csv: str | Path) -> Dict[str, float]:
@@ -251,7 +293,9 @@ def resolver(ruta_imagen: str | Path,
              um_por_px_manual: float = 0.0,
              diametro_mm: float = DIAMETRO_PLACA_MM,
              medir_placa: bool = False,
-             bgr: Optional[np.ndarray] = None) -> Calibracion:
+             bgr: Optional[np.ndarray] = None,
+             altura_placa_mm: float = 0.0,
+             distancia_camara_mm: float = 0.0) -> Calibracion:
     """Escala de una imagen, por orden de fiabilidad.
 
     1. ``indice`` -- ya calibrada contra la placa, por foto. Es lo que hay para
@@ -273,7 +317,8 @@ def resolver(ruta_imagen: str | Path,
     if medir_placa:
         if bgr is None:
             bgr = leer_imagen(ruta_imagen)
-        cal = calibrar_desde_placa(bgr, diametro_mm)
+        cal = calibrar_desde_placa(bgr, diametro_mm, altura_placa_mm,
+                                   distancia_camara_mm)
         if cal.valida:
             return cal
         if um_por_px_manual > 0:

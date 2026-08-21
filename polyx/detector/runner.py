@@ -160,7 +160,9 @@ class DetectorRunner(QThread):
                                um_por_px_manual=params.um_per_px,
                                diametro_mm=params.diametro_placa_mm,
                                medir_placa=params.medir_placa,
-                               bgr=img_bgr)
+                               bgr=img_bgr,
+                               altura_placa_mm=params.altura_placa_mm,
+                               distancia_camara_mm=params.distancia_camara_mm)
                 state.calibraciones[img_path.name] = cal
                 um_px = cal.um_por_px if cal.valida else None
 

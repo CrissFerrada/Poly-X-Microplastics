@@ -262,6 +262,22 @@ class ParametrosPage(DetectorPage):
         g4.addWidget(self.sb_placa_mm, 0, 1)
         g4.addWidget(_hint(tr("Diámetro externo nominal. La placa Petri del estudio mide 100 mm.")),
                      0, 2)
+
+        g4.addWidget(QLabel(tr("Altura de la placa (mm):")), 1, 0)
+        self.sb_altura = QDoubleSpinBox()
+        self.sb_altura.setRange(0.0, 100.0); self.sb_altura.setDecimals(1)
+        self.sb_altura.setValue(state.params.altura_placa_mm)
+        self.sb_altura.valueChanged.connect(self._on_change)
+        g4.addWidget(self.sb_altura, 1, 1)
+        g4.addWidget(_hint(tr("0 = no corregir. Una Petri de 100 mm suele medir 15 mm de alto.")), 1, 2)
+
+        g4.addWidget(QLabel(tr("Distancia cámara → base (mm):")), 2, 0)
+        self.sb_distancia = QDoubleSpinBox()
+        self.sb_distancia.setRange(0.0, 5000.0); self.sb_distancia.setDecimals(0)
+        self.sb_distancia.setValue(state.params.distancia_camara_mm)
+        self.sb_distancia.valueChanged.connect(self._on_change)
+        g4.addWidget(self.sb_distancia, 2, 1)
+        g4.addWidget(_hint(tr("0 = no corregir. Medir hasta el FONDO de la placa, no hasta el borde.")), 2, 2)
         l3.addLayout(g4)
 
         l3.addWidget(_hint(tr(
@@ -270,6 +286,12 @@ class ParametrosPage(DetectorPage):
             "rechazo de atípicos; Hough solo aporta el centro aproximado porque su radio "
             "llega a errar un 12 %. En los recortes la placa no aparece, así que ahí la "
             "escala se hereda del índice de calibración que dejó el recorte.")))
+        l3.addWidget(_hint(tr(
+            "El borde de la placa está más cerca de la cámara que el fondo donde reposan "
+            "las partículas, de modo que se proyecta más grande y la escala sale pequeña: "
+            "sin corregir, TODAS las tallas quedan subestimadas. Con la placa a 15 mm y la "
+            "cámara a 100 mm son casi 16 puntos porcentuales; a 500 mm, un 3 %. Rellena los "
+            "dos campos de arriba para corregirlo.")))
         l3.addWidget(_hint(
             tr("El detector calcula área y diámetro equivalente (de círculo con misma área) "
             "para cada partícula detectada. Si hay calibración, también en μm y μm².")
@@ -367,6 +389,8 @@ class ParametrosPage(DetectorPage):
         p.um_per_px = float(self.sb_umpx.value())
         p.medir_placa = self.chk_placa.isChecked()
         p.diametro_placa_mm = float(self.sb_placa_mm.value())
+        p.altura_placa_mm = float(self.sb_altura.value())
+        p.distancia_camara_mm = float(self.sb_distancia.value())
         p.size_min_um = float(self.sb_min.value())
         p.size_max_um = float(self.sb_max.value())
         p.troceo = self.combo_troceo.currentData() or "auto"

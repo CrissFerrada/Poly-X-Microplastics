@@ -42,6 +42,12 @@ class InferenceParams:
     # valor único para todo el lote daría tamaños con hasta 50 % de error.
     medir_placa: bool = False
     diametro_placa_mm: float = 100.0
+    # El aro de la placa esta MAS CERCA de la cámara que el fondo donde reposan
+    # las partículas, así que se proyecta más grande y la escala sale pequeña:
+    # las tallas quedan subestimadas. Con estos dos datos se corrige al plano de
+    # la base. En 0 no se corrige y el informe lo declara.
+    altura_placa_mm: float = 0.0
+    distancia_camara_mm: float = 0.0
     # CSV que asocia nombre de imagen con µm/px ya calibrado. Es la única vía
     # para los recortes, donde el borde de la placa no aparece y por tanto no se
     # puede volver a medir: la escala se hereda de la foto de la que salieron.
