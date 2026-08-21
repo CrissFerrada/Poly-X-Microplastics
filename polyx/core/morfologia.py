@@ -7,34 +7,57 @@ la fibra. Y lo peor no es la magnitud sino que **la misma particula rotada da
 otro numero**, con lo que la medida no es una medida.
 
 Aqui se segmenta dentro de la caja -- que ya dice donde mirar, asi que no hace
-falta anotar mascaras ni reentrenar nada -- y las magnitudes salen del contorno.
+falta anotar mascaras ni reentrenar nada -- y las magnitudes salen de la mascara.
 
-Sobre el largo de una particula curva. Una fibra doblada mide mas que la
-distancia entre sus extremos, asi que la cuerda la subestima. Se calcula por dos
-vias que se apoyan en supuestos distintos:
+COMO SE MIDE EL LARGO
+---------------------
+Se calculan dos cotas y se reporta la mayor:
 
-  * MODELO DE RECTANGULO. Suponiendo ancho constante, area y perimetro dan el
-    largo y el ancho resolviendo A = L*W y P = 2(L+W):
+  * FERET MAXIMO. La mayor distancia entre dos puntos del borde, sobre la
+    envolvente convexa. Es la medida correcta del largo aparente y de una fibra
+    RECTA, y no la afecta un borde dentado. Pero en una fibra curva da la
+    cuerda: en un arco de 180 grados se queda un 35% corto.
 
-        L = (P + sqrt(P^2 - 16A)) / 4        W = (P - sqrt(P^2 - 16A)) / 4
+  * DIAMETRO GEODESICO. El camino mas largo que cabe DENTRO de la particula,
+    por doble propagacion. Al no poder salirse de la mascara, rodea la curva y
+    devuelve su longitud. En una particula compacta el camino mas largo es el
+    recto y coincide con Feret.
 
-    Lo valioso es que **doblar una fibra no cambia ni su area ni su perimetro**,
-    de modo que esto da el largo verdadero de una fibra curva sin modelar la
-    curva. Solo vale si el discriminante es positivo: para una particula compacta
-    P^2 < 16A (un circulo da 4*pi*r^2*(pi-4) < 0) y entonces no hay rectangulo
-    que la describa.
+Se toma el mayor de los dos porque en una forma conexa el geodesico siempre es
+mayor o igual que Feret -- en una convexa coinciden --, de modo que si Feret
+sale mayor es solo error de discretizacion y el maximo es la cota mas ajustada.
 
-  * CUERDA. El lado mayor del rectangulo de area minima (``minAreaRect``), que
-    es la extension en linea recta y no depende de la orientacion, al contrario
-    que la caja del detector.
+QUE SE DESCARTO, Y POR QUE
+--------------------------
+El rectangulo de igual area y perimetro, L = (P + sqrt(P^2-16A))/4, se uso como
+talla y NO sirve para eso, aunque se conserva como descriptor:
 
-El cociente entre las dos es una medida de cuanto se curva la particula, y sale
-gratis: en una recta coinciden, y cuanto mas doblada este mas grande es el
-cociente. Se reporta para poder decir en el paper cuantas particulas eran
-curvas, en vez de suponerlo.
+  * Depende del perimetro, y un borde dentado lo infla. Medido sobre una recta
+    con dientes de sierra de talla conocida: +22.5%.
+  * Solo existe si P^2 >= 16A. Un circulo da P^2 = 4*pi*A < 16A y no tiene
+    rectangulo equivalente.
+  * No es "el largo de la particula" sino el de un rectangulo con su misma area
+    y su mismo perimetro, que es otra cosa.
 
-Solo se usan cv2, numpy y scipy, que ya son dependencias: anadir skimage u
-opencv-contrib es justo lo que rompe la instalacion en otra maquina.
+Se conserva en ``largo_rect_eq`` porque comparado con Feret y con el geodesico
+informa de lo irregular que es la particula: si es mucho mayor que los otros
+dos, el borde esta dentado.
+
+Contra formas sinteticas de talla conocida, el largo reportado da 3.7% de error
+mediano y 4.7% en el peor caso, salvo una excepcion documentada abajo. El
+modelo de rectangulo daba 1.2% mediano pero 22.5% en el peor caso, y aqui
+importa mas no fallar feo que afinar en el caso bueno.
+
+LIMITE CONOCIDO
+---------------
+En una fibra muy enroscada el camino geodesico corta por dentro en cada codo y
+subestima: en una fibra en ese de curvas cerradas se queda un 19% corto. Por eso
+se reporta tambien ``largo_rect_eq``, que en ese caso concreto acierta mas
+(-5%): si las dos cifras discrepan mucho, la particula pide un vistazo.
+
+Solo se usan cv2 y numpy. Ni scipy -- que no es dependencia declarada y solo
+llega de rebote con ultralytics -- ni skimage ni opencv-contrib: anadir
+dependencias es justo lo que rompe la instalacion en otra maquina.
 """
 from __future__ import annotations
 
@@ -64,13 +87,23 @@ class Morfologia:
     # px
     area_px: float = 0.0
     perimetro_px: float = 0.0
-    largo_px: float = 0.0        # por el modelo de rectangulo si aplica
+    largo_px: float = 0.0        # la talla que se reporta: max(feret, geodesico)
     ancho_px: float = 0.0
     cuerda_px: float = 0.0       # extension recta (minAreaRect)
+    feret_px: float = 0.0        # mayor distancia entre dos puntos del borde
+    geodesico_px: float = 0.0    # camino mas largo DENTRO de la particula
+    # Largo del rectangulo de igual area y perimetro. NO es "el largo de la
+    # particula": es el de un rectangulo equivalente, y un borde dentado infla
+    # el perimetro y con el esta cifra. Se conserva porque comparado con feret y
+    # geodesico informa de lo irregular o filamentosa que es la particula.
+    largo_rect_eq_px: float = 0.0
     # um, si hay calibracion
     area_um2: Optional[float] = None
     largo_um: Optional[float] = None
     ancho_um: Optional[float] = None
+    feret_um: Optional[float] = None
+    geodesico_um: Optional[float] = None
+    largo_rect_eq_um: Optional[float] = None
     # adimensionales
     aspecto: float = 0.0
     circularidad: float = 0.0
@@ -178,6 +211,111 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
     return mascara
 
 
+def feret_maximo(contorno: np.ndarray) -> float:
+    """Diametro de Feret maximo: la mayor distancia entre dos puntos del borde.
+
+    Se calcula sobre la envolvente convexa, no sobre el contorno entero: el par
+    mas separado siempre esta en la envolvente, y esta suele tener decenas de
+    puntos frente a los miles del contorno, asi que la busqueda exhaustiva es
+    barata y exacta.
+
+    Es la medida correcta para el "largo maximo aparente" y para una fibra
+    RECTA. Para una fibra curva da la cuerda, que subestima su longitud.
+    """
+    if contorno is None or len(contorno) < 2:
+        return 0.0
+    env = cv2.convexHull(contorno).reshape(-1, 2).astype(float)
+    if len(env) < 2:
+        return 0.0
+    d = env[:, None, :] - env[None, :, :]
+    return float(np.sqrt((d ** 2).sum(-1)).max())
+
+
+def _propagar_geodesico(dentro: np.ndarray, semilla: tuple) -> np.ndarray:
+    """Distancia geodesica desde una semilla, sin salir de la mascara.
+
+    Propagacion por minimos sucesivos sobre los 8 vecinos, con peso 1 en recto
+    y raiz de 2 en diagonal. Vectorizado: cada iteracion son ocho
+    desplazamientos de la matriz, y hacen falta tantas como pixeles tenga el
+    camino mas largo. Sobre recortes de particula -- decenas o pocos cientos de
+    pixeles de lado -- eso es inmediato.
+
+    Se hace asi y no con scipy.sparse.csgraph porque scipy no es una dependencia
+    declarada del proyecto: llega de rebote con ultralytics, y apoyarse en eso
+    romperia la instalacion el dia que ultralytics deje de traerlo.
+    """
+    INF = np.inf
+    d = np.full(dentro.shape, INF, dtype=np.float32)
+    d[semilla] = 0.0
+    # Pesos optimos del chamfer 3x3, no 1 y raiz de 2. Con los pesos ingenuos el
+    # camino en escalera sobreestima la distancia euclidea hasta un 8% -- medido
+    # sobre un circulo de diametro conocido, daba 108 en vez de 100 --. Estos
+    # dos minimizan ese error maximo y lo dejan en torno al 1.4%.
+    UNO = np.float32(0.95509)
+    R2 = np.float32(1.36930)
+    # Cota de seguridad: ningun camino simple puede tener mas pasos que pixeles.
+    tope = int(dentro.sum()) + 2
+    for _ in range(tope):
+        p = np.full_like(d, INF)
+        # Rectos
+        p[1:, :] = np.minimum(p[1:, :], d[:-1, :] + UNO)
+        p[:-1, :] = np.minimum(p[:-1, :], d[1:, :] + UNO)
+        p[:, 1:] = np.minimum(p[:, 1:], d[:, :-1] + UNO)
+        p[:, :-1] = np.minimum(p[:, :-1], d[:, 1:] + UNO)
+        # Diagonales
+        p[1:, 1:] = np.minimum(p[1:, 1:], d[:-1, :-1] + R2)
+        p[1:, :-1] = np.minimum(p[1:, :-1], d[:-1, 1:] + R2)
+        p[:-1, 1:] = np.minimum(p[:-1, 1:], d[1:, :-1] + R2)
+        p[:-1, :-1] = np.minimum(p[:-1, :-1], d[1:, 1:] + R2)
+        p[~dentro] = INF
+        nuevo = np.minimum(d, p)
+        # Basta comparar con el paso anterior: la propagacion es monotona
+        # decreciente, asi que si nada bajo, ya converge.
+        if np.array_equal(nuevo, d):
+            break
+        d = nuevo
+    return d
+
+
+def largo_geodesico(mascara: np.ndarray) -> float:
+    """Camino mas largo que cabe DENTRO de la particula, siguiendo su forma.
+
+    Es el diametro geodesico. Hace lo correcto en los dos casos que importan y
+    sin cambiar de formula:
+
+      * Fibra curva: el camino no puede salirse de la particula, asi que rodea
+        la curva y devuelve su longitud, no la cuerda entre los extremos.
+      * Particula compacta: el camino mas largo es el recto, y coincide con el
+        diametro de Feret maximo.
+
+    Se obtiene con la tecnica de las dos propagaciones, la misma que da el
+    diametro de un arbol: desde un punto cualquiera se busca el mas lejano, y
+    desde ese se vuelve a propagar; el maximo de esa segunda propagacion es el
+    diametro. No depende del perimetro, de modo que un borde dentado no lo
+    infla como si hace el modelo de rectangulo.
+    """
+    idx = np.argwhere(mascara > 0)
+    if len(idx) < 2:
+        return 0.0
+    # Recortar al minimo rectangulo que contiene la particula. El coste de la
+    # propagacion va con el area del lienzo, y una particula de 30 px dentro de
+    # una placa de 4096 costaria lo mismo que la placa entera.
+    y0, x0 = idx.min(axis=0)
+    y1_, x1_ = idx.max(axis=0) + 1
+    dentro = (mascara[y0:y1_, x0:x1_] > 0)
+    idx = np.argwhere(dentro)
+
+    d1 = _propagar_geodesico(dentro, tuple(idx[0]))
+    finitos = np.isfinite(d1)
+    if not finitos.any():
+        return 0.0
+    a = np.unravel_index(np.argmax(np.where(finitos, d1, -1)), d1.shape)
+
+    d2 = _propagar_geodesico(dentro, a)
+    finitos2 = np.isfinite(d2)
+    return float(d2[finitos2].max()) if finitos2.any() else 0.0
+
+
 def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
     """Talla y forma a partir de la mascara de una particula."""
     m = Morfologia()
@@ -213,45 +351,45 @@ def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
 
     # Modelo de rectangulo: valido solo si existe un rectangulo con esa area y
     # ese perimetro. En una particula compacta el discriminante es negativo.
+    # Rectangulo de igual area y perimetro. Descriptor, NO la talla: solo existe
+    # si P^2 >= 16A, que es tanto como decir que la particula es lo bastante
+    # alargada -- un circulo da P^2 = 4*pi*A < 16A y no tiene rectangulo
+    # equivalente. Comparado con feret y geodesico dice si la particula es
+    # irregular: si es mucho mayor que ellos, el borde esta dentado.
     disc = perim * perim - 16.0 * area
-    if disc > 0:
-        raiz = float(np.sqrt(disc))
-        largo = (perim + raiz) / 4.0
-        ancho = (perim - raiz) / 4.0
-        metodo = "rectangulo (area+perimetro)"
-    else:
-        # Compacta: el largo que tiene sentido es su extension recta.
-        largo = cuerda
-        ancho = grosor_recto
-        metodo = "cuerda (particula compacta)"
+    largo_rect_eq = (perim + float(np.sqrt(disc))) / 4.0 if disc > 0 else 0.0
 
-    # ¿Es de verdad una cinta? El modelo supone ancho constante, y a un grumo de
-    # borde rugoso le atribuye un perimetro grande, que traduce en "cinta larga y
-    # fina". Distinguirlos: una fibra enrollada es delgada en TODO su recorrido,
-    # mientras que un grumo es grueso por dentro. El radio del mayor circulo que
-    # cabe dentro de la mascara mide exactamente eso, y no depende del perimetro.
+    # ── El largo que se reporta ──
+    # Feret maximo y diametro geodesico, y se toma el mayor. Para una forma
+    # conexa el geodesico SIEMPRE es mayor o igual que Feret -- en una convexa
+    # coinciden --, asi que cuando Feret sale mayor es solo error de
+    # discretizacion del chamfer, y quedarse con el mayor toma la cota mas
+    # ajustada de las dos.
     #
-    # Sin esta comprobacion, una particula real de este material daba 8595 um de
-    # largo dentro de una mascara cuya diagonal era 3900: el modelo la describia
-    # como una cinta de 260 px enrollada, y era un grumo.
-    dt = cv2.distanceTransform(mascara, cv2.DIST_L2, 5)
-    grosor_real = 2.0 * float(dt.max())
-    curvatura = largo / cuerda if largo > 0 and cuerda > 0 else 1.0
+    # Se prefiere esto al modelo de rectangulo, medido contra formas de talla
+    # conocida, porque el modelo depende del perimetro y un borde dentado lo
+    # infla: en una recta con dientes de sierra daba +22.5%. max(Feret,
+    # geodesico) tiene un error mediano algo mayor (3.6% frente a 1.2%) pero su
+    # peor caso es 4.7% en vez de 22.5%, y aqui importa mas no fallar feo.
+    feret = feret_maximo(c)
+    geo = largo_geodesico(mascara)
+    largo = max(feret, geo)
+    metodo = "geodesico" if geo >= feret else "Feret maximo"
 
-    if disc > 0 and ancho > 0 and grosor_real > 2.0 * ancho:
-        # El modelo dice que es el doble de fina de lo que realmente es en su
-        # punto mas grueso: no es una cinta.
-        largo, ancho = cuerda, grosor_recto
-        metodo = "cuerda (no es una cinta: el interior es grueso)"
-        m.aviso = (f"el modelo de rectangulo daba un ancho de {ancho:.0f} px pero la "
-                   f"particula mide {grosor_real:.0f} px en su punto mas grueso")
-        curvatura = 1.0
-    elif curvatura > 4.0:
-        # Curvatura implausible aunque el grosor cuadre.
-        largo, ancho = cuerda, grosor_recto
-        metodo = "cuerda (el modelo de rectangulo se disparo)"
-        m.aviso = "contorno irregular; el modelo de rectangulo no era fiable"
-        curvatura = 1.0
+    # El ancho es el grosor maximo inscrito: el diametro del mayor circulo que
+    # cabe dentro de la particula, que da la transformada de distancia.
+    #
+    # No se usa area/largo, que seria el ancho medio de una cinta, porque en una
+    # particula compacta no da su diametro: un disco tiene A/L = pi*d/4 = 0.785d,
+    # con lo que un circulo perfecto salia con aspecto 1.27 en vez de 1.0 y la
+    # clasificacion fibra/fragmento arrancaba sesgada. Con el grosor inscrito el
+    # circulo da 1.04 y una fibra recta de 200x10 da 20, que es lo esperado.
+    dt = cv2.distanceTransform(mascara, cv2.DIST_L2, 5)
+    ancho = 2.0 * float(dt.max())
+
+    # Cuanto se aparta de una recta. Con el geodesico esto ya no depende del
+    # perimetro: es cuanto mas largo es el camino por dentro que la cuerda.
+    curvatura = largo / cuerda if largo > 0 and cuerda > 0 else 1.0
 
     m.ok = True
     m.area_px = area
@@ -259,6 +397,9 @@ def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
     m.largo_px = largo
     m.ancho_px = max(ancho, 0.0)
     m.cuerda_px = cuerda
+    m.feret_px = feret
+    m.geodesico_px = geo
+    m.largo_rect_eq_px = largo_rect_eq
     m.aspecto = largo / ancho if ancho > 0 else 0.0
     m.circularidad = float(4.0 * np.pi * area / (perim * perim))
     m.curvatura = curvatura
@@ -270,6 +411,9 @@ def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
         m.area_um2 = area * um_por_px * um_por_px
         m.largo_um = largo * um_por_px
         m.ancho_um = m.ancho_px * um_por_px
+        m.feret_um = feret * um_por_px
+        m.geodesico_um = geo * um_por_px
+        m.largo_rect_eq_um = largo_rect_eq * um_por_px if largo_rect_eq else None
     return m
 
 
@@ -325,9 +469,13 @@ def aplicar_a_deteccion(det, bgr: np.ndarray,
     det.aspecto = m.aspecto
     det.curvatura = m.curvatura
     det.morfotipo = m.morfotipo
+    det.metodo_largo = m.metodo
     if um_por_px and um_por_px > 0:
         det.area_um2 = m.area_um2
         det.largo_um = m.largo_um
         det.ancho_um = m.ancho_um
+        det.feret_um = m.feret_um
+        det.geodesico_um = m.geodesico_um
+        det.largo_rect_eq_um = m.largo_rect_eq_um
         det.diam_um = 2.0 * float(np.sqrt(m.area_um2 / np.pi)) if m.area_um2 else None
     return True

@@ -464,7 +464,9 @@ class ResultadosPage(DetectorPage):
                 w.writerow(["modelo", "imagen", "clase", "conf",
                             "x1", "y1", "x2", "y2",
                             "um_por_px", "origen_escala",
-                            "largo_um", "ancho_um", "area_um2", "diam_um",
+                            "largo_um", "metodo_largo", "feret_um",
+                            "geodesico_um", "largo_rect_eq_um",
+                            "ancho_um", "area_um2", "diam_um",
                             "aspecto", "curvatura", "morfotipo"])
                 cals = getattr(self.state, "calibraciones", None) or {}
                 for mi, rs in self.state.results.items():
@@ -482,7 +484,9 @@ class ResultadosPage(DetectorPage):
                                 f"{p.x1:.1f}", f"{p.y1:.1f}",
                                 f"{p.x2:.1f}", f"{p.y2:.1f}",
                                 um, origen,
-                                _n(p.largo_um, 1), _n(p.ancho_um, 1),
+                                _n(p.largo_um, 1), p.metodo_largo or "",
+                                _n(p.feret_um, 1), _n(p.geodesico_um, 1),
+                                _n(p.largo_rect_eq_um, 1), _n(p.ancho_um, 1),
                                 _n(p.area_um2, 1), _n(p.diam_um),
                                 _n(p.aspecto), _n(p.curvatura),
                                 p.morfotipo or "",

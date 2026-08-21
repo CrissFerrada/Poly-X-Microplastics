@@ -679,6 +679,25 @@ def _ficha_particula(det, ruta_imagen, um_por_px: Optional[float],
         cuenta = (f"<p style='font-family:monospace;font-size:10pt'>"
                   f"{largo_px:.1f} px &times; {um_por_px:.4f} µm/px = "
                   f"<strong>{det.largo_um:.0f} µm</strong></p>")
+        # Las tres medidas juntas: si el rectangulo equivalente se dispara
+        # respecto de las otras dos, el borde de la particula esta dentado y la
+        # talla merece un vistazo.
+        otras = []
+        if det.feret_um:
+            otras.append(f"<tr><td>Feret máximo (cuerda)</td><td>{det.feret_um:.0f}</td></tr>")
+        if det.geodesico_um:
+            otras.append(f"<tr><td>Geodésico (sigue la curva)</td><td>{det.geodesico_um:.0f}</td></tr>")
+        if det.largo_rect_eq_um:
+            otras.append(f"<tr><td>Rectángulo equivalente <em>(descriptor)</em></td>"
+                         f"<td>{det.largo_rect_eq_um:.0f}</td></tr>")
+        if otras:
+            cuenta += (f"<table class='data'><tr><th>Medida</th><th>µm</th></tr>"
+                       f"{''.join(otras)}</table>"
+                       f"<p>Se reporta la mayor de las dos primeras"
+                       + (f", en este caso por <strong>{det.metodo_largo}</strong>"
+                          if det.metodo_largo else "") + ". El rectángulo equivalente "
+                       "no es una talla: depende del perímetro, y si se dispara "
+                       "respecto de las otras dos es señal de borde irregular.</p>")
     return (f"<h3>{NUM}.{titulo}</h3>"
             f"<p>A la izquierda la partícula; a la derecha, en verde, el contorno que se "
             f"midió sobre ella.</p>{img}{cuenta}")

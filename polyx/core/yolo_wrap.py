@@ -31,6 +31,12 @@ class Detection:
     aspecto: Optional[float] = None       # largo/ancho reales
     curvatura: Optional[float] = None     # 1.0 = recta; >1.15 = curva
     morfotipo: Optional[str] = None       # "fibra" | "fragmento"
+    # Las dos cotas del largo por separado, y el rectángulo equivalente. Se
+    # guardan porque comparadas informan de lo irregular que es la partícula.
+    feret_um: Optional[float] = None      # cuerda: mayor distancia del borde
+    geodesico_um: Optional[float] = None  # camino más largo por dentro
+    largo_rect_eq_um: Optional[float] = None
+    metodo_largo: Optional[str] = None
 
     @property
     def w(self) -> float: return self.x2 - self.x1
