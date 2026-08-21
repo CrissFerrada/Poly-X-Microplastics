@@ -303,25 +303,38 @@ class Detection:
 ```
 
 **La caja no describe la forma.** Medido sobre 7.129 partículas anotadas: la caja
-sobreestima el área **1.87×** y el largo un **14 %**, y una fibra tumbada en
-diagonal tiene caja **cuadrada** — con lo que se reportaba como fragmento. Por la
-caja el aspecto máximo parecía 3.4 y las fibras el 0 %; midiendo sobre la máscara
-son **aspecto 21.1** y **22 % de fibras**.
+sobreestima el área **1.87×**, y una fibra tumbada en diagonal tiene caja
+**cuadrada** — con lo que se reportaba como fragmento.
 
 `morfologia.py` segmenta dentro de cada caja (Otsu sobre el canal de mayor
-contraste, componente conexa del centro) y mide sobre el contorno. El largo sale
-de resolver el rectángulo de igual área y perímetro:
+contraste, componente conexa del centro, recortada a la caja) y mide sobre la
+máscara. **El largo sale de dos medidas estándar y se reporta la mayor:**
 
-```
-L = (P + √(P² − 16A)) / 4        W = (P − √(P² − 16A)) / 4
-```
+| Medida | Qué es | Falla en |
+|---|---|---|
+| **Feret máximo** | mayor distancia entre dos puntos del borde | fibras curvas (da la cuerda: −34.6 % en un arco de 180°) |
+| **Diámetro geodésico** | camino más largo *dentro* de la partícula | partículas gruesas (rodea las concavidades) |
 
-Doblar una fibra **no cambia su área ni su perímetro**, así que este largo sigue
-la curva sin modelarla — y a diferencia de una parábola aguanta fibras en ese o
-con varias curvaturas. Si el discriminante es negativo la partícula es compacta y
-se informa la extensión recta (`minAreaRect`). Validado con formas sintéticas:
-0.0 % de error en fibra recta a 45°, 0.4–3.1 % en arcos, −0.6 % en fibra en S.
-Coste 0.77 ms por partícula; 0 fallos en 7.129.
+El geodésico solo se usa si la partícula es delgada — `largo/grosor ≥ 4`, ver
+`DELGADEZ_PARA_GEODESICO` —. Sin esa condición, un grumo real de 44 px de
+extensión con una muesca daba 73 px porque el camino la bordeaba. Contra formas
+sintéticas de talla conocida: **error mediano 0.8 %, peor caso 4.7 %**.
+
+**El rectángulo equivalente `L = (P + √(P²−16A))/4` NO es una talla** y no debe
+usarse como tal. Depende del perímetro, así que un borde dentado lo infla
+(+22.5 % en una recta con dientes de sierra), y solo está definido si P² ≥ 16A
+—un círculo da P² = 4πA y el discriminante sale negativo—. Se conserva en
+`largo_rect_eq` como descriptor: comparado con los otros dos delata bordes
+irregulares.
+
+> **Corrección de agosto 2026.** Se reportó que el material tenía «22 % de fibras
+> y aspecto hasta 21.1». Era un artefacto de usar `rect_eq` como largo. Medido
+> con Feret/geodésico sobre 6.638 partículas: **aspecto mediano 1.58, máximo 8.7,
+> y 1.1 % de fibras**. El material es mayoritariamente fragmentos compactos.
+
+Coste 5.9 ms por partícula. Solo cv2 y numpy: `scipy` **no** está en
+`requirements.txt` —llega de rebote con ultralytics— y apoyarse en él rompería
+la instalación el día que ultralytics deje de traerlo.
 
 ### `YoloModel` (yolo_wrap.py)
 Wrapper lazy-loading de Ultralytics YOLO:

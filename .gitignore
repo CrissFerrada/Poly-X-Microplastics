@@ -101,3 +101,4 @@ Microplasticos con MATLAB/
 # Herramientas locales de agentes
 .agents/
 .claude/
+_cand.pkl
