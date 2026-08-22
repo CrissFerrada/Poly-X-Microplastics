@@ -112,6 +112,19 @@ DELGADEZ_PARA_GEODESICO = 4.0
 # los arcos entre 0.27 y 0.71.
 SOLIDEZ_CONVEXA = 0.90
 
+# Fraccion de la distancia maxima al fondo por encima de la cual un pixel se
+# considera NUCLEO de una particula. Dos particulas que se tocan tienen dos
+# nucleos aunque formen una sola componente conexa, y el watershed las separa
+# por el cuello que las une.
+#
+# 0.80 sale de barrer el umbral sobre formas de talla conocida. Separa dos
+# circulos de 60 px con solapes de 2, 6, 10 y 16 px -- hasta un 27% del
+# diametro -- y no parte NINGUNA particula sana: ni un circulo, ni una barra, ni
+# una fibra curva, ni una irregular de cuatro lobulos. Subirlo a 0.90 hace
+# estallar la fibra curva en 27 trozos, asi que el margen es amplio por abajo y
+# estrecho por arriba.
+UMBRAL_NUCLEO = 0.80
+
 # Por encima de esto la particula se considera curva y el largo de la cuerda
 # deja de servir como talla. 1.15 = el contorno recorre un 15% mas que la recta.
 CURVA_DESDE = 1.15
@@ -160,6 +173,23 @@ class Morfologia:
         return self.curvatura >= CURVA_DESDE
 
 
+def margen_de_caja(ancho_caja: float, alto_caja: float) -> int:
+    """Cuanto fondo se recorta alrededor de la caja, en pixeles.
+
+    Proporcional al lado menor, con minimo. El 0.50 no es arbitrario: con 0.35
+    una particula vecina que apenas rozaba a la nuestra caIa casi entera FUERA
+    del recorte, y una vecina truncada pierde su nucleo, de modo que el
+    watershed no llegaba a separarlas. Medido sobre dos circulos de 60 px, el
+    error pasa de +16.3% a -2.6% con solo ampliar el margen; de 0.50 en adelante
+    el resultado ya no cambia.
+
+    Se expone como funcion para que las pruebas usen el mismo numero que el
+    codigo en vez de repetirlo, que es como se desincronizan.
+    """
+    return int(max(3, round(0.50 * min(max(1.0, ancho_caja),
+                                       max(1.0, alto_caja)))))
+
+
 def _recorte(bgr: np.ndarray, x1, y1, x2, y2, margen: int):
     """Recorta la caja con margen, y devuelve tambien el desplazamiento.
 
@@ -178,6 +208,65 @@ def _recorte(bgr: np.ndarray, x1, y1, x2, y2, margen: int):
     return bgr[ay:by, ax:bx], ax, ay
 
 
+def separar_pegadas(mascara: np.ndarray, semilla) -> np.ndarray:
+    """Si la mascara une varias particulas, devuelve solo la de la semilla.
+
+    Dos particulas en contacto forman una sola componente conexa, y medirlas
+    juntas suma sus tallas: se observo en placas reales y afecta sobre todo al
+    extremo grande de la distribucion, que es justo el que se reporta como
+    "la particula mayor".
+
+    Se separan por watershed sobre la transformada de distancia, que es el
+    metodo habitual para objetos en contacto en microscopia. La idea es que el
+    centro de cada particula esta lejos del fondo y el cuello que las une esta
+    cerca, de modo que umbralizando la distancia aparecen dos nucleos separados
+    aunque la mascara sea una sola pieza; el watershed crece desde ellos y corta
+    justo por el cuello.
+
+    Si solo hay un nucleo no se toca nada: la inmensa mayoria de las particulas
+    estan aisladas y no tiene sentido arriesgar un corte donde no hay nada que
+    cortar.
+    """
+    if mascara is None or not mascara.any():
+        return mascara
+    dt = cv2.distanceTransform(mascara, cv2.DIST_L2, 5)
+    if dt.max() < 2:
+        return mascara
+
+    _, nucleos = cv2.threshold(dt, UMBRAL_NUCLEO * dt.max(), 255,
+                               cv2.THRESH_BINARY)
+    nucleos = nucleos.astype(np.uint8)
+    n, marcas = cv2.connectedComponents(nucleos)
+    if n <= 2:                       # fondo + un nucleo: particula aislada
+        return mascara
+
+    # cv2.watershed reserva el 0 para "desconocido" y el 1 para el fondo.
+    marcas = marcas + 1
+    marcas[mascara == 0] = 1
+    marcas[(mascara > 0) & (nucleos == 0)] = 0
+    try:
+        cv2.watershed(cv2.cvtColor(mascara, cv2.COLOR_GRAY2BGR), marcas)
+    except cv2.error:
+        return mascara
+
+    sx, sy = int(semilla[0]), int(semilla[1])
+    sx = int(np.clip(sx, 0, marcas.shape[1] - 1))
+    sy = int(np.clip(sy, 0, marcas.shape[0] - 1))
+    etiqueta = marcas[sy, sx]
+    if etiqueta <= 1:
+        # El centro cayo en la linea divisoria o en el fondo. Se queda la region
+        # mayor de las que tocan el centro, antes que devolver el conjunto.
+        vecinas = marcas[max(0, sy - 2):sy + 3, max(0, sx - 2):sx + 3]
+        candidatas = [v for v in np.unique(vecinas) if v > 1]
+        if not candidatas:
+            return mascara
+        etiqueta = max(candidatas,
+                       key=lambda v: int((marcas == v).sum()))
+
+    salida = ((marcas == etiqueta) & (mascara > 0)).astype(np.uint8) * 255
+    return salida if salida.any() else mascara
+
+
 def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
               margen: Optional[int] = None) -> Optional[np.ndarray]:
     """Mascara de la particula dentro de la caja. None si no se pudo aislar.
@@ -189,12 +278,16 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
     """
     if bgr is None or bgr.size == 0:
         return None
+    # Una caja que no corta la imagen es un dato erroneo, no un caso limite. Sin
+    # esta guarda, el margen alcanzaba una esquina de la foto y se devolvia una
+    # medida de fondo como si fuera una particula.
+    alto_img, ancho_img = bgr.shape[:2]
+    if x2 <= 0 or y2 <= 0 or x1 >= ancho_img or y1 >= alto_img:
+        return None
     ancho_caja = max(1.0, x2 - x1)
     alto_caja = max(1.0, y2 - y1)
     if margen is None:
-        # Proporcional, con minimo: en una caja de 30 px un margen fijo de 20
-        # meteria mas vecinos que fondo util.
-        margen = int(max(3, round(0.35 * min(ancho_caja, alto_caja))))
+        margen = margen_de_caja(ancho_caja, alto_caja)
 
     sub, ox, oy = _recorte(bgr, x1, y1, x2, y2, margen)
     if sub is None:
@@ -274,6 +367,14 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
         return None
     mascara = (etiquetas == idx).astype(np.uint8) * 255
 
+    # Separar dos particulas en contacto ANTES de recortar a la caja, no
+    # despues. El recorte trunca a la vecina, y una vecina truncada pierde su
+    # nucleo: sobre dos circulos de 60 px pegados, sin recortar se detectaban
+    # los dos nucleos con solapes de hasta 16 px, y ya recortados no se detectaba
+    # ninguno. Es decir que con el orden inverso la separacion no llegaba a
+    # actuar nunca.
+    mascara = separar_pegadas(mascara, (cx, cy))
+
     # Recortar a la caja. El margen existe para que Otsu tenga fondo con que
     # comparar, no para medir en el: sin este recorte, una particula pegada a
     # otra forma con ella una sola componente conexa y se mide el conjunto. Se
@@ -290,9 +391,7 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
     fuera = np.ones_like(mascara, dtype=bool)
     fuera[hy1:hy2, hx1:hx2] = False
     mascara[fuera] = 0
-    if not mascara.any():
-        return None
-    return mascara
+    return mascara if mascara.any() else None
 
 
 def feret_maximo(contorno: np.ndarray) -> float:

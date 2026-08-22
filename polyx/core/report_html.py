@@ -1522,6 +1522,7 @@ entraría entero en todos los tamaños reportados.</p>"""
               if getattr(p_, "aspecto", None)]
     n_sin_forma = sum(1 for r in all_results for p_ in r.predictions
                       if getattr(p_, "aspecto", None) is None)
+    ficha_mayor = None
     if formas:
         con_talla = [(d, ruta) for d, ruta in formas if d.largo_um]
         fibras = sum(1 for d, _ in formas if d.morfotipo == "fibra")
@@ -1596,13 +1597,37 @@ entraría entero en todos los tamaños reportados.</p>"""
                     f"<th>menor<br>(µm)</th><th>mediana<br>(µm)</th>"
                     f"<th>mayor<br>(µm)</th><th>Fibras</th></tr>{filas_cls}</table>")
 
-            # ── Ficha de la mayor: como se midio y la cuenta de px a µm ──
+            # La ficha de ejemplo se pinta mas abajo, DESPUES de explicar el
+            # metodo: enseñar el recorte con una recta amarilla encima antes de
+            # decir que esa recta es el diametro de Feret no explica nada.
             cal_mayor = (getattr(state, "calibraciones", {}) or {}).get(
                 Path(ruta_mayor).name)
             um_mayor = cal_mayor.um_por_px if cal_mayor and cal_mayor.valida else None
-            forma_html += _ficha_particula(
-                mayor, ruta_mayor, um_mayor,
-                "4 La partícula mayor, y cómo se midió")
+            ficha_mayor = (mayor, ruta_mayor, um_mayor)
+
+        # ── Recuento fibra/fragmento por foto ──
+    # Va dentro de la seccion de forma: responde "cuantas fibras y cuantos
+    # fragmentos hay en cada placa", que es la pregunta que se le hace a la
+    # tabla cuando se revisa foto por foto.
+    if formas:
+        por_img: Dict[str, list] = {}
+        for d, ruta in formas:
+            por_img.setdefault(Path(ruta).name, []).append(d)
+        filas_img = ""
+        for nombre in sorted(por_img):
+            ds = por_img[nombre]
+            nf = sum(1 for d in ds if d.morfotipo == "fibra")
+            largos_i = [d.largo_um for d in ds if d.largo_um]
+            filas_img += (
+                f"<tr><td style='font-size:9pt'>{nombre}</td><td>{len(ds)}</td>"
+                f"<td>{nf}</td><td>{len(ds) - nf}</td>"
+                f"<td>{(f'{np.median(largos_i):.0f}' if largos_i else '—')}</td>"
+                f"<td>{(f'{max(largos_i):.0f}' if largos_i else '—')}</td></tr>")
+        forma_html += (
+            f"<h3>{NUM}.4 Recuento por imagen</h3>"
+            f"<table class='data'><tr><th>Imagen</th><th>Partículas</th>"
+            f"<th>Fibras</th><th>Fragmentos</th><th>Largo mediano<br>(µm)</th>"
+            f"<th>Mayor<br>(µm)</th></tr>{filas_img}</table>")
 
         forma_html += f"""
 <h3>{NUM}.5 Cómo se mide el largo</h3>
@@ -1662,29 +1687,10 @@ se ensayó.</p>"""
                 f"<p>En {n_sin_forma} partículas no se pudo separar la partícula del fondo; "
                 f"su talla proviene de la caja y no es comparable con el resto.</p>")
 
-    # ── Recuento fibra/fragmento por foto ──
-    # Va dentro de la seccion de forma: responde "cuantas fibras y cuantos
-    # fragmentos hay en cada placa", que es la pregunta que se le hace a la
-    # tabla cuando se revisa foto por foto.
-    if formas:
-        por_img: Dict[str, list] = {}
-        for d, ruta in formas:
-            por_img.setdefault(Path(ruta).name, []).append(d)
-        filas_img = ""
-        for nombre in sorted(por_img):
-            ds = por_img[nombre]
-            nf = sum(1 for d in ds if d.morfotipo == "fibra")
-            largos_i = [d.largo_um for d in ds if d.largo_um]
-            filas_img += (
-                f"<tr><td style='font-size:9pt'>{nombre}</td><td>{len(ds)}</td>"
-                f"<td>{nf}</td><td>{len(ds) - nf}</td>"
-                f"<td>{(f'{np.median(largos_i):.0f}' if largos_i else '—')}</td>"
-                f"<td>{(f'{max(largos_i):.0f}' if largos_i else '—')}</td></tr>")
-        forma_html += (
-            f"<h3>{NUM}.6 Recuento por imagen</h3>"
-            f"<table class='data'><tr><th>Imagen</th><th>Partículas</th>"
-            f"<th>Fibras</th><th>Fragmentos</th><th>Largo mediano<br>(µm)</th>"
-            f"<th>Mayor<br>(µm)</th></tr>{filas_img}</table>")
+        # ── El ejemplo, ya explicado el método ──
+        if ficha_mayor is not None:
+            forma_html += _ficha_particula(
+                *ficha_mayor, "6 Un ejemplo: la partícula mayor, medida")
 
     # ── Ficha de cada partícula ──
     # Una entrada por partícula, con su número, su recorte y la medida dibujada

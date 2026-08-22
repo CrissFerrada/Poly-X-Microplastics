@@ -140,8 +140,10 @@ def test_la_mascara_no_se_traga_el_fondo():
     mascara = M.segmentar(img, x1, y1, x2, y2)
     assert mascara is not None
     # La máscara viene en el marco del RECORTE, no de la foto: hay que
-    # desplazarla con el mismo margen que usó segmentar para recortar.
-    margen = int(max(3, round(0.35 * min(x2 - x1, y2 - y1))))
+    # desplazarla con el mismo margen que usó segmentar. Se pide al módulo en
+    # vez de repetir el número, que es como una prueba deja de probar lo que
+    # cree que prueba.
+    margen = M.margen_de_caja(x2 - x1, y2 - y1)
     ox, oy = max(0, x1 - margen), max(0, y1 - margen)
     gris = img.max(axis=2)[oy:oy + mascara.shape[0], ox:ox + mascara.shape[1]]
     dentro = gris[mascara > 0]
@@ -161,6 +163,57 @@ def test_la_mascara_no_se_escapa_de_la_caja():
     ancho = xs.max() - xs.min() + 1
     assert ancho < 40 * 1.6, (
         f"la máscara mide {ancho} px de ancho para una caja de 40")
+
+
+def _foto_dos_pegadas(d=60, solape=8, lienzo=340):
+    """Dos partículas brillantes en contacto, y la caja de la primera."""
+    img = np.full((lienzo, lienzo, 3), 18, np.uint8)
+    c1 = (lienzo // 2 - d // 2 + solape // 2, lienzo // 2)
+    c2 = (lienzo // 2 + d // 2 - solape // 2, lienzo // 2)
+    cv2.circle(img, c1, d // 2, (60, 210, 240), -1)
+    cv2.circle(img, c2, d // 2, (60, 210, 240), -1)
+    caja = (c1[0] - d // 2, c1[1] - d // 2, c1[0] + d // 2, c1[1] + d // 2)
+    return img, caja, float(d)
+
+
+@pytest.mark.parametrize("solape", [2, 6, 10, 16])
+def test_separa_dos_particulas_en_contacto(solape):
+    """Dos partículas que se tocan forman una sola componente conexa, y medirlas
+    juntas suma sus tallas. Se separan por watershed sobre la transformada de
+    distancia: cada una tiene su núcleo, y el corte cae por el cuello."""
+    img, caja, real = _foto_dos_pegadas(60, solape)
+    m = M.medir(M.segmentar(img, *caja))
+    assert m.ok
+    error = 100.0 * abs(m.largo_px - real) / real
+    assert error < 8.0, (
+        f"con solape {solape} px mide {m.largo_px:.1f} en vez de {real:.0f} "
+        f"({error:.1f} % de error): no se separaron")
+
+
+def test_no_parte_una_particula_sana():
+    """El riesgo contrario: cortar donde no hay nada que cortar. Ninguna de las
+    formas de una sola pieza debe verse afectada por la separación."""
+    for nombre, fabrica in (("circulo", circulo), ("recta", recta),
+                            ("arco 180", lambda: arco(180)),
+                            ("dentada", recta_dentada)):
+        mascara, real = fabrica()
+        ys, xs = np.nonzero(mascara)
+        semilla = ((xs.min() + xs.max()) // 2, (ys.min() + ys.max()) // 2)
+        antes = int(np.count_nonzero(mascara))
+        despues = int(np.count_nonzero(M.separar_pegadas(mascara, semilla)))
+        assert despues == antes, (
+            f"{nombre}: la separación recortó {antes - despues} px de una "
+            f"partícula de una sola pieza")
+
+
+def test_una_particula_aislada_no_cambia():
+    """Control de la tubería completa: una partícula sola mide lo mismo con la
+    separación puesta que sin ella."""
+    img = np.full((340, 340, 3), 18, np.uint8)
+    cv2.circle(img, (170, 170), 30, (60, 210, 240), -1)
+    m = M.medir(M.segmentar(img, 140, 140, 200, 200))
+    assert m.ok
+    assert m.largo_px == pytest.approx(60.0, abs=2.0)
 
 
 def test_medir_deteccion_nunca_lanza():
