@@ -28,8 +28,18 @@
 - Carga hasta **3 modelos .pt** en paralelo para comparación directa
 - Inferencia sobre carpetas de imágenes con barra de progreso
 - Análisis de errores: **Verdaderos Positivos / Falsos Positivos / Falsos Negativos / Mal Clasificados**, matriz de confusión, galería de falsos positivos/negativos
-- Calibración **μm/px** para reportar tamaños reales de partículas
-- **Histograma de distribución de tamaños** por clase (PET/PP/LDPE) — visible cuando hay calibración activa
+- **Calibración automática contra la placa Petri**: el borde se encuentra solo y
+  su diámetro conocido fija los μm/px **de cada foto**, sin marcar nada. Importa
+  porque la distancia de disparo varía entre tomas: en el material del estudio la
+  escala real va de 31 a 50 μm/px, un factor 1.6, y un valor único para todo el
+  lote daría tallas con hasta un 50 % de error
+- **Talla y forma medidas sobre la partícula, no sobre su caja**: largo, ancho,
+  área, relación de aspecto y clasificación **fibra / fragmento**. La caja de una
+  partícula alargada está casi vacía y depende de cómo haya caído — una fibra
+  tumbada en diagonal tiene caja cuadrada — así que sobre 7.129 partículas
+  anotadas sobreestimaba el área **1,87×**
+- **Histograma de distribución de tamaños** por clase (PET/PP/LDPE) y por tramos
+  de talla, apilado por polímero
 - **Exportar CSV** directo desde la página de resultados
 - **Drag & Drop** de modelos `.pt` e imágenes/carpetas
 - **Resolución de inferencia** ajustable con perfiles (Rápido 1280 · Equilibrado
@@ -39,6 +49,9 @@
   imágenes de galería se recodifican y se limita su número para que el archivo
   siga siendo abrible en un navegador; las métricas cubren todas las imágenes
 - **Exportación a PDF** del reporte (un clic), listo para enviar por correo
+- **Secciones del informe elegibles**: once casillas y tres presets (Completo ·
+  Resumen breve · Metodológico). Al desmarcar, las secciones se **renumeran solas**
+  y el índice se ajusta; una sección marcada sin datos se omite igualmente
 - **Alcance del informe elegible**: trabajo completo, solo las fotos que marques, o
   ambos de una vez. Las cifras, los gráficos y la matriz de confusión se recalculan
   sobre lo elegido, así que el informe siempre describe las fotos que muestra
@@ -116,9 +129,62 @@
 - **Cargar etiquetas `.txt`**: muestra anotaciones ya existentes sobre la imagen,
   con sus tallas convertidas a μm. Sirve para revisar un conteo manual sin
   volver al Etiquetador
-- Tabla de resultados filtrable por clase con Ø(px) y Ø(μm)
+- **Revisión partícula a partícula**: la tabla lista cada partícula con su
+  **número**, clase, tipo (fibra o fragmento), largo, ancho y aspecto. Al
+  seleccionar una fila se ve **sobre qué se midió**: el recorte sin marcas a la
+  izquierda y, a la derecha, el contorno de la máscara con la medida dibujada
+  encima — en amarillo la recta de Feret, en magenta el camino geodésico —, más
+  la cuenta completa de píxeles a micrómetros. Una talla que no se puede ver
+  medida no se puede verificar
+- **Cargar predicciones de una corrida** ya cerrada desde `runs/detect_.../`, sin
+  volver a pasar el modelo. Se abre siempre la foto original y nunca el PNG
+  anotado, que lleva las cajas pintadas encima
 - **Drag & Drop** de imagen o modelo `.pt` directo al canvas
 - Exporta: imagen anotada + `detecciones.csv` + `resumen.json`
+
+---
+
+## Cómo se mide la talla de una partícula
+
+El criterio general es **la línea recta más larga que cabe en la partícula**, es
+decir la mayor distancia entre dos puntos de su contorno: el *diámetro de Feret
+máximo*. No depende de la orientación con que la partícula haya caído y un borde
+dentado no la altera.
+
+Esa recta deja de servir cuando la partícula está **contorsionada**: en una fibra
+doblada la distancia entre extremos es la cuerda, y en un arco de media
+circunferencia se queda un 35 % corta. Para esos casos se mide el *diámetro
+geodésico*, el camino más largo que cabe **dentro** de la partícula, que al no
+poder salirse de la máscara rodea la curva.
+
+| Forma de la partícula | Qué se reporta como largo |
+|---|---|
+| Compacta o irregular, pero no doblada | Feret máximo — la recta más larga |
+| Alargada y contorsionada (fibra) | Diámetro geodésico — sigue la curva |
+
+El geodésico solo se aplica si la partícula es **delgada** (largo ≥ 4 × grosor) y
+**no convexa** (solidez < 0,90). Sin la primera, cualquier concavidad hace que el
+camino rodee la partícula en vez de atravesarla; sin la segunda, el largo pasaría
+a depender del ángulo de giro, que es justo el defecto que se quería eliminar.
+
+Contra formas sintéticas de talla conocida —rectas, rectas giradas, arcos de 60,
+120 y 180°, un círculo, una recta de borde dentado y un grumo con muesca— el
+largo así medido da **0,6 % de error mediano y 4,7 % en el peor caso**. Está
+fijado en `tests/test_morfologia.py`.
+
+> **El rectángulo equivalente no es una talla.** La fórmula
+> *L* = (*P* + √(*P*²−16*A*))/4 da el largo de un rectángulo con la misma área y
+> el mismo perímetro, que es otra cosa. Depende del perímetro, así que un borde
+> dentado la infla un 22,5 %, y no está definida para partículas compactas, en las
+> que *P*² < 16*A*. Se reporta como descriptor porque comparada con las otras dos
+> delata bordes irregulares, pero no se usa como talla.
+
+**Limitaciones declaradas.** Dos partículas de polímero distinto que se tocan
+dentro de la misma caja se miden como una sola: separarlas por color no es viable
+en este material, porque la diferencia de tono entre dos polímeros no supera a la
+que hay entre el núcleo y el borde de una misma partícula. Y en una fibra muy
+enroscada el camino geodésico ataja por el interior de cada codo, subestimando
+hasta un 19 % en el caso más cerrado ensayado.
 
 ---
 
@@ -285,7 +351,8 @@ instalación vieja, y retirarlo se llevaría el trabajo sin versionar.
 ```
 polyx/
 ├── launcher.py          # Menú principal
-├── core/                # Módulos compartidos (theme, yolo_wrap, metrics, report_html)
+├── core/                # Módulos compartidos (theme, yolo_wrap, metrics, report_html,
+│                        #   calibracion, morfologia, procedencia, i18n)
 ├── detector/            # Módulo 2: análisis en lote (9 páginas)
 ├── trainer/             # Módulo 3: entrenamiento YOLO (9 páginas)
 ├── etiquetador/         # Módulo 4: anotación interactiva
@@ -293,6 +360,7 @@ polyx/
 models/                  # Pesos .pt entrenados
 runs/                    # Resultados de cada ejecución
 data_microplastico/      # Dataset YOLO (images/ + labels/)
+tests/                   # Suite de pruebas de medida y calibración
 ```
 
 ---
@@ -313,6 +381,35 @@ Imágenes de microscopio (UV 254 nm, tinción Nile Red)
 
 ---
 
+## Pruebas
+
+La medida de forma y la calibración tienen suite propia, porque cada cifra que
+producen acaba en una tabla del paper y un cambio bienintencionado puede
+desplazarlas todas sin que nada avise.
+
+```bash
+.venv\Scripts\python.exe -m pytest tests/ -q
+```
+
+43 pruebas sobre **formas sintéticas de talla conocida**, sin depender de ninguna
+anotación humana. Cada una fija además el *porqué* de una decisión de diseño, de
+modo que si alguien vuelve a intentar una variante ya descartada, la suite se lo
+dice.
+
+`pytest` solo hace falta para desarrollar y **no está en `requirements.txt`**: una
+instalación de uso no lo necesita.
+
+### Traducción
+
+```bash
+.venv\Scripts\python.exe auditar_traduccion.py --listar
+```
+
+Recorre el árbol sintáctico de cada módulo buscando llamadas a `tr()` y las
+contrasta con el diccionario. Debe decir **0 sin traducir**.
+
+---
+
 ## Publicaciones
 
 - **Pérez M, Parra S, Ferrada C, Bravo M, Pérez PA, Quiroz W (2024).** Development of a new methodology for the determination of PET microplastics in sediment, based on microwave-assisted acid digestion. *PLoS ONE* **19**(12): e0314520. https://doi.org/10.1371/journal.pone.0314520
@@ -324,6 +421,15 @@ Imágenes de microscopio (UV 254 nm, tinción Nile Red)
 ## Manual de usuario
 
 El archivo `Manual_PolyX.html` contiene la documentación completa con capturas de cada módulo, atajos de teclado, flujos de trabajo recomendados y referencias bibliográficas.
+
+---
+
+## Alcance del repositorio
+
+Este repositorio documenta **el programa**. Todo lo que forma parte de un paper
+en preparación —el pipeline de análisis del estudio, sus fotografías y sus
+hallazgos— se queda deliberadamente fuera, porque publicarlo aquí adelantaría
+resultados que aún no han salido.
 
 ---
 

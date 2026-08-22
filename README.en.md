@@ -5,106 +5,192 @@
 > **Automated detection and classification of microplastics (PET, PP, LDPE)
 > by Nile Red fluorescence under UV light (254 nm), using YOLO v8/v11 models.**
 
-**Author:** Cristofher Ferrada · PhD in Chemistry · Pontificia Universidad Católica de Valparaíso · 2026
+**Author:** Cristofher Ferrada · PhD in Chemistry · PUCV · 2026
 **Version:** 2.0.0 · Windows 10/11 · Python 3.11
 
 ---
 
-## What this is
-
-A desktop application that covers the whole workflow of counting microplastics in
-UV-fluorescence photographs: **train → label → detect → report**. It exists
-because counting particles by hand in photographs of sediment is the rate-limiting
-step of this kind of study, and because the counting has to stay auditable — every
-module records what it did, not just its result.
+## Modules
 
 | # | Module | Status | What it does |
 |---|---|---|---|
-| 1 | 🏠 **Launcher** | ✅ Working | Main menu; opens each module in its own window |
-| 2 | 🔬 **Detector** | ✅ Working | Batch inference with YOLO · paper-quality HTML report |
+| 1 | 🏠 **Launcher** | ✅ Working | Main menu — opens each module in its own window |
+| 2 | 🔬 **Detector** | ✅ Working | Batch analysis with YOLO · paper-quality HTML report |
 | 3 | 🎯 **Trainer** | ✅ Working | YOLO v8/v11 training with live curves |
-| 4 | 🏷 **Labeler** | ✅ Working | Interactive YOLO annotation with model pre-annotation |
-| 5 | 📐 **Viewer** | ✅ Working | Single-image inspection with interactive µm/pixel calibration |
-
-The interface is available in **Spanish and English** (selector in the Launcher's
-top bar, or the `POLYX_IDIOMA=en` environment variable), and the choice is
-remembered between sessions. `python auditar_traduccion.py` reports coverage: all
-308 interface strings across the Launcher and the four modules are translated.
+| 4 | 🏷 **Labeller** | ✅ Working | Interactive YOLO annotation with automatic pre-labelling |
+| 5 | 📐 **Viewer** | ✅ Working | Single-image inspection, calibration and particle-by-particle review |
 
 ---
 
-## Two design decisions worth knowing about
+## Features
 
-### Automatic tiling for large photographs
+### 🔬 Detector (batch analysis)
+- Loads up to **three .pt models** at once for side-by-side comparison
+- Runs over folders of images with a progress bar
+- Error analysis: **true positives / false positives / false negatives /
+  misclassified**, confusion matrix, gallery of the worst cases
+- **Automatic calibration against the Petri dish**: the rim is found on its own
+  and its known diameter sets the µm/px **of each photo**, with nothing to mark
+  by hand. This matters because the shooting distance varies between takes: in
+  this study's material the real scale ranges from 31 to 50 µm/px, a factor of
+  1.6, so a single value for the whole batch would give sizes off by as much as
+  50 %
+- **Size and shape measured on the particle, not on its box**: length, width,
+  area, aspect ratio and **fibre / fragment** classification. The box of an
+  elongated particle is nearly empty and depends on how it happened to land — a
+  fibre lying diagonally has a square box — so across 7,129 annotated particles
+  it overestimated area by **1.87×**
+- **Size distribution histogram** per class (PET/PP/LDPE) and by size band,
+  stacked by polymer
+- **CSV export** straight from the results page
+- **Drag and drop** for `.pt` models and images or folders
+- **Adjustable inference resolution** with presets (Fast 1280 · Balanced 2560 ·
+  Maximum detection 4096) and a button that measures what your GPU can take
+- Self-contained HTML report (images embedded as **base64**, paper quality) with
+  a **side-by-side prediction vs ground truth gallery**. Gallery images are
+  re-encoded and capped in number so the file stays openable in a browser; the
+  metrics still cover every image
+- **PDF export** of the report in one click, ready to email
+- **Selectable report sections**: eleven tick boxes and three presets (Full ·
+  Short summary · Methodological). Unticking renumbers the sections **on its
+  own** and adjusts the table of contents; a ticked section with no data is left
+  out anyway
+- **Selectable report scope**: the whole job, only the photos you tick, or both
+  at once. Figures, charts and the confusion matrix are recomputed over what you
+  chose, so the report always describes the photos it shows
+- **Real model comparison** inside the report: a photo-by-photo table with each
+  model's detections and, when ground truth exists, their TP/FP/FN and overall F1
+- **Automatic tiling of large photographs**: above a threshold the photo is
+  analysed in overlapping tiles, because at full resolution the particles fall
+  below the network's stride and vanish. Boxes are mapped back to the original
+  photo's coordinates and overlaps merged with NMS, so **results and report are
+  always delivered on the whole photo, never on the tiles**
+- The Run tab warns beforehand whether the batch will be tiled and how long it
+  will take
 
-A whole-plate photograph is ~4096 px on its long side. Feeding it to the network
-at `imgsz=2080` rescales it, which halves every particle: at ~12–19 px native, a
-microplastic particle drops below the network's stride and simply stops existing.
-The historical workaround was to cut each plate into pieces by hand and run
-detection piece by piece.
+### 🎯 Trainer
+- Supports **YOLO v8 and v11**, sizes nano → xlarge
+- Loads `data.yaml` with automatic train/val/test split detection
+- **Dataset validation** with ✓/✗ indicators (images, labels, classes)
+- Live loss curves (box loss, mAP, precision, recall)
+- Configurable augmentation (flip, rotation, mosaic, HSV)
+- Export to **ONNX / TensorRT / CoreML**
 
-The Detector, Labeler and Viewer now decide on their own. `politica_troceado()`
-compares the **longest side** against a threshold — what destroys the particle is
-the rescaling, not the file size — and if the photo is over it, the image is split
-into overlapping tiles, each inferred at native resolution, with the boxes mapped
-back to full-image coordinates and merged by global NMS.
+### 🏷 Labeller
+- Manual YOLO annotation with optional automatic pre-labelling
+- Progress is recovered from disk, so a count can be spread over several sessions
+- A `.txt` is written **only** when the image is marked as reviewed or a box is
+  drawn: recording a barely glanced image as "reviewed with zero" would falsify
+  the census
 
-Measured on one whole plate from the study (3072×4096): **123 detections in a
-single pass versus 328 tiled** into 6 tiles of 2000 px (manual count for that
-plate: 424). The overlap is what removes the seam problem — a particle straddling
-two tiles is merged rather than double-counted or lost.
+### 📐 Viewer
+- Opens a single image, or steps through a folder with `← →`
+- **Interactive µm/pixel calibration** in two modes:
+  - 📏 **Line** (2 clicks): mark a known reference, type its real size
+  - ⭕ **Circle** (3 clicks): mark 3 points on a circular edge, type the real
+    diameter (handy with Petri dishes, whose diameter is known)
+- The status bar shows `📐 0.4880 µm/px (line)` live
+- Detection with a loaded `.pt` model, with **configurable inference resolution**
+  (320–8192) and GPU when available. With tiny objects in high-resolution photos
+  `imgsz` is decisive: at low values the particles fall below the network's
+  stride and nothing is detected
+- **Load `.txt` labels**: shows existing annotations over the image with their
+  sizes converted to µm. Useful for reviewing a manual count without going back
+  to the Labeller
+- **Particle-by-particle review**: the table lists every particle with its
+  **number**, class, type (fibre or fragment), length, width and aspect ratio.
+  Selecting a row shows **what it was measured on**: the crop without marks on
+  the left and, on the right, the mask outline with the measurement drawn over it
+  — the Feret line in yellow, the geodesic path in magenta — plus the full
+  pixels-to-micrometres arithmetic. A size you cannot see being measured cannot
+  be verified
+- **Load predictions from a closed run** in `runs/detect_.../`, without running
+  the model again. It always opens the original photo and never the annotated
+  PNG, which has the boxes painted onto it
+- **Drag and drop** an image or a `.pt` model straight onto the canvas
+- Exports: annotated image + `detecciones.csv` + `resumen.json`
 
-The default threshold of 2000 px lets the study's own 1630-px crops through in one
-piece and tiles the full plates. All of it is configurable in *Parameters →
-Automatic tiling*.
+---
 
-### The Trainer prioritizes resolution over batch size
+## How a particle's size is measured
 
-For particles of ~12–19 px, what makes them detectable is resolution, not batch
-size. So `recomendar_config()` applies a fixed order:
+The general criterion is **the longest straight line that fits inside the
+particle**, that is the greatest distance between two points of its outline: the
+*maximum Feret diameter*. It does not depend on the orientation the particle
+happened to land in, and a jagged edge does not disturb it.
 
-1. **imgsz as high as it fits** in VRAM at the smallest usable batch, capped by the
-   dataset's native resolution — training at 4096 on 1630-px crops only
-   interpolates and eats the VRAM the batch needs.
-2. **batch** afterwards, with imgsz already fixed, using whatever is left.
-3. **speed** last: AMP, workers, cache. AMP stays on permanently, because it is
-   not only speed — it is what makes the high imgsz possible, so switching it off
-   would violate priority 1.
+That straight line stops working when the particle is **contorted**: in a bent
+fibre the distance between the ends is the chord, and on a half-circle arc it
+falls 35 % short. For those cases the *geodesic diameter* is measured instead —
+the longest path that fits **inside** the particle, which cannot leave the mask
+and therefore follows the curve.
 
-GPU detection picks the card with the most VRAM rather than device 0 (on a machine
-with integrated and discrete graphics, device 0 can be the wrong one), and reports
-compute capability, driver and the CUDA version PyTorch was built against. If
-PyTorch cannot see CUDA but `nvidia-smi` can see the card, that specific situation
-is reported as such — it is an installation problem, not missing hardware, and the
-old "no GPU detected" message sent people looking in the wrong place.
+| Particle shape | What is reported as length |
+|---|---|
+| Compact or irregular, but not bent | Maximum Feret — the longest straight line |
+| Elongated and contorted (fibre) | Geodesic diameter — follows the curve |
+
+The geodesic is only used when the particle is **thin** (length ≥ 4 × thickness)
+and **non-convex** (solidity < 0.90). Without the first condition, any concavity
+makes the path go around the particle instead of through it; without the second,
+the length would start depending on the rotation angle, which is precisely the
+defect this was meant to remove.
+
+Against synthetic shapes of known size — straight bars, rotated bars, arcs of
+60°, 120° and 180°, a circle, a bar with a jagged edge and a blob with a notch —
+the length measured this way gives a **median error of 0.6 % and 4.7 % in the
+worst case**. This is pinned down in `tests/test_morfologia.py`.
+
+> **The equivalent rectangle is not a size.** The formula
+> *L* = (*P* + √(*P*²−16*A*))/4 gives the length of a rectangle with the same
+> area and the same perimeter, which is a different thing. It depends on the
+> perimeter, so a jagged edge inflates it by 22.5 %, and it is undefined for
+> compact particles, where *P*² < 16*A*. It is reported as a descriptor, because
+> compared against the other two it exposes irregular outlines, but it is not
+> used as a size.
+
+**Stated limitations.** Two particles of different polymer touching inside the
+same box are measured as one: separating them by colour is not viable in this
+material, because the difference in hue between two polymers is no greater than
+the difference between the core and the edge of a single particle. And in a
+tightly coiled fibre the geodesic path cuts the corner at each bend,
+underestimating by up to 19 % in the tightest case tested.
 
 ---
 
 ## Polymer classes
 
-| ID | Class | Observed fluorescence (Nile Red, UV) | On-screen box color |
+| ID | Class | Observed fluorescence (Nile Red, UV) | Interface colour |
 |---|---|---|---|
 | 0 | **PET** | Red–salmon | 🔴 `#e3342f` |
 | 1 | **PP** | **Dull yellow-green** | 🟠 `#ff8c00` |
-| 2 | **LDPE** | Clear yellow, **brighter** | 🟡 `#ffd700` |
+| 2 | **LDPE** | Bright, clear yellow | 🟡 `#ffd700` |
 
-The colors on the right are only how boxes are drawn; they do not describe the real
-emission. Mean RGB measured inside the training-set boxes (n=30 per class):
+The interface colours are there to tell the boxes apart on screen and **do not
+describe the real emission**. Measured inside the training-set boxes (mean RGB,
+n = 30 per class): PET 116/58/65 · PP 122/125/32 · LDPE 181/162/57.
 
-| Class | R | G | B |
-|---|---|---|---|
-| PET | 116 | 58 | 65 |
-| PP | 122 | **125** | 32 |
-| LDPE | 181 | 162 | 57 |
+**PP and LDPE share a hue and separate by brightness** (R 122 against 181), plus
+PP's greenish cast. That is the dominant confusion when annotating, and it
+explains why per-class recall collapses there: PET 0.98 · PP 0.70 · LDPE 0.54.
 
-**PP and LDPE do not separate by hue but by brightness**: both are yellowish, but
-in PP the green channel equals or exceeds the red and the emission is markedly
-duller. This is the most common annotation confusion and the reason per-class
-recall drops on those two.
+---
 
-> Fluorescence-based class assignment is **not** a chemical identification. Any
-> claim about polymer composition needs FTIR or Raman confirmation on a subsample,
-> and needs correcting for the per-class recall.
+## Language
+
+The interface is available in **Spanish and English**. The selector sits in the
+Launcher's top bar and the choice is remembered between sessions. The first time,
+the system language is used; `POLYX_IDIOMA=en` forces it without touching the
+interface.
+
+Modules are separate processes and read the language when they open, so the
+change takes effect as soon as you open the next module.
+
+To see what is still untranslated:
+
+```bat
+.venv\Scripts\python.exe auditar_traduccion.py
+```
 
 ---
 
@@ -115,49 +201,35 @@ recall drops on those two.
 | Windows | 10 / 11 |
 | Python | **3.11.x** (not 3.12+) |
 | RAM | 8 GB minimum |
-| GPU | NVIDIA optional (20–30× faster for training) |
+| GPU | NVIDIA optional (20–30× faster for training). The installer picks the CUDA build that matches the card's architecture |
 
 Main dependencies: `PySide6 6.7`, `Ultralytics 8.3`, `OpenCV 4.10`, `NumPy 1.26`,
-`Matplotlib 3.9`, `psutil 6.0`.
+`Matplotlib 3.9`
 
 ---
 
 ## Installation
 
-Download the project (**Code → Download ZIP**, then unzip; or `git clone`) and
-double-click:
+Clone or download the repository, then run once:
 
 ```bat
 SETUP.bat
 ```
 
-The installer:
+It creates `.venv`, detects the GPU and installs PyTorch, Ultralytics and
+PySide6. Nothing else has to be installed by hand.
 
-1. Asks **where to install** (press ENTER to install in place).
-2. Finds Python 3.11 and creates the `.venv` environment.
-3. Detects an NVIDIA GPU and downloads the matching PyTorch build (CUDA or CPU).
-4. Installs the remaining dependencies and verifies that everything imports.
-5. Creates `models\` and `data\`, and puts a **"Poly-X" shortcut on the Desktop**
-   pointing at `Poly-X.vbs` with the application icon.
+---
 
-Then launch from the Desktop shortcut, or double-click `Poly-X.vbs` (starts with
-`pythonw`, so no console window). `iniciar_polyx.bat` does the same but keeps the
-console visible, which is useful when something fails at startup.
+## Usage
 
-To pull the latest published version without reinstalling, double-click
-`actualizar.bat`.
+Double-click the **Poly-X** shortcut on the Desktop, or:
 
-### What is *not* in the download
+```bat
+iniciar_polyx.bat
+```
 
-Two things are deliberately excluded because of their size, and have to be supplied
-separately:
-
-| What | Where it goes |
-|---|---|
-| A trained model, `*.pt` | drop it in `models\` |
-| The training dataset | unzip anywhere, then pick its `dataset.yaml` in the Trainer |
-
-Command-line entry points, if preferred:
+That opens the **Launcher** → pick a module. Or straight from a terminal:
 
 ```bash
 .venv\Scripts\python.exe -m polyx.launcher
@@ -169,23 +241,113 @@ Command-line entry points, if preferred:
 
 ---
 
-## Repository scope
+## Updating
 
-This repository contains **the program only**. Trained weights, image datasets and
-the analysis pipeline and manuscript of the study in preparation are excluded by
-`.gitignore` — publishing them here would pre-empt unpublished results, the
-author's and other people's.
+To pull the latest version published on GitHub **without reinstalling anything**,
+double-click:
+
+```bat
+actualizar.bat
+```
+
+It checks whether there is a new commit on `main`; if there is, it downloads and
+replaces only the program files. It **keeps** your `.venv` environment, your
+`models\*.pt`, your `runs\` and any local data. Git does not need to be installed
+(it downloads over HTTPS).
+
+---
+
+## Project layout
+
+```
+polyx/
+├── launcher.py          # Main menu
+├── core/                # Shared modules (theme, yolo_wrap, metrics, report_html,
+│                        #   calibracion, morfologia, procedencia, i18n)
+├── detector/            # Module 2: batch analysis (9 pages)
+├── trainer/             # Module 3: YOLO training (9 pages)
+├── etiquetador/         # Module 4: interactive annotation
+└── visor/               # Module 5: inspection + µm/px calibration
+models/                  # Trained .pt weights
+runs/                    # Results of each run
+data_microplastico/      # YOLO dataset (images/ + labels/)
+tests/                   # Test suite for measurement and calibration
+```
+
+---
+
+## The full workflow
+
+```
+Microscope images (UV 254 nm, Nile Red staining)
+        ↓
+  🏷 Labeller  → annotate PET/PP/LDPE in YOLO format
+        ↓
+  🎯 Trainer   → train a YOLO v8/v11 model
+        ↓
+  🔬 Detector  → batch analysis + HTML report
+        ↓
+  📐 Viewer    → detailed inspection + µm/px calibration
+```
+
+---
+
+## Tests
+
+Shape measurement and calibration have their own suite, because every figure they
+produce ends up in a table of the paper and a well-meant change can shift them
+all without anything warning you.
+
+```bash
+.venv\Scripts\python.exe -m pytest tests/ -q
+```
+
+43 tests against **synthetic shapes of known size**, depending on no human
+annotation whatsoever. Each one also pins down the *why* of a design decision, so
+that if someone tries a variant that was already discarded, the suite says so.
+
+`pytest` is only needed for development and is **not in `requirements.txt`**: an
+installation meant for use does not need it.
 
 ---
 
 ## Related publications
 
-- **Pérez M, Parra S, Ferrada C, Bravo M, Pérez PA, Quiroz W (2024).** Development of a new methodology for the determination of PET microplastics in sediment, based on microwave-assisted acid digestion. *PLoS ONE* 19(12): e0314520.
+- **Pérez M, Parra S, Ferrada C, Bravo M, Pérez PA, Quiroz W (2024).** Development
+  of a new methodology for the determination of PET microplastics in sediment,
+  based on microwave-assisted acid digestion. *PLoS ONE* 19(12): e0314520.
   https://doi.org/10.1371/journal.pone.0314520
-- **Ferrada C, Pérez M, Parra S, Salas E, Sepúlveda F, Bravo MA, Quiroz W (2024).** Evaluation of microwave-assisted acid/oxidant digestion method for the detection of polyethylene microplastics in *Merluccius gayi* fish by Nile Red fluorescent staining and image analysis. *J. Chil. Chem. Soc.* 69(1): 6082–6085.
+- **Ferrada C, Pérez M, Parra S, Salas E, Sepúlveda F, Bravo MA, Quiroz W (2024).**
+  Evaluation of microwave-assisted acid/oxidant digestion method for the detection
+  of polyethylene microplastics in *Merluccius gayi* fish by Nile Red fluorescent
+  staining and image analysis. *J. Chil. Chem. Soc.* 69(1): 6082-6085.
   https://doi.org/10.4067/s0717-97072024000106082
 
-## Contact
+---
 
-Cristofher Ferrada — PhD in Chemistry, Pontificia Universidad Católica de
-Valparaíso, Chile.
+## User manual
+
+`Manual_PolyX.en.html` ships with the repository: every tab documented with
+screenshots. Regenerate it with:
+
+```bash
+POLYX_IDIOMA=en .venv\Scripts\python.exe generar_manual.py --manual Manual_PolyX.en.html
+```
+
+---
+
+## Repository scope
+
+This repository documents **the program**. Everything belonging to a paper in
+preparation — the study's analysis pipeline, its photographs and its findings —
+is deliberately left out, because publishing it here would pre-empt results that
+are not out yet.
+
+---
+
+## Licence and contact
+
+**Cristofher Ferrada** — PhD in Chemistry, Pontificia Universidad Católica de
+Valparaíso, 2026.
+
+Repository: https://github.com/CrissFerrada/Poly-X-Microplastics
