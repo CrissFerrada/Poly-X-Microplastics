@@ -250,16 +250,47 @@ class VisorWindow(QMainWindow):
         self.lbl_det_count.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
         rv.addWidget(self.lbl_det_count)
 
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Clase", "Conf", "Ø(px)", "Ø(μm)"])
+        self.lbl_morfo = QLabel("")
+        self.lbl_morfo.setStyleSheet(f"color: {T.INK2}; font-size: 9.5pt; font-weight: 600;")
+        rv.addWidget(self.lbl_morfo)
+
+        # Una fila por partícula, con su NÚMERO delante: es el mismo que lleva
+        # dibujado en la imagen, así que se puede ir de la fila a la partícula.
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(
+            ["#", "Clase", "Tipo", "Largo μm", "Ancho μm", "Asp."])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.verticalHeader().setDefaultSectionSize(22)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setAlternatingRowColors(True)
-        self.table.setFixedHeight(220)
+        self.table.setFixedHeight(200)
         self.table.setStyleSheet(f"font-size: 9pt;")
+        self.table.itemSelectionChanged.connect(self._on_particula_elegida)
         rv.addWidget(self.table)
+
+        # ── Ficha de la partícula seleccionada ──
+        # Aquí se ve SOBRE QUÉ se midió: el contorno de la máscara y, encima, la
+        # recta de Feret o el camino geodésico. Una talla que no se puede ver
+        # medida no se puede verificar, y eso es lo que pide un revisor.
+        self.lbl_ficha_tit = QLabel(tr("Selecciona una partícula para ver su medición"))
+        self.lbl_ficha_tit.setStyleSheet(f"color: {T.INK3}; font-size: 9pt;")
+        self.lbl_ficha_tit.setWordWrap(True)
+        rv.addWidget(self.lbl_ficha_tit)
+
+        self.lbl_ficha = QLabel()
+        self.lbl_ficha.setAlignment(Qt.AlignCenter)
+        self.lbl_ficha.setMinimumHeight(150)
+        self.lbl_ficha.setStyleSheet(
+            f"background: #0d1117; border: 1px solid #d0d7de; border-radius: 6px;")
+        rv.addWidget(self.lbl_ficha)
+
+        self.lbl_ficha_datos = QLabel("")
+        self.lbl_ficha_datos.setWordWrap(True)
+        self.lbl_ficha_datos.setStyleSheet(
+            f"color: {T.INK3}; font-size: 9pt; font-family: Consolas, monospace;")
+        rv.addWidget(self.lbl_ficha_datos)
 
         rv.addWidget(HLine())
 
@@ -444,27 +475,114 @@ class VisorWindow(QMainWindow):
         return ["PET", "PP", "LDPE"]
 
     def _on_detections_changed(self, dets: list):
+        self._medir_formas(dets)
         self._rebuild_table(dets)
         self._update_filter_combo(dets)
         self.lbl_det_count.setText(f"{len(dets)} detección(es)")
         self._update_status_bar()
 
+    def _medir_formas(self, dets: list):
+        """Numera y mide la forma real de cada partícula.
+
+        Se hace aquí y no al dibujar la tabla porque medir cuesta unos 6 ms por
+        partícula y la tabla se reconstruye cada vez que cambia un filtro.
+        """
+        self._bgr_actual = None
+        if not dets:
+            self.lbl_morfo.setText("")
+            return
+        ruta = self.state.current_image
+        if ruta is None:
+            return
+        try:
+            from ..core.calibracion import leer_imagen
+            from ..core.morfologia import aplicar_a_deteccion
+            bgr = leer_imagen(ruta)
+        except Exception:
+            bgr = None
+        if bgr is None:
+            return
+        self._bgr_actual = bgr
+        um = self.state.um_per_px if self.state.um_per_px > 0 else None
+        # De arriba abajo y de izquierda a derecha: el mismo criterio que usa el
+        # Detector, para que el número signifique lo mismo en los dos módulos.
+        for i, d in enumerate(sorted(dets, key=lambda z: (round(z.y1 / 40), z.x1)), 1):
+            d.numero = i
+            aplicar_a_deteccion(d, bgr, um)
+        fib = sum(1 for d in dets if d.morfotipo == "fibra")
+        sin = sum(1 for d in dets if d.morfotipo is None)
+        txt = f"{fib} fibra(s) · {len(dets) - fib - sin} fragmento(s)"
+        if sin:
+            txt += f" · {sin} sin medir"
+        if not um:
+            txt += "   (sin calibrar: tallas solo en píxeles)"
+        self.lbl_morfo.setText(txt)
+
     def _rebuild_table(self, dets: list):
         self.table.setRowCount(0)
-        for det in dets:
+        for det in sorted(dets, key=lambda z: (z.numero or 0)):
             row = self.table.rowCount()
             self.table.insertRow(row)
-            w_px = det.x2 - det.x1
-            h_px = det.y2 - det.y1
-            diam_px = math.sqrt(w_px * h_px)
-            um = self.state.px_to_um(diam_px)
-
-            self.table.setItem(row, 0, QTableWidgetItem(det.class_name))
-            self.table.setItem(row, 1, QTableWidgetItem(f"{det.conf:.2f}"))
-            self.table.setItem(row, 2, QTableWidgetItem(f"{diam_px:.1f}"))
+            it = QTableWidgetItem(str(det.numero or row + 1))
+            # La Detection viaja dentro del item: al seleccionar la fila hay que
+            # poder volver a ella sin buscarla por índice, que se desincroniza
+            # en cuanto se filtra por clase.
+            it.setData(Qt.UserRole, det)
+            self.table.setItem(row, 0, it)
+            self.table.setItem(row, 1, QTableWidgetItem(det.class_name))
+            self.table.setItem(row, 2, QTableWidgetItem(det.morfotipo or "—"))
             self.table.setItem(row, 3, QTableWidgetItem(
-                f"{um:.1f}" if um is not None else "—"
-            ))
+                f"{det.largo_um:.0f}" if det.largo_um else "—"))
+            self.table.setItem(row, 4, QTableWidgetItem(
+                f"{det.ancho_um:.0f}" if det.ancho_um else "—"))
+            self.table.setItem(row, 5, QTableWidgetItem(
+                f"{det.aspecto:.1f}" if det.aspecto else "—"))
+
+    def _on_particula_elegida(self):
+        """Dibuja la medición de la partícula seleccionada en la tabla."""
+        filas = self.table.selectionModel().selectedRows()
+        if not filas or getattr(self, "_bgr_actual", None) is None:
+            return
+        item = self.table.item(filas[0].row(), 0)
+        det = item.data(Qt.UserRole) if item else None
+        if det is None:
+            return
+        try:
+            from ..core.morfologia import dibujar_medicion
+            img, m = dibujar_medicion(self._bgr_actual, det, zoom=6)
+        except Exception:
+            img, m = None, None
+        if img is None or m is None or not m.ok:
+            self.lbl_ficha.setText(tr("No se pudo aislar esta partícula del fondo"))
+            self.lbl_ficha_datos.setText("")
+            return
+
+        from PySide6.QtGui import QImage, QPixmap
+        alto, ancho = img.shape[:2]
+        qim = QImage(img.data, ancho, alto, 3 * ancho, QImage.Format_BGR888).copy()
+        pix = QPixmap.fromImage(qim)
+        disponible = self.lbl_ficha.width() - 12
+        if disponible > 0 and pix.width() > disponible:
+            pix = pix.scaledToWidth(disponible, Qt.SmoothTransformation)
+        self.lbl_ficha.setPixmap(pix)
+        self.lbl_ficha_tit.setText(
+            f"Partícula #{det.numero} · {det.class_name} · {det.morfotipo or '—'}"
+            "   —   izquierda: sin marcas · derecha: verde = contorno medido, "
+            "amarillo = Feret, magenta = geodésico")
+        um = self.state.um_per_px
+        lineas = [
+            f"medido por  {m.metodo}",
+            f"largo       {m.largo_px:8.1f} px"
+            + (f"  x {um:.4f} um/px = {det.largo_um:.0f} um" if um > 0 and det.largo_um else ""),
+            f"ancho       {m.ancho_px:8.1f} px"
+            + (f"  = {det.ancho_um:.0f} um" if um > 0 and det.ancho_um else ""),
+            f"Feret       {m.feret_px:8.1f} px",
+            f"geodesico   {m.geodesico_px:8.1f} px",
+            f"aspecto     {m.aspecto:8.1f}   curvatura {m.curvatura:.2f}",
+        ]
+        if m.aviso:
+            lineas.append(f"aviso: {m.aviso}")
+        self.lbl_ficha_datos.setText("\n".join(lineas))
 
     def _update_filter_combo(self, dets: list):
         self.combo_filter.blockSignals(True)

@@ -140,6 +140,19 @@ class ResultadosPage(DetectorPage):
         self.table.cellDoubleClicked.connect(self._open_row)
         self.table.setMinimumHeight(280)
         l3.addWidget(self.table)
+        fila_rev = QHBoxLayout()
+        btn_rev = QPushButton(tr("🔍  Revisar partícula a partícula en el Visor"))
+        btn_rev.clicked.connect(self._revisar_en_visor)
+        fila_rev.addWidget(btn_rev)
+        fila_rev.addStretch(1)
+        l3.addLayout(fila_rev)
+        nota_rev = QLabel(tr(
+            "Abre la imagen seleccionada en el Visor con estas mismas detecciones, "
+            "numeradas. Allí cada partícula muestra sobre qué se midió y si es "
+            "fibra o fragmento — sin volver a pasar el modelo."))
+        nota_rev.setWordWrap(True)
+        nota_rev.setStyleSheet(f"color: {T.INK3}; font-size: 9pt; border: none;")
+        l3.addWidget(nota_rev)
         self.body.addWidget(c3)
 
         # Suscribir
@@ -502,3 +515,59 @@ class ResultadosPage(DetectorPage):
         annot = self.state.run_dir / alias / f"{img.stem}_annot.png"
         if annot.exists():
             os.startfile(str(annot))
+
+    def _revisar_en_visor(self):
+        """Abre la imagen seleccionada en el Visor, con sus detecciones puestas.
+
+        Revisar partícula a partícula es una tarea interactiva y no cabe en un
+        informe: doce fichas ya pesan más de un megabyte. Pero tampoco debería
+        obligar a salir del Detector, buscar el archivo y volver a detectar, que
+        además correría el modelo por segunda vez sobre la misma foto. Aquí se le
+        pasan al Visor las detecciones que YA se calcularon, de modo que lo que
+        se revisa es exactamente lo que produjo la corrida.
+        """
+        filas = self.table.selectionModel().selectedRows()
+        if not filas:
+            QMessageBox.information(
+                self, tr("Revisar"),
+                tr("Selecciona primero una fila de la tabla de abajo."))
+            return
+        row = filas[0].row()
+        alias = self.table.item(row, 0).data(Qt.UserRole)
+        img = Path(self.table.item(row, 1).data(Qt.UserRole))
+
+        # Las detecciones de ESA imagen con ESE modelo.
+        dets = []
+        for mi, rs in self.state.results.items():
+            if self.state.model_slots[mi].alias != alias:
+                continue
+            for r in rs:
+                if Path(r.image_path) == img:
+                    dets = list(r.predictions)
+                    break
+        if not dets:
+            QMessageBox.information(
+                self, tr("Revisar"),
+                tr("Esa imagen no tiene detecciones que revisar."))
+            return
+
+        try:
+            from ...visor.window import VisorWindow
+        except Exception as e:
+            QMessageBox.warning(self, tr("Revisar"),
+                                f"No se pudo abrir el Visor: {e}")
+            return
+
+        # Se guarda en self para que no lo recoja el recolector de basura al
+        # salir de la función: una ventana Qt sin referencia viva se cierra sola.
+        self._visor = VisorWindow()
+        self._visor.state.load_single(img)
+        cal = (getattr(self.state, "calibraciones", None) or {}).get(img.name)
+        if cal is not None and getattr(cal, "valida", False):
+            self._visor.state.um_per_px = cal.um_por_px
+        elif self.state.params.um_per_px > 0:
+            self._visor.state.um_per_px = self.state.params.um_per_px
+        self._visor.state.detections = dets
+        self._visor.state.detections_changed.emit(dets)
+        self._visor.show()
+        self._visor.raise_()
