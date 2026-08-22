@@ -1523,6 +1523,7 @@ entraría entero en todos los tamaños reportados.</p>"""
     n_sin_forma = sum(1 for r in all_results for p_ in r.predictions
                       if getattr(p_, "aspecto", None) is None)
     ficha_mayor = None
+    tabla_morfotipo = tablas = recuento = metodo = ejemplo = ""
     if formas:
         con_talla = [(d, ruta) for d, ruta in formas if d.largo_um]
         fibras = sum(1 for d, _ in formas if d.morfotipo == "fibra")
@@ -1530,7 +1531,7 @@ entraría entero en todos los tamaños reportados.</p>"""
         pc_f = 100.0 * fibras / len(formas)
 
         # ── Reparto por morfotipo ──
-        forma_html = f"""
+        tabla_morfotipo = f"""
 <table class='data'><tr><th>Morfotipo</th><th>Partículas</th><th>%</th></tr>
 <tr><td>Fibra (relación de aspecto ≥ 3)</td><td>{fibras}</td><td>{pc_f:.1f} %</td></tr>
 <tr><td>Fragmento</td><td>{len(formas) - fibras}</td><td>{100 - pc_f:.1f} %</td></tr>
@@ -1552,8 +1553,8 @@ entraría entero en todos los tamaños reportados.</p>"""
                         f"<td>{_num(d.curvatura, 2)}</td><td>{d.morfotipo or '—'}</td>"
                         f"<td style='font-size:9pt'>{Path(ruta).name}</td></tr>")
 
-            forma_html += f"""
-<h3>{NUM}.1 Partícula mayor y menor</h3>
+            tablas = f"""
+<h3>{NUM}.3 Partícula mayor y menor</h3>
 <table class='data'>
 <tr><th></th><th>Clase</th><th>Largo<br>(µm)</th><th>Ancho<br>(µm)</th>
 <th>Área<br>(µm²)</th><th>Aspecto</th><th>Curvatura</th><th>Morfotipo</th><th>Imagen</th></tr>
@@ -1561,7 +1562,7 @@ entraría entero en todos los tamaños reportados.</p>"""
 {_fila("Menor", menor, ruta_menor)}
 </table>
 
-<h3>{NUM}.2 Distribución de tallas</h3>
+<h3>{NUM}.4 Distribución de tallas</h3>
 <table class='data'>
 <tr><th>Estadístico</th><th>Largo (µm)</th></tr>
 <tr><td>mínimo</td><td>{largos.min():.0f}</td></tr>
@@ -1577,7 +1578,7 @@ entraría entero en todos los tamaños reportados.</p>"""
                 por_clase.setdefault(d.class_name, []).append(d.largo_um)
             fig = _fig_tallas_por_tramo(por_clase)
             if fig:
-                forma_html += f"<img src='{fig}' style='max-width:100%'>"
+                tablas += f"<img src='{fig}' style='max-width:100%'>"
 
             # ── Tabla por clase, con su mayor ──
             filas_cls = ""
@@ -1591,8 +1592,8 @@ entraría entero en todos los tamaños reportados.</p>"""
                               f"<td>{v[0]:.0f}</td><td>{v[len(v) // 2]:.0f}</td>"
                               f"<td>{v[-1]:.0f}</td><td>{nf}</td></tr>")
             if filas_cls:
-                forma_html += (
-                    f"<h3>{NUM}.3 Talla por tipo de plástico</h3>"
+                tablas += (
+                    f"<h3>{NUM}.5 Talla por tipo de plástico</h3>"
                     f"<table class='data'><tr><th>Clase</th><th>n</th>"
                     f"<th>menor<br>(µm)</th><th>mediana<br>(µm)</th>"
                     f"<th>mayor<br>(µm)</th><th>Fibras</th></tr>{filas_cls}</table>")
@@ -1623,14 +1624,14 @@ entraría entero en todos los tamaños reportados.</p>"""
                 f"<td>{nf}</td><td>{len(ds) - nf}</td>"
                 f"<td>{(f'{np.median(largos_i):.0f}' if largos_i else '—')}</td>"
                 f"<td>{(f'{max(largos_i):.0f}' if largos_i else '—')}</td></tr>")
-        forma_html += (
-            f"<h3>{NUM}.4 Recuento por imagen</h3>"
+        recuento = (
+            f"<h3>{NUM}.6 Recuento por imagen</h3>"
             f"<table class='data'><tr><th>Imagen</th><th>Partículas</th>"
             f"<th>Fibras</th><th>Fragmentos</th><th>Largo mediano<br>(µm)</th>"
             f"<th>Mayor<br>(µm)</th></tr>{filas_img}</table>")
 
-        forma_html += f"""
-<h3>{NUM}.5 Cómo se mide el largo</h3>
+        metodo = f"""
+<h3>{NUM}.1 Cómo se mide el largo</h3>
 <p>Las magnitudes se miden sobre la <strong>máscara de cada partícula</strong>, no sobre la caja
 del detector. La caja de una partícula alargada está casi vacía y depende de cómo haya caído:
 una fibra tumbada en diagonal tiene caja cuadrada, de modo que medir sobre la caja la
@@ -1683,14 +1684,20 @@ borde de una misma partícula. Y en una fibra muy enroscada el camino geodésico
 interior de cada codo, subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que
 se ensayó.</p>"""
         if n_sin_forma:
-            forma_html += (
+            metodo += (
                 f"<p>En {n_sin_forma} partículas no se pudo separar la partícula del fondo; "
                 f"su talla proviene de la caja y no es comparable con el resto.</p>")
 
         # ── El ejemplo, ya explicado el método ──
         if ficha_mayor is not None:
-            forma_html += _ficha_particula(
-                *ficha_mayor, "6 Un ejemplo: la partícula mayor, medida")
+            ejemplo = _ficha_particula(
+                *ficha_mayor, "2 Un ejemplo: la partícula mayor, medida")
+
+    # Orden de la sección: primero cómo se mide, luego un caso medido, y al
+    # final las cifras. Al revés, las tablas llegan antes de que nada haya
+    # explicado qué significa aquí "largo".
+    if formas:
+        forma_html = metodo + ejemplo + tabla_morfotipo + tablas + recuento
 
     # ── Ficha de cada partícula ──
     # Una entrada por partícula, con su número, su recorte y la medida dibujada
