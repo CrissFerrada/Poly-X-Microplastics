@@ -1603,18 +1603,58 @@ entraría entero en todos los tamaños reportados.</p>"""
                 "4 La partícula mayor, y cómo se midió")
 
         forma_html += f"""
-<p>Las magnitudes se miden sobre la <strong>máscara de cada partícula</strong>, no sobre su
-caja. La caja de una partícula alargada está casi vacía y depende de cómo haya caído: una
-fibra tumbada en diagonal tiene caja cuadrada, de modo que medir sobre la caja la reportaría
-como fragmento y con una talla equivocada.</p>
-<p>El largo se obtiene resolviendo el rectángulo de igual área y perímetro,
-<em>L</em> = (<em>P</em> + √(<em>P</em>²−16<em>A</em>))&nbsp;/&nbsp;4. Doblar una fibra no
-cambia ni su área ni su perímetro, así que este largo sigue la curva sin necesidad de
-modelarla. En partículas compactas el discriminante es negativo —no existe tal rectángulo— y
-entonces se informa la extensión recta.</p>
-<p><strong>{curvas} partículas ({100.0 * curvas / len(formas):.1f} %) están curvadas</strong>,
-entendiendo por tal que su largo supera en más de un 15 % su extensión en línea recta. En
-ellas la distancia entre extremos subestima la talla, y es la razón por la que no se usa.</p>"""
+<h3>{NUM}.5 Cómo se mide el largo</h3>
+<p>Las magnitudes se miden sobre la <strong>máscara de cada partícula</strong>, no sobre la caja
+del detector. La caja de una partícula alargada está casi vacía y depende de cómo haya caído:
+una fibra tumbada en diagonal tiene caja cuadrada, de modo que medir sobre la caja la
+reportaría como fragmento y con una talla equivocada. La máscara se obtiene umbralizando cada
+recorte a medio camino entre el nivel del fondo —la mediana del anillo que rodea la caja— y el
+de la partícula —el percentil 90 dentro de ella—.</p>
+
+<p><strong>El criterio general es la línea recta más larga que cabe en la partícula</strong>, es
+decir la mayor distancia entre dos puntos de su contorno: el <em>diámetro de Feret máximo</em>.
+Para una partícula de forma irregular pero no doblada, esa recta es su talla, y tiene dos
+propiedades que la hacen fiable: no depende de la orientación con que la partícula haya caído,
+y un borde dentado no la altera.</p>
+
+<p><strong>Esa recta deja de servir cuando la partícula está contorsionada.</strong> En una fibra
+doblada la distancia entre sus extremos es la cuerda, no su longitud: en un arco de media
+circunferencia se queda un 35&nbsp;% corta. Para esos casos se mide el <em>diámetro
+geodésico</em>, que es el camino más largo que cabe <strong>dentro</strong> de la partícula. Al
+no poder salirse de la máscara, ese camino rodea la curva y devuelve la longitud recorrida.</p>
+
+<table class='data'>
+<tr><th>Forma de la partícula</th><th>Qué se reporta como largo</th></tr>
+<tr><td>Compacta o irregular, pero no doblada</td><td>Feret máximo (la recta más larga)</td></tr>
+<tr><td>Alargada y contorsionada (fibra)</td><td>Diámetro geodésico (sigue la curva)</td></tr>
+</table>
+
+<p>La distinción se hace por el <strong>grosor</strong>: solo se usa el geodésico si el largo
+supera al menos cuatro veces el grosor máximo inscrito de la partícula. La razón es que en una
+partícula gruesa cualquier concavidad obliga al camino geodésico a bordearla en vez de
+atravesarla, y entonces el número se infla; en una fibra delgada eso no puede ocurrir.</p>
+
+<p>Contrastado con formas de talla conocida —rectas, rectas giradas 45&nbsp;°, arcos de 60, 120
+y 180&nbsp;°, un círculo y una recta de borde dentado— el largo así medido da un
+<strong>error mediano del 0,8&nbsp;% y del 4,7&nbsp;% en el peor caso</strong>.</p>
+
+<p>Se reporta además el <em>rectángulo equivalente</em>,
+<em>L</em>&nbsp;=&nbsp;(<em>P</em>&nbsp;+&nbsp;√(<em>P</em>²−16<em>A</em>))/4, que es el largo
+que tendría un rectángulo con la misma área y el mismo perímetro. <strong>No se usa como
+talla</strong>: depende del perímetro, y el perímetro se infla con la rugosidad del contorno
+—un 22,5&nbsp;% en la recta dentada de talla conocida—, además de no estar definido para
+partículas compactas, en las que <em>P</em>²&nbsp;&lt;&nbsp;16<em>A</em>. Se conserva porque al
+compararlo con las otras dos medidas delata qué partículas tienen el borde irregular.</p>
+
+<p><strong>{curvas} partículas ({100.0 * curvas / len(formas):.1f} %) están contorsionadas</strong>,
+entendiendo por tal que su largo supera en más de un 15&nbsp;% su extensión en línea recta.</p>
+
+<p><em>Limitaciones conocidas.</em> Dos partículas de polímero distinto que se tocan dentro de
+la misma caja se miden como una sola: separarlas por color no es viable en este material,
+porque la diferencia de tono entre dos polímeros no supera a la que hay entre el núcleo y el
+borde de una misma partícula. Y en una fibra muy enroscada el camino geodésico ataja por el
+interior de cada codo, subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que
+se ensayó.</p>"""
         if n_sin_forma:
             forma_html += (
                 f"<p>En {n_sin_forma} partículas no se pudo separar la partícula del fondo; "
