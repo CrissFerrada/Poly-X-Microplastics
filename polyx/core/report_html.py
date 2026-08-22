@@ -687,17 +687,12 @@ def _ficha_particula(det, ruta_imagen, um_por_px: Optional[float],
             otras.append(f"<tr><td>Feret máximo (cuerda)</td><td>{det.feret_um:.0f}</td></tr>")
         if det.geodesico_um:
             otras.append(f"<tr><td>Geodésico (sigue la curva)</td><td>{det.geodesico_um:.0f}</td></tr>")
-        if det.largo_rect_eq_um:
-            otras.append(f"<tr><td>Rectángulo equivalente <em>(descriptor)</em></td>"
-                         f"<td>{det.largo_rect_eq_um:.0f}</td></tr>")
         if otras:
             cuenta += (f"<table class='data'><tr><th>Medida</th><th>µm</th></tr>"
                        f"{''.join(otras)}</table>"
                        f"<p>Se reporta la mayor de las dos primeras"
                        + (f", en este caso por <strong>{det.metodo_largo}</strong>"
-                          if det.metodo_largo else "") + ". El rectángulo equivalente "
-                       "no es una talla: depende del perímetro, y si se dispara "
-                       "respecto de las otras dos es señal de borde irregular.</p>")
+                          if det.metodo_largo else "") + ".</p>")
     return (f"<h3>{NUM}.{titulo}</h3>"
             f"<p>A la izquierda la partícula; a la derecha, en verde, el contorno que se "
             f"midió sobre ella.</p>{img}{cuenta}")
@@ -1666,23 +1661,19 @@ atravesarla, y entonces el número se infla; en una fibra delgada eso no puede o
 y 180&nbsp;°, un círculo y una recta de borde dentado— el largo así medido da un
 <strong>error mediano del 0,8&nbsp;% y del 4,7&nbsp;% en el peor caso</strong>.</p>
 
-<p>Se reporta además el <em>rectángulo equivalente</em>,
-<em>L</em>&nbsp;=&nbsp;(<em>P</em>&nbsp;+&nbsp;√(<em>P</em>²−16<em>A</em>))/4, que es el largo
-que tendría un rectángulo con la misma área y el mismo perímetro. <strong>No se usa como
-talla</strong>: depende del perímetro, y el perímetro se infla con la rugosidad del contorno
-—un 22,5&nbsp;% en la recta dentada de talla conocida—, además de no estar definido para
-partículas compactas, en las que <em>P</em>²&nbsp;&lt;&nbsp;16<em>A</em>. Se conserva porque al
-compararlo con las otras dos medidas delata qué partículas tienen el borde irregular.</p>
-
 <p><strong>{curvas} partículas ({100.0 * curvas / len(formas):.1f} %) están contorsionadas</strong>,
 entendiendo por tal que su largo supera en más de un 15&nbsp;% su extensión en línea recta.</p>
 
-<p><em>Limitaciones conocidas.</em> Dos partículas de polímero distinto que se tocan dentro de
-la misma caja se miden como una sola: separarlas por color no es viable en este material,
-porque la diferencia de tono entre dos polímeros no supera a la que hay entre el núcleo y el
-borde de una misma partícula. Y en una fibra muy enroscada el camino geodésico ataja por el
-interior de cada codo, subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que
-se ensayó.</p>"""
+<p><em>Partículas en contacto.</em> Dos partículas que se tocan forman una sola mancha, y
+medirlas juntas sumaría sus tallas. Se separan por <em>watershed</em> sobre la transformada de
+distancia: el centro de cada una queda lejos del fondo y el cuello que las une queda cerca, de
+modo que el corte cae por el cuello. Sobre círculos de talla conocida las separa hasta un
+27&nbsp;% de solapamiento del diámetro, sin partir ninguna partícula de una sola pieza.</p>
+
+<p><em>Limitaciones conocidas.</em> Dos partículas solapadas más allá de un 40&nbsp;% de su
+diámetro se siguen midiendo como una sola: a esa altura ya no hay un cuello por el que cortar.
+Y en una fibra muy enroscada el camino geodésico ataja por el interior de cada codo,
+subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensayó.</p>"""
         if n_sin_forma:
             metodo += (
                 f"<p>En {n_sin_forma} partículas no se pudo separar la partícula del fondo; "

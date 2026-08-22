@@ -804,13 +804,25 @@ camino geodésico —, más la cuenta completa de píxeles a micrómetros. Desde
 pestaña <b>Resultados</b> del Detector, el botón «Revisar partícula a partícula»
 abre allí la imagen seleccionada con esas mismas detecciones.</p>
 
+
+<h3>Partículas que se tocan</h3>
+
+<p>Dos partículas en contacto forman una sola mancha, y medirlas juntas sumaría
+sus tallas. Se separan automáticamente por <i>watershed</i> sobre la transformada
+de distancia: el centro de cada partícula queda lejos del fondo y el cuello que
+las une queda cerca, de modo que umbralizando la distancia aparecen dos núcleos
+aunque la mancha sea una sola pieza, y el corte cae justo por el cuello.</p>
+
+<p>Sobre círculos de talla conocida las separa hasta un <b>27 % de solapamiento
+del diámetro</b>, y no parte ninguna partícula de una sola pieza: ni un círculo,
+ni una barra, ni una fibra curva, ni una irregular de varios lóbulos.</p>
+
 <h3>Limitaciones declaradas</h3>
 
 <ul>
-<li>Dos partículas de <b>polímero distinto que se tocan</b> dentro de la misma
-caja se miden como una sola. Separarlas por color no es viable en este material:
-la diferencia de tono entre dos polímeros no supera a la que hay entre el núcleo y
-el borde de una misma partícula.</li>
+<li>Dos partículas solapadas <b>más allá de un 40 % de su diámetro</b> se
+siguen midiendo como una sola: a esa altura ya no queda un cuello por el que
+cortar. Por debajo de ese solapamiento se separan solas (ver más abajo).</li>
 <li>En una <b>fibra muy enroscada</b> el camino geodésico ataja por el interior de
 cada codo y subestima, hasta un 19 % en el caso más cerrado ensayado.</li>
 <li>El <b>rectángulo equivalente</b> — <i>L</i> = (<i>P</i> + √(<i>P</i>²−16<i>A</i>))/4 —

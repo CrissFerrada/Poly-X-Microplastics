@@ -149,12 +149,17 @@ worst case**. This is pinned down in `tests/test_morfologia.py`.
 > compared against the other two it exposes irregular outlines, but it is not
 > used as a size.
 
-**Stated limitations.** Two particles of different polymer touching inside the
-same box are measured as one: separating them by colour is not viable in this
-material, because the difference in hue between two polymers is no greater than
-the difference between the core and the edge of a single particle. And in a
-tightly coiled fibre the geodesic path cuts the corner at each bend,
-underestimating by up to 19 % in the tightest case tested.
+**Touching particles.** Two particles in contact form a single blob, and
+measuring them together would add their sizes up. They are separated by
+*watershed* on the distance transform: the centre of each one sits far from the
+background while the neck joining them sits close, so the cut falls on the neck.
+Against circles of known size it separates them up to **27 % overlap of the
+diameter**, without splitting any particle that is a single piece.
+
+**Stated limitations.** Two particles overlapping by more than 40 % of their
+diameter are still measured as one: past that point there is no neck left to cut
+along. And in a tightly coiled fibre the geodesic path cuts the corner at each
+bend, underestimating by up to 19 % in the tightest case tested.
 
 ---
 

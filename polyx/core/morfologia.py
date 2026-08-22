@@ -60,12 +60,20 @@ y aqui importa mas no fallar feo que afinar en el caso bueno.
 Todo esto esta fijado en tests/test_morfologia.py contra formas de talla
 conocida, incluida la barra girada que destapo lo de la convexidad.
 
-LIMITE CONOCIDO
----------------
-En una fibra muy enroscada el camino geodesico corta por dentro en cada codo y
-subestima: en una fibra en ese de curvas cerradas se queda un 19% corto. Por eso
-se reporta tambien ``largo_rect_eq``, que en ese caso concreto acierta mas
-(-5%): si las dos cifras discrepan mucho, la particula pide un vistazo.
+PARTICULAS EN CONTACTO
+----------------------
+Dos particulas que se tocan forman una sola componente conexa. Se separan por
+watershed sobre la transformada de distancia en ``separar_pegadas()``, hasta un
+27% de solapamiento del diametro.
+
+LIMITES CONOCIDOS
+-----------------
+  * Por encima de un 40% de solapamiento ya no hay cuello por el que cortar y
+    las dos particulas se siguen midiendo juntas.
+  * En una fibra muy enroscada el camino geodesico corta por dentro en cada codo
+    y subestima: en una fibra en ese de curvas cerradas se queda un 19% corto.
+    ``largo_rect_eq`` acierta mas en ese caso concreto (-5%), asi que si las dos
+    cifras discrepan mucho la particula pide un vistazo.
 
 Solo se usan cv2 y numpy. Ni scipy -- que no es dependencia declarada y solo
 llega de rebote con ultralytics -- ni skimage ni opencv-contrib: anadir
@@ -343,8 +351,8 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
     # el 93.7% de los bordes propios y con 0.26 solo se separa el 54% de los
     # vecinos ajenos. La causa es que PP y LDPE se distinguen por BRILLO y no por
     # tono, y que el borde tenue de cualquier particula deriva su color hacia el
-    # fondo. Queda como limite conocido: dos polimeros distintos en contacto
-    # dentro de la misma caja se miden juntos.
+    # fondo. El caso se resuelve por geometria en separar_pegadas(), que no
+    # necesita distinguir de que polimero es cada una.
 
     # Quita el ruido de sal sin cerrar el hueco de una particula con forma de U.
     mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN,

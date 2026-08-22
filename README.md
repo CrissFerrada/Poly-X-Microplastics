@@ -179,12 +179,17 @@ fijado en `tests/test_morfologia.py`.
 > que *P*² < 16*A*. Se reporta como descriptor porque comparada con las otras dos
 > delata bordes irregulares, pero no se usa como talla.
 
-**Limitaciones declaradas.** Dos partículas de polímero distinto que se tocan
-dentro de la misma caja se miden como una sola: separarlas por color no es viable
-en este material, porque la diferencia de tono entre dos polímeros no supera a la
-que hay entre el núcleo y el borde de una misma partícula. Y en una fibra muy
-enroscada el camino geodésico ataja por el interior de cada codo, subestimando
-hasta un 19 % en el caso más cerrado ensayado.
+**Partículas en contacto.** Dos partículas que se tocan forman una sola mancha,
+y medirlas juntas sumaría sus tallas. Se separan por *watershed* sobre la
+transformada de distancia: el centro de cada una queda lejos del fondo y el cuello
+que las une queda cerca, de modo que el corte cae por el cuello. Sobre círculos de
+talla conocida las separa hasta un **27 % de solapamiento del diámetro**, sin
+partir ninguna partícula de una sola pieza.
+
+**Limitaciones declaradas.** Dos partículas solapadas más allá de un 40 % de su
+diámetro se siguen midiendo como una sola: a esa altura ya no hay un cuello por el
+que cortar. Y en una fibra muy enroscada el camino geodésico ataja por el interior
+de cada codo, subestimando hasta un 19 % en el caso más cerrado ensayado.
 
 ---
 
