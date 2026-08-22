@@ -315,10 +315,16 @@ máscara. **El largo sale de dos medidas estándar y se reporta la mayor:**
 | **Feret máximo** | mayor distancia entre dos puntos del borde | fibras curvas (da la cuerda: −34.6 % en un arco de 180°) |
 | **Diámetro geodésico** | camino más largo *dentro* de la partícula | partículas gruesas (rodea las concavidades) |
 
-El geodésico solo se usa si la partícula es delgada — `largo/grosor ≥ 4`, ver
-`DELGADEZ_PARA_GEODESICO` —. Sin esa condición, un grumo real de 44 px de
-extensión con una muesca daba 73 px porque el camino la bordeaba. Contra formas
-sintéticas de talla conocida: **error mediano 0.8 %, peor caso 4.7 %**.
+El geodésico solo se usa si la partícula cumple **dos** condiciones, y cada una
+viene de un fallo observado:
+
+| Condición | Constante | Por qué |
+|---|---|---|
+| **Delgada**, `largo/grosor ≥ 4` | `DELGADEZ_PARA_GEODESICO` | en una gruesa el camino rodea las concavidades: un grumo real de 44 px recibía 73 |
+| **No convexa**, `solidez < 0.90` | `SOLIDEZ_CONVEXA` | en un convexo geodésico y Feret coinciden por definición; una barra girada medía 200 px a 0° y 45° pero **208 a 15°, 30° y 60°** |
+
+Contra formas sintéticas de talla conocida: **error mediano 0.6 %, peor caso
+4.7 %**. Fijado en `tests/test_morfologia.py`.
 
 **El rectángulo equivalente `L = (P + √(P²−16A))/4` NO es una talla** y no debe
 usarse como tal. Depende del perímetro, así que un borde dentado lo infla

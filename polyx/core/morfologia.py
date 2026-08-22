@@ -23,9 +23,20 @@ Se calculan dos cotas y se reporta la mayor:
     devuelve su longitud. En una particula compacta el camino mas largo es el
     recto y coincide con Feret.
 
-Se toma el mayor de los dos porque en una forma conexa el geodesico siempre es
-mayor o igual que Feret -- en una convexa coinciden --, de modo que si Feret
-sale mayor es solo error de discretizacion y el maximo es la cota mas ajustada.
+El geodesico solo se usa si la particula es DELGADA (largo/grosor >= 4) y NO
+CONVEXA (solidez < 0.90). Las dos condiciones salen de fallos observados:
+
+  * En una particula gruesa, cualquier concavidad hace que el camino la RODEE
+    en vez de atravesarla. Un grumo real de 44 px de extension con una muesca
+    recibia 73 px.
+  * En una forma convexa el camino mas largo por dentro es el recto, asi que
+    geodesico y Feret coinciden por definicion. Si el geodesico sale mayor es
+    error de discretizacion del chamfer, que no es isotropo: una barra recta
+    girada media 200 px a 0 y 45 grados pero 208 a 15, 30 y 60 -- justo la
+    dependencia de la orientacion que se querIa eliminar.
+
+Con las dos condiciones el error mediano contra formas de talla conocida baja a
+0.6% y el peor caso queda en 4.7%.
 
 QUE SE DESCARTO, Y POR QUE
 --------------------------
@@ -43,10 +54,11 @@ Se conserva en ``largo_rect_eq`` porque comparado con Feret y con el geodesico
 informa de lo irregular que es la particula: si es mucho mayor que los otros
 dos, el borde esta dentado.
 
-Contra formas sinteticas de talla conocida, el largo reportado da 3.7% de error
-mediano y 4.7% en el peor caso, salvo una excepcion documentada abajo. El
-modelo de rectangulo daba 1.2% mediano pero 22.5% en el peor caso, y aqui
-importa mas no fallar feo que afinar en el caso bueno.
+El modelo de rectangulo daba 1.2% de error mediano pero 22.5% en el peor caso,
+y aqui importa mas no fallar feo que afinar en el caso bueno.
+
+Todo esto esta fijado en tests/test_morfologia.py contra formas de talla
+conocida, incluida la barra girada que destapo lo de la convexidad.
 
 LIMITE CONOCIDO
 ---------------
@@ -87,6 +99,19 @@ ASPECTO_FIBRA = 3.0
 # 0.8% -- un circulo pasa de 104 a 100 exacto -- sin tocar ninguna fibra.
 DELGADEZ_PARA_GEODESICO = 4.0
 
+# Y ademas la particula tiene que ser NO CONVEXA para que el geodesico aporte
+# algo. En una forma convexa el camino mas largo por dentro es el recto, asi que
+# geodesico y Feret coinciden POR DEFINICION; si el geodesico sale mayor es solo
+# error de discretizacion del chamfer, que no es isotropo y se desvia mas en
+# angulos oblicuos. Se vio en una barra recta girada: a 0 y 45 grados medIa
+# 200 px, pero a 15, 30 y 60 daba 208, un 4% que aparecia y desaparecia con el
+# giro -- justo el defecto que se querIa eliminar.
+#
+# La solidez (area / area de la envolvente convexa) los separa sin ambiguedad
+# sobre formas de talla conocida: barras y circulos quedan por encima de 1.00,
+# los arcos entre 0.27 y 0.71.
+SOLIDEZ_CONVEXA = 0.90
+
 # Por encima de esto la particula se considera curva y el largo de la cuerda
 # deja de servir como talla. 1.15 = el contorno recorre un 15% mas que la recta.
 CURVA_DESDE = 1.15
@@ -121,6 +146,7 @@ class Morfologia:
     circularidad: float = 0.0
     curvatura: float = 1.0       # largo / cuerda; 1.0 = recta
     llenado: float = 0.0         # area de la particula / area de su caja
+    solidez: float = 1.0         # area / area de su envolvente convexa
     morfotipo: str = INDETERMINADO
     metodo: str = ""             # de donde salio el largo
     aviso: str = ""
@@ -539,7 +565,14 @@ def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
     dt = cv2.distanceTransform(mascara, cv2.DIST_L2, 5)
     grosor = 2.0 * float(dt.max())
     delgadez = geo / grosor if grosor > 0 else 0.0
-    if delgadez >= DELGADEZ_PARA_GEODESICO and geo >= feret:
+
+    # Solidez: cuanto se aparta de su propia envolvente convexa. Una fibra
+    # doblada deja mucho hueco dentro de la envolvente; una barra recta, ninguno.
+    envolvente = cv2.contourArea(cv2.convexHull(c))
+    solidez = area / envolvente if envolvente > 0 else 1.0
+
+    if (delgadez >= DELGADEZ_PARA_GEODESICO
+            and solidez < SOLIDEZ_CONVEXA and geo >= feret):
         largo, metodo = geo, "geodesico"
     else:
         largo, metodo = feret, "Feret maximo"
@@ -570,6 +603,7 @@ def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
     m.circularidad = float(4.0 * np.pi * area / (perim * perim))
     m.curvatura = curvatura
     m.llenado = area / (rw * rh) if rw * rh > 0 else 0.0
+    m.solidez = solidez
     m.metodo = metodo
     m.morfotipo = FIBRA if m.aspecto >= ASPECTO_FIBRA else FRAGMENTO
 

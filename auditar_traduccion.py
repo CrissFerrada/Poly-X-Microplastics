@@ -11,8 +11,6 @@ Uso:
 """
 from __future__ import annotations
 
-import io
-
 import argparse
 import ast
 import sys
