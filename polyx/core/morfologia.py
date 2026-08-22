@@ -179,7 +179,53 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
     # mejor del fondo que la media ponderada que usa BGR2GRAY.
     canal = sub.max(axis=2)
     canal = cv2.GaussianBlur(canal, (3, 3), 0)
-    _, mascara = cv2.threshold(canal, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # El umbral sale del CONTRASTE ENTRE EL ANILLO Y LA CAJA, no de Otsu sobre
+    # todo el recorte. Otsu parte el histograma en dos clases sin saber donde
+    # esta la particula, y cuando el recorte es casi todo particula acaba
+    # metiendo fondo oscuro dentro de la mascara: medido sobre 2863 particulas,
+    # la mediana de la mascara que era fondo oscuro era del 5.4%, y en un 7.4%
+    # de ellas pasaba del 20%. Eso inflaba el area de forma sistematica.
+    #
+    # Aqui se usa lo que la caja del detector ya sabe: fuera de ella hay fondo,
+    # dentro hay particula. El nivel de fondo es la mediana del anillo, el de la
+    # particula el percentil 90 de la caja, y se corta a medio camino -- la
+    # misma tecnica con que calibracion.py encuentra el borde de la placa.
+    bx1 = int(np.clip(int(x1) - ox, 0, canal.shape[1]))
+    by1 = int(np.clip(int(y1) - oy, 0, canal.shape[0]))
+    bx2 = int(np.clip(int(np.ceil(x2)) - ox, 0, canal.shape[1]))
+    by2 = int(np.clip(int(np.ceil(y2)) - oy, 0, canal.shape[0]))
+    anillo = np.ones(canal.shape, dtype=bool)
+    anillo[by1:by2, bx1:bx2] = False
+    dentro_caja = canal[by1:by2, bx1:bx2]
+
+    umbral = None
+    if anillo.sum() >= 20 and dentro_caja.size >= 9:
+        fondo = float(np.median(canal[anillo]))
+        pico = float(np.percentile(dentro_caja, 90))
+        # Sin contraste suficiente el punto medio no significa nada y se vuelve
+        # a Otsu, que al menos parte por donde el histograma se separa.
+        if pico - fondo >= 12:
+            umbral = fondo + 0.5 * (pico - fondo)
+
+    if umbral is None:
+        _, mascara = cv2.threshold(canal, 0, 255,
+                                   cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    else:
+        mascara = (canal > umbral).astype(np.uint8) * 255
+
+    # NO se filtra por color, aunque separaria dos particulas de polimero
+    # distinto que se tocan. Se probo y se midio, y no funciona en este material:
+    #
+    #   nucleo -> borde de la MISMA particula   mediana 0.197 de cromaticidad
+    #   nucleo -> vecino de OTRA clase          mediana 0.281, p25 0.173
+    #
+    # Las dos distribuciones se solapan, asi que no hay umbral: con 0.10 se corta
+    # el 93.7% de los bordes propios y con 0.26 solo se separa el 54% de los
+    # vecinos ajenos. La causa es que PP y LDPE se distinguen por BRILLO y no por
+    # tono, y que el borde tenue de cualquier particula deriva su color hacia el
+    # fondo. Queda como limite conocido: dos polimeros distintos en contacto
+    # dentro de la misma caja se miden juntos.
 
     # Quita el ruido de sal sin cerrar el hueco de una particula con forma de U.
     mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN,
