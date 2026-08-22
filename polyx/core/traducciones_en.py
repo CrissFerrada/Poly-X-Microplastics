@@ -19,7 +19,7 @@ NO_TRADUCIR = {
     "Cache:", "Momentum:", "Patience:", "Workers:", "data.yaml:", "Preset:",
     "Run:", "Device:", "device:", "imgsz:", "conf:", "Label smoothing:",
     "Weight decay:", "Batch size:", "Auto-split", "Close mosaic:",
-    "Save period:", "Modelo .pt:", "Pesos .pt:",
+    "Save period:",
 }
 
 EN: dict[str, str] = {
@@ -520,4 +520,167 @@ EN: dict[str, str] = {
     'RECOMENDADO. Precisión sólida en GPU media.': 'RECOMMENDED. Solid accuracy on a mid-range GPU.',
     'Más preciso, requiere GPU potente.': 'More accurate, needs a powerful GPU.',
     'El más preciso, muy lento sin GPU buena.': 'The most accurate, very slow without a good GPU.',
+    # ── Anadidas en agosto de 2026: calibracion contra la placa, medida de
+    # forma de particula, selector de secciones del informe y revision
+    # particula a particula en el Visor. ──
+    '   ⚠ Vuelve a Ejecutar la detección: el informe usa el GT leído en la última corrida.':
+        '   ⚠ Run the detection again: the report uses the ground truth read during the last run.',
+    'No hay ninguna caja dibujada. ¿Guardar esta imagen como revisada con cero partículas? Se sobrescribirá la anotación anterior, si la hubiera.':
+        'No boxes have been drawn. Save this image as reviewed with zero particles? Any previous annotation will be overwritten.',
+    'Medir la placa en cada foto y usar su escala (recomendado)':
+        'Measure the dish in every photo and use its scale (recommended)',
+    'Respaldo: se usa solo si no se puede medir la placa. 0 = sin medición.':
+        'Fallback: used only when the dish cannot be measured. 0 = no calibration.',
+    'Diámetro real de la placa (mm):':
+        'Actual dish diameter (mm):',
+    'Diámetro externo nominal. La placa Petri del estudio mide 100 mm.':
+        'Nominal outer diameter. The Petri dish used in this study is 100 mm.',
+    'Altura de la placa (mm):':
+        'Dish height (mm):',
+    '0 = no corregir. Una Petri de 100 mm suele medir 15 mm de alto.':
+        '0 = no correction. A 100 mm Petri dish is usually 15 mm tall.',
+    'Distancia cámara → base (mm):':
+        'Camera-to-base distance (mm):',
+    '0 = no corregir. Medir hasta el FONDO de la placa, no hasta el borde.':
+        '0 = no correction. Measure to the BOTTOM of the dish, not to its rim.',
+    'No hay que marcar nada: el borde de la placa se encuentra solo. El radio se obtiene ajustando un círculo al anillo muestreado en 720 direcciones, con rechazo de atípicos; Hough solo aporta el centro aproximado porque su radio llega a errar un 12 %. En los recortes la placa no aparece, así que ahí la escala se hereda del índice de calibración que dejó el recorte.':
+        'Nothing has to be marked: the dish rim is found automatically. The radius comes from fitting a circle to the rim sampled along 720 directions, with outlier rejection; the Hough transform only supplies the approximate centre, because its radius can be off by as much as 12 %. In crops the dish is not visible, so there the scale is inherited from the calibration index left behind when the crop was made.',
+    'El borde de la placa está más cerca de la cámara que el fondo donde reposan las partículas, de modo que se proyecta más grande y la escala sale pequeña: sin corregir, TODAS las tallas quedan subestimadas. Con la placa a 15 mm y la cámara a 100 mm son casi 16 puntos porcentuales; a 500 mm, un 3 %. Rellena los dos campos de arriba para corregirlo.':
+        'The dish rim sits closer to the camera than the base where the particles lie, so it projects larger and the resulting scale is too small: left uncorrected, ALL sizes are underestimated. With a 15 mm dish and the camera at 100 mm that is almost 16 percentage points; at 500 mm, about 3 %. Fill in both fields above to correct it.',
+    'Genera un informe HTML autocontenido (todas las imágenes embebidas en base64, así no se rompen al enviarlo a otra persona) con métodos, métricas, gráficos, galería comparativa, conteo por muestra y análisis de errores. Puedes exportarlo directamente a PDF para enviarlo, o guardar aparte cada foto con sus etiquetas dibujadas.':
+        'Generates a self-contained HTML report (every image embedded as base64, so nothing breaks when you send it to someone else) with methods, metrics, charts, a comparison gallery, per-sample counts and error analysis. You can export it straight to PDF to send it, or save each photo separately with its labels drawn on.',
+    '📄  Generar informe HTML':
+        '📄  Generate HTML report',
+    'Guardar las fotos con las etiquetas':
+        'Save the photos with their labels',
+    'Guarda cada foto analizada con sus cajas dibujadas, en su resolución original. Eliges una carpeta y dentro se crea una subcarpeta por cada opción que marques (<code>conteo_manual</code>, <code>deteccion_modelo</code>, <code>ambas_superpuestas</code>), así no se mezclan. Respeta el <b>alcance</b> elegido arriba: si marcaste fotos concretas, solo se guardan esas.':
+        'Saves every analysed photo with its boxes drawn on, at its original resolution. You pick a folder and a subfolder is created inside it for each option you tick (<code>conteo_manual</code>, <code>deteccion_modelo</code>, <code>ambas_superpuestas</code>), so they do not get mixed up. It honours the <b>scope</b> chosen above: if you ticked specific photos, only those are saved.',
+    'Etiquetas manuales (Ground Truth)':
+        'Manual labels (ground truth)',
+    'Detecciones del modelo':
+        'Model detections',
+    'Las dos superpuestas en la misma foto':
+        'Both overlaid on the same photo',
+    '🖼️  Guardar fotos etiquetadas':
+        '🖼️  Save labelled photos',
+    'Carpeta donde guardar las fotos etiquetadas':
+        'Folder to save the labelled photos in',
+    'Qué incluir en el informe':
+        'What to include in the report',
+    'El informe completo es largo. Desmarca lo que no necesites: las secciones se renumeran solas y el índice se ajusta. Una sección marcada que no tenga datos —errores sin ground truth, por ejemplo— se omite igualmente.':
+        'The full report is long. Untick whatever you do not need: sections renumber themselves and the table of contents adjusts. A ticked section with no data — error analysis without ground truth, for instance — is left out anyway.',
+    'Galería por imagen  (es lo que más pesa)':
+        'Per-image gallery  (this is what makes the file big)',
+    'Nada que guardar':
+        'Nothing to save',
+    'Marca al menos una de las tres opciones: etiquetas manuales, detecciones del modelo, o las dos superpuestas.':
+        'Tick at least one of the three options: manual labels, model detections, or both overlaid.',
+    "El alcance está en 'solo las fotos que marque' y no hay ninguna marcada.":
+        "The scope is set to 'only the photos I tick' and none are ticked.",
+    "No se encontró ninguna imagen anotada en disco para lo que pediste.\n\nSi marcaste 'etiquetas manuales', recuerda que solo existen para las fotos que tienen Ground Truth.":
+        "No annotated image was found on disk for what you asked for.\n\nIf you ticked 'manual labels', remember that these only exist for photos that have ground truth.",
+    'Completo':
+        'Full',
+    'Resumen breve':
+        'Short summary',
+    'Metodológico':
+        'Methodological',
+    'Guardando {} imagen(es)…':
+        'Saving {} image(s)…',
+    'Algunas no se pudieron guardar':
+        'Some could not be saved',
+    '{} imagen(es) en {} carpeta(s) dentro de {}':
+        '{} image(s) in {} folder(s) inside {}',
+    '{} fallaron':
+        '{} failed',
+    'Métricas detalladas (suma de todos los modelos)':
+        'Detailed metrics (summed over all models)',
+    'Ground truth':
+        'Ground truth',
+    'No pide ninguna carpeta: relee los .txt que están junto a cada foto, los mismos que ves en GT manual. Hace falta porque la corrida guarda el ground truth que leyó, así que corregir una anotación después no cambia por sí solo estas métricas ni el informe. Recalcula sin pasar el modelo otra vez y solo redibuja las imágenes cuyo .txt cambió.':
+        'It asks for no folder: it re-reads the .txt files sitting next to each photo, the same ones you see under Manual GT. This is needed because a run freezes the ground truth it read, so fixing an annotation afterwards does not by itself change these metrics or the report. It recalculates without running the model again, and only redraws the images whose .txt actually changed.',
+    '🔄  Releer los .txt del disco y recalcular':
+        '🔄  Re-read the .txt files from disk and recalculate',
+    '🔍  Revisar partícula a partícula en el Visor':
+        '🔍  Review particle by particle in the Viewer',
+    'Abre la imagen seleccionada en el Visor con estas mismas detecciones, numeradas. Allí cada partícula muestra sobre qué se midió y si es fibra o fragmento — sin volver a pasar el modelo.':
+        'Opens the selected image in the Viewer with these very detections, numbered. There each particle shows what it was measured on and whether it is a fibre or a fragment — without running the model again.',
+    'Releyendo ground truth…':
+        'Re-reading ground truth…',
+    'Cancelar':
+        'Cancel',
+    'Recargar GT':
+        'Reload GT',
+    'Revisar':
+        'Review',
+    'Selecciona primero una fila de la tabla de abajo.':
+        'Select a row from the table below first.',
+    'Esa imagen no tiene detecciones que revisar.':
+        'That image has no detections to review.',
+    'Guardar también el mejor peso para el conjunto real':
+        'Also save the best weights for the real dataset',
+    'Al terminar quedan tres pesos en la carpeta del run: <b>best_sintetico.pt</b>, <b>best_real.pt</b> y <b>last.pt</b> (este último sirve para reanudar el entrenamiento).':
+        'When it finishes there are three sets of weights in the run folder: <b>best_sintetico.pt</b>, <b>best_real.pt</b> and <b>last.pt</b> (this last one is what you use to resume training).',
+    '📁  Cargar predicciones de una corrida':
+        '📁  Load predictions from a run',
+    'Lee las predicciones que el Detector dejó en runs/detect_.../ para esta misma foto. Sirve para revisar una corrida ya cerrada, sin volver a pasar el modelo.':
+        'Reads the predictions the Detector left in runs/detect_.../ for this same photo. Use it to review a run you have already closed, without running the model again.',
+    'Selecciona una partícula para ver su medición':
+        'Select a particle to see how it was measured',
+    'Carpeta de la corrida (runs/detect_...)':
+        'Run folder (runs/detect_...)',
+    'Abre primero la foto original.':
+        'Open the original photo first.',
+    'Sin predicciones':
+        'No predictions',
+    'Varios modelos':
+        'Several models',
+    'Esta foto se analizó con varios modelos. ¿Cuál revisar?':
+        'This photo was analysed with several models. Which one do you want to review?',
+    'El archivo está vacío: esa foto no tuvo detecciones.':
+        'The file is empty: that photo had no detections.',
+    'No se pudo aislar esta partícula del fondo':
+        'This particle could not be separated from the background',
+    '● {n} predicciones cargadas de {c}':
+        '● {n} predictions loaded from {c}',
+    "En esa corrida no hay predicciones para {n}.\n\nSe buscó en las subcarpetas 'labels'.":
+        "That run has no predictions for {n}.\n\nThe 'labels' subfolders were searched.",
+    # ── Cadenas que estaban fuera de tr() y se detectaron arrancando los
+    # tres modulos en ingles y buscando texto con aspecto de espanol. ──
+    'Detecciones': 'Detections',
+    'Confianza media': 'Mean confidence',
+    'Tamaño medio (μm)': 'Mean size (μm)',
+    'Época actual': 'Current epoch',
+    'Sin mejora': 'No improvement',
+    'Split train con imágenes': 'Train split with images',
+    'Split val con imágenes': 'Val split with images',
+    'Resumen': 'Summary',
+    'Métodos': 'Methods',
+    'Calibración de escala': 'Scale calibration',
+    'Forma y talla de las partículas': 'Particle shape and size',
+    'Ficha de partículas medidas (muestra)': 'Measured-particle cards (sample)',
+    'Resultados generales': 'Overall results',
+    'Análisis de errores': 'Error analysis',
+    'Comparación entre modelos': 'Model comparison',
+    'Galería por imagen': 'Per-image gallery',
+    'Conteo por muestra y tipo de plástico': 'Counts by sample and polymer type',
+    'Referencias bibliográficas': 'References',
+    # El indice del informe y el aviso de deteccion de GPU: las dos ultimas
+    # cadenas visibles que quedaban sin traducir.
+    '<ol><li><b>Resumen</b> con detecciones, confianza media y tamaño medio.</li><li><b>Métodos</b> — modelo, parámetros, calibración y dispositivo.</li><li><b>Calibración de escala</b> — de dónde salió el µm/px de cada foto.</li><li><b>Forma y talla</b> — reparto fibra/fragmento, distribución de tallas, la mayor y la menor, recuento por imagen y cómo se mide el largo.</li><li><b>Fichas</b> — una muestra de partículas con su medición dibujada.</li><li><b>Resultados generales</b> — clases, confianza y tamaños.</li><li><b>Resumen por modelo</b> (tabla comparativa)</li><li><b>Análisis de errores</b> (solo si hay ground truth) — matriz de confusión y P/R/F1 por clase.</li><li><b>Comparación entre modelos</b></li><li><b>Galería por imagen</b> — predicción y ground truth lado a lado.</li><li><b>Conteo por muestra y tipo de plástico</b> — por imagen, por tramo y por estación.</li><li><b>Referencias bibliográficas</b></li></ol><p>Todas las secciones son opcionales: se eligen arriba.</p>':
+        "<ol><li><b>Summary</b> with detections, mean confidence and mean size.</li><li><b>Methods</b> — model, parameters, calibration and device.</li><li><b>Scale calibration</b> — where each photo's µm/px came from.</li><li><b>Shape and size</b> — fibre/fragment split, size distribution, the largest and the smallest, per-image counts and how length is measured.</li><li><b>Particle cards</b> — a sample of particles with their measurement drawn on.</li><li><b>Overall results</b> — classes, confidence and sizes.</li><li><b>Per-model summary</b> (comparison table)</li><li><b>Error analysis</b> (only when ground truth is available) — confusion matrix and per-class P/R/F1.</li><li><b>Model comparison</b></li><li><b>Per-image gallery</b> — prediction and ground truth side by side.</li><li><b>Counts by sample and polymer type</b> — per image, per depth interval and per station.</li><li><b>References</b></li></ol><p>Every section is optional: you choose them above.</p>",
+    '⌛  Detectando GPU en background (puede tardar 10–30 s la primera vez)…':
+        '⌛  Detecting GPU in the background (may take 10–30 s the first time)…',
+    # ── Ultimo barrido: alias por defecto, estimacion de VRAM y
+    # descripciones de los formatos de exportacion. ──
+    'Modelo .pt:': 'Model .pt:',
+    'Pesos .pt:': 'Weights .pt:',
+    'Modelo {n}': 'Model {n}',
+    'Estimación de VRAM: ~{gb} (modelo {size}, imgsz {imgsz}, batch {batch}, AMP={amp})': 'VRAM estimate: ~{gb} (model {size}, imgsz {imgsz}, batch {batch}, AMP={amp})',
+    'Más portable. Para CPU o GPU vía onnxruntime.': 'Most portable. For CPU or GPU via onnxruntime.',
+    'Modelo nativo de PyTorch.': 'Native PyTorch model.',
+    'Solo NVIDIA. Inferencia más rápida en producción.': 'NVIDIA only. Fastest inference in production.',
+    'Intel CPU/iGPU.': 'Intel CPU/iGPU.',
+    'Mobile/Edge devices.': 'Mobile/edge devices.',
+    'Apple Silicon (M1/M2/M3) y iOS.': 'Apple Silicon (M1/M2/M3) and iOS.',
 }

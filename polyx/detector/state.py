@@ -11,6 +11,7 @@ from typing import List, Dict, Optional
 from PySide6.QtCore import QObject, Signal
 
 from ..core.yolo_wrap import Detection, YoloModel
+from ..core.i18n import tr
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -148,7 +149,8 @@ class DetectorState(QObject):
 
     def __init__(self):
         super().__init__()
-        self.model_slots: List[ModelSlot] = [ModelSlot(alias=f"Modelo {i+1}") for i in range(3)]
+        self.model_slots: List[ModelSlot] = [
+            ModelSlot(alias=tr("Modelo {n}").format(n=i + 1)) for i in range(3)]
         self.images: List[Path] = []
         self.gt_folder: Optional[Path] = None
         self.params = InferenceParams()

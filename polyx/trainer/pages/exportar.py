@@ -121,7 +121,9 @@ class ExportarPage(TrainerPage):
 
     def _update_desc(self):
         idx = self.combo.currentIndex()
-        self.lbl_desc.setText(FORMATS[idx][2])
+        # La descripcion se traduce aqui y no en FORMATS porque esa lista fija
+        # tambien el codigo interno del formato, que no se traduce nunca.
+        self.lbl_desc.setText(tr(FORMATS[idx][2]))
 
     def _run(self):
         w = self.ed_w.text().strip()

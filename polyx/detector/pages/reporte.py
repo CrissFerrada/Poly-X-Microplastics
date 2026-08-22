@@ -85,30 +85,25 @@ class ReportePage(DetectorPage):
 
         # ── Contenido del reporte ──
         c2, l2 = self.card(tr("Contenido del reporte"), "📋")
-        contents = QLabel(
+        contents = QLabel(tr(
             "<ol>"
-            "<li><b>Resumen (abstract)</b> con detecciones, conf. media y tamaño medio.</li>"
-            "<li><b>Métodos</b> — modelo, parámetros, calibración, dispositivo, fecha.</li>"
-            "<li><b>Resultados generales</b>"
-            "<ul>"
-            "<li>Distribución de clases (predicciones y/o GT)</li>"
-            "<li>Histograma de confianza</li>"
-            "<li>Distribución de tamaños (μm) si hay calibración</li>"
-            "<li>Tabla por clase con P/R/F1</li>"
-            "</ul></li>"
+            "<li><b>Resumen</b> con detecciones, confianza media y tamaño medio.</li>"
+            "<li><b>Métodos</b> — modelo, parámetros, calibración y dispositivo.</li>"
+            "<li><b>Calibración de escala</b> — de dónde salió el µm/px de cada foto.</li>"
+            "<li><b>Forma y talla</b> — reparto fibra/fragmento, distribución de tallas, "
+            "la mayor y la menor, recuento por imagen y cómo se mide el largo.</li>"
+            "<li><b>Fichas</b> — una muestra de partículas con su medición dibujada.</li>"
+            "<li><b>Resultados generales</b> — clases, confianza y tamaños.</li>"
             "<li><b>Resumen por modelo</b> (tabla comparativa)</li>"
-            "<li><b>Análisis de errores</b> (solo si hay GT)"
-            "<ul>"
-            "<li>Matriz de confusión</li>"
-            "<li>Precisión / Recall / F1 por clase</li>"
-            "<li>Galería de imágenes con más errores</li>"
-            "</ul></li>"
-            "<li><b>Galería comparativa</b> Predicción vs Ground Truth (lado a lado), "
-            "cada foto con su tabla de partículas por polímero</li>"
-            "<li><b>Conteo por muestra y tipo de plástico</b> — conteo manual y del "
-            "modelo, por imagen, por tramo y por estación</li>"
+            "<li><b>Análisis de errores</b> (solo si hay ground truth) — matriz de "
+            "confusión y P/R/F1 por clase.</li>"
+            "<li><b>Comparación entre modelos</b></li>"
+            "<li><b>Galería por imagen</b> — predicción y ground truth lado a lado.</li>"
+            "<li><b>Conteo por muestra y tipo de plástico</b> — por imagen, por tramo "
+            "y por estación.</li>"
             "<li><b>Referencias bibliográficas</b></li>"
             "</ol>"
+            "<p>Todas las secciones son opcionales: se eligen arriba.</p>")
         )
         contents.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none;")
         contents.setTextFormat(Qt.RichText)
@@ -410,7 +405,9 @@ class ReportePage(DetectorPage):
 
         self.chk_secciones = {}
         for sid, titulo in SECCIONES:
-            chk = QCheckBox(titulo)
+            # El titulo se traduce aqui y no en SECCIONES porque esa misma lista
+            # alimenta el documento HTML, que se genera en espanol.
+            chk = QCheckBox(tr(titulo))
             chk.setChecked(True)
             chk.setStyleSheet(f"color: {T.INK2}; border: none;")
             l.addWidget(chk)

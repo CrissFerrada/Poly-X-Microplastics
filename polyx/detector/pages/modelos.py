@@ -34,7 +34,7 @@ class _ModelSlotCard(QFrame):
         head.setSpacing(8)
         head_icon = QLabel("🎯")
         head_icon.setStyleSheet("font-size: 14pt; border: none;")
-        head_title = QLabel(f"Modelo {idx + 1}")
+        head_title = QLabel(tr("Modelo {n}").format(n=idx + 1))
         head_title.setStyleSheet(f"color: {T.INK}; font-size: 12.5pt; font-weight: 600; border: none;")
         head.addWidget(head_icon)
         head.addWidget(head_title)
@@ -50,7 +50,7 @@ class _ModelSlotCard(QFrame):
         row1.setSpacing(8)
         lbl1 = QLabel(tr("Alias:"))
         lbl1.setStyleSheet(f"color: {T.INK2}; border: none; min-width: 40px;")
-        self.ed_alias = QLineEdit(f"Modelo {idx + 1}")
+        self.ed_alias = QLineEdit(tr("Modelo {n}").format(n=idx + 1))
         self.ed_alias.setMaximumWidth(220)
         self.ed_alias.editingFinished.connect(self._emit_change)
         row1.addWidget(lbl1)
@@ -183,7 +183,7 @@ class ModelosPage(DetectorPage):
     # ──────────────────────────────────────────
     def _on_slot_changed(self, idx: int, alias: str, path_str: str):
         slot = self.state.model_slots[idx]
-        slot.alias = alias or f"Modelo {idx+1}"
+        slot.alias = alias or tr("Modelo {n}").format(n=idx + 1)
         if path_str:
             p = Path(path_str)
             if p.exists() and p.suffix.lower() == ".pt":

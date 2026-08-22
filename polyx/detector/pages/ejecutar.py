@@ -181,9 +181,9 @@ class EjecutarPage(DetectorPage):
         grid = QHBoxLayout()
         grid.setSpacing(12)
         self.previews = [
-            _PreviewSlot("Modelo 1"),
-            _PreviewSlot("Modelo 2"),
-            _PreviewSlot("Modelo 3"),
+            _PreviewSlot(tr("Modelo {n}").format(n=1)),
+            _PreviewSlot(tr("Modelo {n}").format(n=2)),
+            _PreviewSlot(tr("Modelo {n}").format(n=3)),
         ]
         for p in self.previews:
             grid.addWidget(p, 1)

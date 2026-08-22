@@ -215,7 +215,7 @@ class ParametrosPage(TrainerPage):
 
         # Detección de GPU diferida (en background) para no bloquear el arranque
         self._gpu_worker: _GpuDetectWorker | None = None
-        self.lbl_gpu.setText("⌛  Detectando GPU en background (puede tardar 10–30 s la primera vez)…")
+        self.lbl_gpu.setText(tr("⌛  Detectando GPU en background (puede tardar 10–30 s la primera vez)…"))
         self.lbl_gpu.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         QTimer.singleShot(100, self._detect_gpu)
         self._update_estimate()
@@ -449,10 +449,15 @@ class ParametrosPage(TrainerPage):
         try:
             est = estimate_vram_gb(self.state.model.size, imgsz, self.state.params.batch,
                                    amp=self.cb_amp.isChecked())
+            # La clave que se traduce es la PLANTILLA, no el texto ya armado:
+            # con los datos dentro cambiaria en cada llamada y nunca coincidiria
+            # con una entrada del diccionario.
             self.lbl_est.setText(
-                f"Estimación de VRAM: ~{humanize_gb(est)} "
-                f"(modelo {self.state.model.size}, imgsz {imgsz}, batch {self.state.params.batch}, "
-                f"AMP={'on' if self.cb_amp.isChecked() else 'off'})"
+                tr("Estimación de VRAM: ~{gb} (modelo {size}, imgsz {imgsz}, "
+                   "batch {batch}, AMP={amp})").format(
+                    gb=humanize_gb(est), size=self.state.model.size, imgsz=imgsz,
+                    batch=self.state.params.batch,
+                    amp='on' if self.cb_amp.isChecked() else 'off')
             )
         except Exception:
             self.lbl_est.setText(tr("Estimación de VRAM: —"))

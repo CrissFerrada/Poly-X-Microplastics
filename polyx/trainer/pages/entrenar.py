@@ -183,14 +183,14 @@ class EntrenarPage(TrainerPage):
         # Tab 1: Métricas en vivo (8 tarjetas KPI)
         metr = QFrame(); metr.setStyleSheet(f"background: {T.BG};")
         ml = QGridLayout(metr); ml.setContentsMargins(16, 16, 16, 16); ml.setSpacing(12)
-        self.kpi_epoch  = KPICard("Época actual", T.ACCENT)
+        self.kpi_epoch  = KPICard(tr("Época actual"), T.ACCENT)
         self.kpi_map50  = KPICard("mAP@50", T.OK)
         self.kpi_map95  = KPICard("mAP@50-95", T.VIO)
         self.kpi_box    = KPICard("Box loss", T.WARN)
         self.kpi_prec   = KPICard("Precision", T.ACCENT_D)
         self.kpi_rec    = KPICard("Recall", T.ACCENT)
         self.kpi_best   = KPICard("Mejor mAP@50", T.OK)
-        self.kpi_nomp   = KPICard("Sin mejora", T.WARN)
+        self.kpi_nomp   = KPICard(tr("Sin mejora"), T.WARN)
         for w, pos in [(self.kpi_epoch,(0,0)), (self.kpi_map50,(0,1)), (self.kpi_map95,(0,2)), (self.kpi_box,(0,3)),
                        (self.kpi_prec,(1,0)), (self.kpi_rec,(1,1)), (self.kpi_best,(1,2)), (self.kpi_nomp,(1,3))]:
             ml.addWidget(w, *pos)

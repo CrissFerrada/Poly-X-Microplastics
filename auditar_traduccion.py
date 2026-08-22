@@ -1,165 +1,100 @@
-"""Mide cuanto de la interfaz esta traducido al ingles y que falta.
+"""Dice que cadenas de la interfaz no tienen traduccion al ingles.
 
-Recorre el codigo buscando texto que ve el usuario y lo cruza contra el
-diccionario de ``polyx/core/i18n.py``. Sin esto, "traducir el programa" es una
-tarea sin fondo visible: aqui se ve el porcentaje y la lista concreta.
-
-Que cuenta como texto de interfaz: literales dentro de las llamadas Qt que
-muestran algo (``QLabel``, ``QPushButton``, ``setText``, ``setToolTip``,
-``setWindowTitle``, ``addItem``, los mensajes de ``QMessageBox``...). Se
-descartan hojas de estilo, nombres de objeto, rutas y claves de diccionario,
-que son las que inflaban el recuento a ~2350.
+Recorre el arbol sintactico de cada modulo buscando llamadas a ``tr()`` con una
+cadena literal, y las contrasta con el diccionario. Se hace con AST y no con una
+expresion regular porque muchas cadenas van partidas en varios trozos entre
+parentesis, y una regular las cortaria por la mitad.
 
 Uso:
-    python auditar_traduccion.py            # resumen por modulo
-    python auditar_traduccion.py --faltan   # lista lo no traducido
-    python auditar_traduccion.py --plantilla pendientes.py
+    python auditar_traduccion.py           # resumen
+    python auditar_traduccion.py --listar  # ademas, las cadenas que faltan
 """
 from __future__ import annotations
+
+import io
 
 import argparse
 import ast
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
 sys.path.insert(0, str(RAIZ))
 
-# Llamadas cuyo argumento de texto llega a la pantalla.
-CONSTRUCTORES = {"QLabel", "QPushButton", "QCheckBox", "QRadioButton",
-                 "QGroupBox", "QAction", "QToolButton", "QLineEdit"}
-METODOS = {"setText", "setToolTip", "setWindowTitle", "setPlaceholderText",
-           "setTitle", "setStatusTip", "addItem", "addItems", "setItemText",
-           "setLabelText", "setFormat", "information", "warning", "critical",
-           "question", "about", "setHtml"}
-
-# Un literal es texto de interfaz solo si parece una frase, no un identificador.
-def es_texto_ui(s: str) -> bool:
-    if len(s) < 4 or len(s) > 400:
-        return False
-    bajo = s.lower()
-    if any(t in bajo for t in ("color:", "background", "border", "font-size",
-                               "padding", "margin", "qwidget", "qframe",
-                               "qpushbutton{", "border-radius")):
-        return False
-    if s.startswith(("#", "http", "/", "\\", ".", "_")):
-        return False
-    if s.count(" ") == 0 and "_" in s:      # identificadores tipo modo_rapido
-        return False
-    return any(c.isalpha() for c in s)
+from polyx.core.traducciones_en import EN, NO_TRADUCIR  # noqa: E402
 
 
-def literales_de(nodo: ast.AST) -> list[str]:
-    """Extrae los literales de texto de un nodo, incluida la concatenacion implicita."""
-    out = []
-    for hijo in ast.walk(nodo):
-        if isinstance(hijo, ast.Constant) and isinstance(hijo.value, str):
-            out.append(hijo.value)
-        elif isinstance(hijo, ast.JoinedStr):
-            # f-string: se reconstruye con marcador para poder traducir el molde
-            partes = []
-            for v in hijo.values:
-                if isinstance(v, ast.Constant) and isinstance(v.value, str):
-                    partes.append(v.value)
-                else:
-                    partes.append("{}")
-            out.append("".join(partes))
-    return out
-
-
-def recolectar(archivo: Path) -> tuple[set[str], set[str]]:
-    """(envueltas en tr(), crudas). Envolver no puede hacer bajar el total.
-
-    Se separan porque una cadena solo esta lista si cumple las dos cosas:
-    envuelta en ``tr()`` **y** presente en el diccionario. Envuelta sin entrada
-    sale en espanol; con entrada pero sin envolver, la entrada no se usa nunca.
-    """
+def cadenas_tr(archivo: Path) -> list[str]:
+    """Todas las cadenas literales que pasan por tr() en ese archivo."""
     try:
-        arbol = ast.parse(archivo.read_text(encoding="utf-8"))
+        arbol = ast.parse(archivo.read_text(encoding="utf-8", errors="replace"))
     except SyntaxError:
-        return set(), set()
-    envueltas: set[str] = set()
-    crudas: set[str] = set()
+        return []
+    out = []
     for nodo in ast.walk(arbol):
         if not isinstance(nodo, ast.Call):
             continue
         f = nodo.func
-        nombre = (f.id if isinstance(f, ast.Name)
-                  else f.attr if isinstance(f, ast.Attribute) else "")
-        if nombre not in CONSTRUCTORES and nombre not in METODOS:
+        nombre = f.id if isinstance(f, ast.Name) else (
+            f.attr if isinstance(f, ast.Attribute) else "")
+        if nombre != "tr" or not nodo.args:
             continue
-        for arg in nodo.args:
-            if (isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name)
-                    and arg.func.id == "tr"):
-                for s in literales_de(arg):
-                    if es_texto_ui(s):
-                        envueltas.add(s)
-            elif isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                # Solo el literal COMPLETO cuenta como unidad traducible. Los
-                # trozos sueltos de un f-string o de una concatenacion no lo son:
-                # contarlos inflaba el total con fragmentos como " px → " que no
-                # se traducen por separado sino como parte de su mensaje.
-                if es_texto_ui(arg.value):
-                    crudas.add(arg.value)
-    return envueltas, crudas
+        arg = nodo.args[0]
+        # Solo literales: tr(variable) no se puede auditar en estatico, y
+        # tr(f"...{x}") tampoco sirve como clave porque cambia en cada llamada.
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            out.append(arg.value)
+    return out
 
 
 def main():
+    # La consola de Windows va en cp1252 y muchas cadenas llevan flechas o
+    # emoji; sin esto el auditor muere al imprimirlas en vez de auditar.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
     ap = argparse.ArgumentParser()
-    ap.add_argument("--faltan", action="store_true", help="lista lo no traducido")
-    ap.add_argument("--plantilla", help="escribe un .py con las entradas vacias")
+    ap.add_argument("--listar", action="store_true",
+                    help="imprime las cadenas sin traducir")
     args = ap.parse_args()
 
-    from polyx.core.i18n import TRADUCCIONES
-
-    envueltas: dict[str, set[str]] = defaultdict(set)
-    crudas: dict[str, set[str]] = defaultdict(set)
+    faltan: dict[str, list[Path]] = {}
+    total = 0
     for py in sorted((RAIZ / "polyx").rglob("*.py")):
-        if "__pycache__" in py.parts or py.name == "i18n.py":
+        if "legacy" in py.parts or "__pycache__" in py.parts:
             continue
-        modulo = py.relative_to(RAIZ / "polyx").parts[0]
-        if modulo.endswith(".py"):
-            modulo = f"({py.stem})"
-        e, c = recolectar(py)
-        envueltas[modulo] |= e
-        crudas[modulo] |= c
+        for c in cadenas_tr(py):
+            total += 1
+            if c in EN or c in NO_TRADUCIR:
+                continue
+            faltan.setdefault(c, []).append(py.relative_to(RAIZ))
 
-    modulos = sorted(set(envueltas) | set(crudas))
-    print(f"{'modulo':16}{'cadenas':>9}{'listas':>8}{'sin tr()':>10}"
-          f"{'sin traducir':>14}{'%':>6}")
-    print("-" * 63)
-    total = listas = 0
-    for m in modulos:
-        e, c = envueltas[m], crudas[m]
-        n = len(e | c)
-        ok = sum(1 for s in e if s in TRADUCCIONES)
-        sin_trad = sum(1 for s in e if s not in TRADUCCIONES)
-        total += n
-        listas += ok
-        print(f"{m:16}{n:>9}{ok:>8}{len(c):>10}{sin_trad:>14}"
-              f"{100 * ok / max(n, 1):>5.0f}%")
-    print("-" * 63)
-    print(f"{'TOTAL':16}{total:>9}{listas:>8}"
-          f"{sum(len(c) for c in crudas.values()):>10}"
-          f"{sum(1 for m in modulos for s in envueltas[m] if s not in TRADUCCIONES):>14}"
-          f"{100 * listas / max(total, 1):>5.0f}%")
+    unicas = len({c for py in sorted((RAIZ / "polyx").rglob("*.py"))
+                  if "legacy" not in py.parts and "__pycache__" not in py.parts
+                  for c in cadenas_tr(py)})
+    print(f"cadenas en tr(): {total} ({unicas} distintas)")
+    print(f"traducidas:      {unicas - len(faltan)}")
+    print(f"SIN TRADUCIR:    {len(faltan)}"
+          + (f"   ({100 * len(faltan) / unicas:.1f} %)" if unicas else ""))
 
-    faltantes = sorted({s for m in modulos for s in (envueltas[m] | crudas[m])
-                        if s not in TRADUCCIONES})
-    if args.faltan:
-        print("\nSin traducir:")
-        for c in faltantes:
-            print(f"  {c!r}")
-    if args.plantilla:
-        destino = Path(args.plantilla)
-        destino.write_text(
-            "# Pegar en TRADUCCIONES de polyx/core/i18n.py y completar.\n"
-            "PENDIENTES = {\n"
-            + "".join(f"    {c!r}: {''!r},\n" for c in faltantes)
-            + "}\n", encoding="utf-8")
-        print(f"\nPlantilla con {len(faltantes)} entradas en {destino}")
+    if faltan:
+        por_archivo: dict[str, int] = {}
+        for cs in faltan.values():
+            for p in cs:
+                por_archivo[str(p)] = por_archivo.get(str(p), 0) + 1
+        print("\npor archivo:")
+        for p, n in sorted(por_archivo.items(), key=lambda t: -t[1]):
+            print(f"  {n:>4}  {p}")
+
+    if args.listar and faltan:
+        print("\ncadenas sin traducir:")
+        for c in sorted(faltan):
+            uno = c.replace("\n", " ")
+            print(f"  {uno[:110]}")
+
+    return 1 if faltan else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

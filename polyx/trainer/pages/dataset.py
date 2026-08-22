@@ -224,8 +224,8 @@ class DatasetPage(TrainerPage):
         self._val_checks: list[QLabel] = []
         val_checks_names = [
             "data.yaml cargado y válido",
-            "Split train con imágenes",
-            "Split val con imágenes",
+            tr("Split train con imágenes"),
+            tr("Split val con imágenes"),
             "Labels encontradas (≥ 80 %)",
             "Clases definidas en YAML",
         ]
