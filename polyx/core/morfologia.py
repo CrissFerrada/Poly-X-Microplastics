@@ -374,6 +374,107 @@ def largo_geodesico(mascara: np.ndarray) -> float:
     return float(d2[finitos2].max()) if finitos2.any() else 0.0
 
 
+def camino_geodesico(mascara: np.ndarray):
+    """Los puntos del camino geodesico mas largo, para poder dibujarlo.
+
+    Misma doble propagacion que ``largo_geodesico``, pero devolviendo el
+    recorrido en vez de solo su longitud. Se reconstruye bajando siempre al
+    vecino de menor distancia desde el extremo mas lejano.
+
+    Existe para que el informe pueda ENSENAR sobre que recorrido se midio cada
+    fibra. Una talla que no se puede ver medida no se puede verificar.
+    """
+    idx = np.argwhere(mascara > 0)
+    if len(idx) < 2:
+        return []
+    y0, x0 = idx.min(axis=0)
+    y1, x1 = idx.max(axis=0) + 1
+    dentro = (mascara[y0:y1, x0:x1] > 0)
+    ii = np.argwhere(dentro)
+    d1 = _propagar_geodesico(dentro, tuple(ii[0]))
+    if not np.isfinite(d1).any():
+        return []
+    a = np.unravel_index(np.argmax(np.where(np.isfinite(d1), d1, -1)), d1.shape)
+    d2 = _propagar_geodesico(dentro, a)
+    if not np.isfinite(d2).any():
+        return []
+    b = np.unravel_index(np.argmax(np.where(np.isfinite(d2), d2, -1)), d2.shape)
+
+    camino, p = [b], b
+    for _ in range(int(dentro.sum()) + 2):
+        if p == a:
+            break
+        mejor, menor = None, d2[p]
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                q = (p[0] + dy, p[1] + dx)
+                if (0 <= q[0] < d2.shape[0] and 0 <= q[1] < d2.shape[1]
+                        and d2[q] < menor):
+                    menor, mejor = d2[q], q
+        if mejor is None:
+            break
+        p = mejor
+        camino.append(p)
+    return [(int(c[1] + x0), int(c[0] + y0)) for c in camino]
+
+
+def extremos_feret(contorno: np.ndarray):
+    """Los dos puntos del contorno mas separados entre si, para dibujarlos."""
+    if contorno is None or len(contorno) < 2:
+        return None
+    env = cv2.convexHull(contorno).reshape(-1, 2).astype(float)
+    if len(env) < 2:
+        return None
+    d = env[:, None, :] - env[None, :, :]
+    D = np.sqrt((d ** 2).sum(-1))
+    i, j = np.unravel_index(np.argmax(D), D.shape)
+    return tuple(env[i].astype(int)), tuple(env[j].astype(int))
+
+
+def dibujar_medicion(bgr: np.ndarray, det, zoom: int = 4):
+    """Recorte de la particula con la medida que se le aplico, dibujada encima.
+
+    Devuelve (imagen, Morfologia) o (None, None). La imagen lleva el contorno de
+    la mascara y, encima, la recta de Feret o el camino geodesico segun cual de
+    los dos haya decidido la talla, para que se vea EXACTAMENTE sobre que se
+    midio esa particula y no haya que creerselo.
+    """
+    try:
+        x1, y1, x2, y2 = det.x1, det.y1, det.x2, det.y2
+        mascara = segmentar(bgr, x1, y1, x2, y2)
+        if mascara is None:
+            return None, None
+        m = medir(mascara)
+        # Mismo desplazamiento que uso segmentar para recortar.
+        margen = int(max(3, round(0.35 * min(max(1.0, x2 - x1), max(1.0, y2 - y1)))))
+        ox, oy = max(0, int(x1) - margen), max(0, int(y1) - margen)
+        sub = bgr[oy:oy + mascara.shape[0], ox:ox + mascara.shape[1]].copy()
+        if sub.size == 0:
+            return None, None
+
+        vis = sub.copy()
+        cont, _ = cv2.findContours(mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        cv2.drawContours(vis, cont, -1, (0, 220, 0), 1)
+        if m.ok:
+            if m.metodo.startswith("geodesico"):
+                cam = camino_geodesico(mascara)
+                for k in range(1, len(cam)):
+                    cv2.line(vis, cam[k - 1], cam[k], (255, 80, 255), 1)
+            elif cont:
+                ext = extremos_feret(max(cont, key=cv2.contourArea))
+                if ext:
+                    cv2.line(vis, ext[0], ext[1], (0, 210, 255), 1)
+                    for q in ext:
+                        cv2.circle(vis, q, 2, (0, 210, 255), -1)
+        par = np.hstack([sub, vis])
+        if zoom > 1:
+            par = cv2.resize(par, None, fx=zoom, fy=zoom,
+                             interpolation=cv2.INTER_NEAREST)
+        return par, m
+    except Exception:
+        return None, None
+
+
 def medir(mascara: np.ndarray, um_por_px: Optional[float] = None) -> Morfologia:
     """Talla y forma a partir de la mascara de una particula."""
     m = Morfologia()

@@ -41,6 +41,10 @@ def _draw_annotated(img_bgr: np.ndarray, dets, color_for, label_for) -> np.ndarr
         x1, y1, x2, y2 = int(d.x1), int(d.y1), int(d.x2), int(d.y2)
         cv2.rectangle(out, (x1, y1), (x2, y2), c, grosor)
         label = label_for(d)
+        # El numero delante de todo lo demas: es lo que se busca cuando se viene
+        # desde la tabla del informe.
+        if getattr(d, "numero", None):
+            label = f"{d.numero}. {label}" if label else str(d.numero)
         if label:
             (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX,
                                           escala_txt, grosor_txt)
@@ -245,6 +249,13 @@ class DetectorRunner(QThread):
                             if params.size_max_um > 0 and d.diam_um > params.size_max_um: continue
                             keep.append(d)
                         preds = keep
+
+                    # Numerar de arriba a abajo y de izquierda a derecha, no en
+                    # el orden en que el modelo las devolvio: asi el numero 1
+                    # esta arriba del todo y buscar el 37 en la foto es viable.
+                    for _i, _d in enumerate(
+                            sorted(preds, key=lambda z: (round(z.y1 / 40), z.x1)), 1):
+                        _d.numero = _i
 
                     # Match con GT
                     # El .txt existe = hay ground truth, aunque no tenga

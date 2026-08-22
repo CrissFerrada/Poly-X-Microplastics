@@ -37,6 +37,10 @@ class Detection:
     geodesico_um: Optional[float] = None  # camino más largo por dentro
     largo_rect_eq_um: Optional[float] = None
     metodo_largo: Optional[str] = None
+    # Numero de la partícula dentro de SU imagen, empezando en 1. Es lo que
+    # permite ir de una fila de la tabla a la partícula concreta en la foto: sin
+    # él, «la mayor mide 5878 µm» no se puede ir a comprobar.
+    numero: Optional[int] = None
 
     @property
     def w(self) -> float: return self.x2 - self.x1

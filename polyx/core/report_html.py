@@ -902,6 +902,7 @@ SECCIONES = [
     ("metodos",     "Métodos"),
     ("calibracion", "Calibración de escala"),
     ("forma",       "Forma y talla de las partículas"),
+    ("fichas",      "Ficha de partículas medidas (muestra)"),
     ("resultados",  "Resultados generales"),
     ("modelos",     "Resumen por modelo"),
     ("errores",     "Análisis de errores"),
@@ -919,8 +920,8 @@ IDS_SECCIONES = [s[0] for s in SECCIONES]
 PRESETS = {
     "completo": IDS_SECCIONES,
     "resumen": ["resumen", "calibracion", "forma", "conteo", "galeria"],
-    "metodologico": ["resumen", "metodos", "calibracion", "forma", "modelos",
-                     "errores", "comparacion", "referencias"],
+    "metodologico": ["resumen", "metodos", "calibracion", "forma", "fichas",
+                     "modelos", "errores", "comparacion", "referencias"],
 }
 
 # Marca que se sustituye por el numero definitivo de la seccion al ensamblar.
@@ -933,6 +934,7 @@ def generate_report(state, output_path: Path,
                     include_refs: bool = True,
                     include_gallery: bool = True,
                     max_gallery: int = 60,
+                    max_fichas: int = 12,
                     solo_imagenes=None,
                     secciones=None) -> Path:
     """Genera el reporte HTML. `state` es un DetectorState con resultados.
@@ -1660,6 +1662,97 @@ se ensayó.</p>"""
                 f"<p>En {n_sin_forma} partículas no se pudo separar la partícula del fondo; "
                 f"su talla proviene de la caja y no es comparable con el resto.</p>")
 
+    # ── Recuento fibra/fragmento por foto ──
+    # Va dentro de la seccion de forma: responde "cuantas fibras y cuantos
+    # fragmentos hay en cada placa", que es la pregunta que se le hace a la
+    # tabla cuando se revisa foto por foto.
+    if formas:
+        por_img: Dict[str, list] = {}
+        for d, ruta in formas:
+            por_img.setdefault(Path(ruta).name, []).append(d)
+        filas_img = ""
+        for nombre in sorted(por_img):
+            ds = por_img[nombre]
+            nf = sum(1 for d in ds if d.morfotipo == "fibra")
+            largos_i = [d.largo_um for d in ds if d.largo_um]
+            filas_img += (
+                f"<tr><td style='font-size:9pt'>{nombre}</td><td>{len(ds)}</td>"
+                f"<td>{nf}</td><td>{len(ds) - nf}</td>"
+                f"<td>{(f'{np.median(largos_i):.0f}' if largos_i else '—')}</td>"
+                f"<td>{(f'{max(largos_i):.0f}' if largos_i else '—')}</td></tr>")
+        forma_html += (
+            f"<h3>{NUM}.6 Recuento por imagen</h3>"
+            f"<table class='data'><tr><th>Imagen</th><th>Partículas</th>"
+            f"<th>Fibras</th><th>Fragmentos</th><th>Largo mediano<br>(µm)</th>"
+            f"<th>Mayor<br>(µm)</th></tr>{filas_img}</table>")
+
+    # ── Ficha de cada partícula ──
+    # Una entrada por partícula, con su número, su recorte y la medida dibujada
+    # encima. Es lo que permite comprobar partícula a partícula que la talla que
+    # se reporta se corresponde con lo que hay en la foto, en vez de tener que
+    # fiarse de la tabla.
+    fichas_html = ""
+    if formas and max_fichas:
+        import cv2
+        from .morfologia import dibujar_medicion
+        por_img_f: Dict[str, list] = {}
+        for d, ruta in formas:
+            por_img_f.setdefault(str(ruta), []).append(d)
+        piezas, hechas = [], 0
+        for ruta in sorted(por_img_f):
+            if hechas >= max_fichas:
+                break
+            bgr = None
+            try:
+                from .calibracion import leer_imagen
+                bgr = leer_imagen(ruta)
+            except Exception:
+                bgr = None
+            if bgr is None:
+                continue
+            cal = (getattr(state, "calibraciones", {}) or {}).get(Path(ruta).name)
+            um = cal.um_por_px if cal and cal.valida else None
+            tarjetas = ""
+            for d in sorted(por_img_f[ruta], key=lambda z: (z.numero or 0)):
+                if hechas >= max_fichas:
+                    break
+                img, m = dibujar_medicion(bgr, d)
+                if img is None or m is None or not m.ok:
+                    continue
+                ok, buf = cv2.imencode(".png", img)
+                if not ok:
+                    continue
+                hechas += 1
+                cuenta = ""
+                if d.largo_um and um:
+                    cuenta = (f"{m.largo_px:.1f} px &times; {um:.4f} = "
+                              f"<strong>{d.largo_um:.0f} µm</strong>")
+                color = "#1f6b5e" if d.morfotipo == "fibra" else "#656d76"
+                tarjetas += (
+                    f"<div style='display:inline-block;vertical-align:top;margin:0 14px 18px 0;"
+                    f"max-width:290px'>"
+                    f"<div style='font-weight:700'>#{d.numero} · {d.class_name} · "
+                    f"<span style='color:{color}'>{d.morfotipo}</span></div>"
+                    f"<img src='{_img_b64(buf.tobytes())}' style='max-width:100%'>"
+                    f"<div style='font-size:9pt;color:#656d76'>{cuenta}<br>"
+                    f"ancho {d.ancho_um:.0f} µm · aspecto {d.aspecto:.1f} · "
+                    f"medido por {m.metodo}</div></div>")
+            if tarjetas:
+                piezas.append(f"<h3>{Path(ruta).name}</h3>{tarjetas}")
+        if piezas:
+            fichas_html = (
+                "<p>Cada partícula con el número que lleva en la imagen anotada, su recorte y "
+                "la medida dibujada <strong>sobre ella</strong>: en amarillo la recta de Feret, "
+                "en magenta el camino geodésico, según cuál de las dos haya decidido su talla. "
+                "El contorno verde es la máscara que se midió. A la izquierda va la partícula "
+                "sin marcas, para poder juzgar si el contorno la sigue.</p>"
+                + "".join(piezas))
+            if hechas >= max_fichas:
+                fichas_html += (
+                    f"<p>Se muestran las primeras {max_fichas} partículas. El límite existe "
+                    f"porque cada ficha lleva su imagen incrustada y un lote completo haría "
+                    f"un archivo inabrible.</p>")
+
     # ── Ensamblar HTML ──
     # Cada bloque es (id, cuerpo). El cuerpo NO lleva su <h2>: el titulo y el
     # numero los pone el ensamblador, que es el unico que sabe que secciones
@@ -1684,6 +1777,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 {methods_para}""",
         "calibracion": calib_html,
         "forma": forma_html,
+        "fichas": fichas_html,
         "resultados": figures_html,
         "modelos": f"""
 <table class='data'><tr><th>Modelo</th><th>Imágenes</th><th>Detecciones</th>
@@ -1701,7 +1795,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
     # Un id en ``pedidas`` con cuerpo vacio se cae aqui: se marco la casilla pero
     # no habia con que llenarla (errores sin ground truth, conteo sin muestras).
     ancla = {"resumen": "abstract", "metodos": "methods", "calibracion": "calib",
-             "forma": "forma",
+             "forma": "forma", "fichas": "fichas",
              "resultados": "results", "modelos": "models", "errores": "errors",
              "comparacion": "compare", "galeria": "gallery", "conteo": "conteo",
              "referencias": "refs"}
