@@ -578,8 +578,14 @@ def dibujar_medicion(bgr: np.ndarray, det, zoom: int = 4):
         if mascara is None:
             return None, None
         m = medir(mascara)
-        # Mismo desplazamiento que uso segmentar para recortar.
-        margen = int(max(3, round(0.35 * min(max(1.0, x2 - x1), max(1.0, y2 - y1)))))
+        # Mismo margen que uso segmentar() para recortar -- tiene que ser
+        # EXACTAMENTE margen_de_caja(), no un numero aparte. Aqui habia un 0.35
+        # copiado a mano que no coincidia con el 0.50 real de segmentar(): la
+        # mascara se calculaba sobre un recorte y el fondo mostrado se leia
+        # desde otro origen, asi que el contorno y la foto de abajo quedaban
+        # desalineados unos pocos px (visibles a zoom alto). Se vio a ojo en un
+        # informe: la mascara "quedaba corrida" respecto de la particula.
+        margen = margen_de_caja(x2 - x1, y2 - y1)
         ox, oy = max(0, int(x1) - margen), max(0, int(y1) - margen)
         sub = bgr[oy:oy + mascara.shape[0], ox:ox + mascara.shape[1]].copy()
         if sub.size == 0:
