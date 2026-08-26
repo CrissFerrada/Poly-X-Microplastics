@@ -14,11 +14,12 @@ Contenido:
 from __future__ import annotations
 import base64
 import io
+import math
 import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -623,6 +624,156 @@ def _fig_tallas_por_tramo(largos_por_clase: Dict[str, List[float]]) -> str:
     return _fig_to_b64(fig)
 
 
+# ── Comparación de talla entre grupos (carpeta, o foto dentro de una carpeta) ──
+#
+# El pipeline del paper comparaba "por estación" parseando un patrón de
+# nombre de archivo (N.T de un estudio concreto). Eso no sirve para un lote
+# cualquiera que alguien cargue en el Detector. Lo único que la app sabe de
+# CUALQUIER lote es de qué carpeta vino cada foto, así que la comparación se
+# generaliza a eso: por carpeta, y por foto dentro de cada carpeta.
+#
+# La prueba (Kruskal-Wallis) se implementa aquí a mano, sin scipy: scipy no es
+# una dependencia declarada del proyecto -- llega de rebote con ultralytics, y
+# apoyarse en él rompería la instalación el día que ultralytics deje de
+# traerlo (mismo motivo por el que morfologia.py evita scipy). El estadístico H
+# y el valor p se verificaron contra scipy.stats.kruskal en un centenar de
+# casos aleatorios, con y sin empates, y coinciden a precisión de máquina.
+
+_MAX_GRUPOS_BOXPLOT = 12
+_MAX_CARPETAS_POR_FOTO = 6
+
+
+def _rankdata(a: np.ndarray) -> np.ndarray:
+    """Rango de cada valor, promediando el rango entre los empates."""
+    orden = np.argsort(a, kind="mergesort")
+    ordenado = a[orden]
+    rangos_ord = np.empty(len(a), dtype=float)
+    i = 0
+    while i < len(a):
+        j = i
+        while j + 1 < len(a) and ordenado[j + 1] == ordenado[i]:
+            j += 1
+        rangos_ord[i:j + 1] = (i + j) / 2.0 + 1.0
+        i = j + 1
+    rangos = np.empty(len(a), dtype=float)
+    rangos[orden] = rangos_ord
+    return rangos
+
+
+def _chi2_sf(h: float, df: int) -> float:
+    """P(X > h) de una chi-cuadrado con ``df`` grados de libertad, sin scipy.
+
+    Se construye con la recurrencia de la función gamma incompleta superior
+    Q(a+1,x) = Q(a,x) + x^a e^-x / Gamma(a+1), subiendo de a en a=0.5 desde el
+    caso cerrado (erfc para df impar, exp para df par). df aquí es siempre un
+    entero chico (número de grupos - 1), así que la recurrencia converge en
+    pocos pasos.
+    """
+    if h <= 0 or df < 1:
+        return 1.0
+    xa = h / 2.0
+    if df % 2 == 1:
+        q = math.erfc(math.sqrt(xa))
+        a0, n = 0.5, (df - 1) // 2
+    else:
+        q = math.exp(-xa)
+        a0, n = 1.0, (df - 2) // 2
+    if n <= 0:
+        return min(1.0, max(0.0, q))
+    termino = (xa ** a0) * math.exp(-xa) / math.gamma(a0 + 1.0)
+    q += termino
+    for k in range(1, n):
+        termino *= xa / (a0 + k)
+        q += termino
+    return min(1.0, max(0.0, q))
+
+
+def _kruskal_wallis(grupos: List[np.ndarray]) -> Optional[Tuple[float, float, int]]:
+    """(H, p, grados de libertad), o None si no hay datos suficientes.
+
+    Incluye la corrección estándar por empates (frecuente aquí: las tallas se
+    redondean a un decimal). Sin corrección, un lote con muchos valores
+    repetidos infla H artificialmente.
+    """
+    grupos = [np.asarray(g, dtype=float) for g in grupos if len(g) > 0]
+    if len(grupos) < 2:
+        return None
+    todos = np.concatenate(grupos)
+    n_total = len(todos)
+    if n_total < 3:
+        return None
+    rangos = _rankdata(todos)
+    h = 0.0
+    idx = 0
+    for g in grupos:
+        n_i = len(g)
+        r_i = rangos[idx:idx + n_i].sum()
+        h += (r_i * r_i) / n_i
+        idx += n_i
+    h = (12.0 / (n_total * (n_total + 1))) * h - 3 * (n_total + 1)
+    _, cuentas = np.unique(todos, return_counts=True)
+    empate = np.sum(cuentas ** 3 - cuentas)
+    denom = n_total ** 3 - n_total
+    if denom > 0 and empate > 0:
+        c = 1.0 - empate / denom
+        if c > 0:
+            h = h / c
+    df = len(grupos) - 1
+    p = _chi2_sf(h, df)
+    return h, p, df
+
+
+def _texto_kruskal(resultado: Optional[Tuple[float, float, int]], n_grupos: int) -> str:
+    if resultado is None:
+        return ("Sin datos suficientes para una prueba estadística (hace falta más de "
+                "una observación por grupo).")
+    h, p, df = resultado
+    frase = ("<strong>diferencia significativa</strong>" if p < 0.05
+             else "sin diferencia significativa")
+    return (f"Kruskal-Wallis entre los {n_grupos} grupos: {frase} "
+           f"(H={h:.2f}, gl={df}, p={p:.3g}). No dice CUÁL grupo difiere de cuál, "
+           "solo que no todos comparten la misma distribución de talla.")
+
+
+def _fig_boxplot_grupos(grupos: Dict[str, List[float]], titulo: str, xlabel: str,
+                        max_grupos: int = _MAX_GRUPOS_BOXPLOT) -> str:
+    """Boxplot de talla por grupo (carpeta, o foto dentro de una carpeta).
+
+    Se trunca a los ``max_grupos`` con más partículas: un boxplot con más de
+    una docena de cajas se vuelve ilegible antes de aportar nada, y los grupos
+    con pocas partículas son los que menos dicen de todas formas.
+    """
+    items = sorted(grupos.items(), key=lambda kv: -len(kv[1]))
+    truncado = len(items) > max_grupos
+    items = items[:max_grupos]
+    items.sort(key=lambda kv: kv[0])
+
+    datos = [np.asarray(v, dtype=float) for _, v in items]
+    etiquetas = [f"{k}\n(n={len(v)})" for k, v in items]
+
+    fig, ax = plt.subplots(figsize=(max(5.5, 1.15 * len(items) + 2), 4.2), dpi=140)
+    bp = ax.boxplot(datos, tick_labels=etiquetas, patch_artist=True, showfliers=True,
+                    flierprops=dict(marker='o', markersize=3, alpha=0.35, markeredgewidth=0))
+    for patch in bp["boxes"]:
+        patch.set_facecolor(T.ACCENT)
+        patch.set_alpha(0.30)
+        patch.set_edgecolor(T.ACCENT)
+    for med in bp["medians"]:
+        med.set_color("black")
+        med.set_linewidth(1.4)
+    ax.set_yscale("log")
+    ax.set_ylabel("talla (µm, escala log)")
+    ax.set_xlabel(xlabel)
+    titulo_completo = titulo + (f" (las {max_grupos} con más partículas)" if truncado else "")
+    ax.set_title(titulo_completo, fontsize=10)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", which="both", alpha=0.2)
+    rota = len(items) > 5
+    plt.setp(ax.get_xticklabels(), rotation=30 if rota else 0, ha="right" if rota else "center")
+    fig.tight_layout()
+    return _fig_to_b64(fig)
+
+
 def _ficha_particula(det, ruta_imagen, um_por_px: Optional[float],
                      titulo: str) -> str:
     """Recorte de una particula con su mascara y la cuenta de px a µm.
@@ -897,6 +1048,7 @@ SECCIONES = [
     ("metodos",     "Métodos"),
     ("calibracion", "Calibración de escala"),
     ("forma",       "Forma y talla de las partículas"),
+    ("talla_carpetas", "Talla por carpeta y por foto (comparación entre sitios)"),
     ("fichas",      "Ficha de partículas medidas (muestra)"),
     ("resultados",  "Resultados generales"),
     ("modelos",     "Resumen por modelo"),
@@ -1519,6 +1671,9 @@ entraría entero en todos los tamaños reportados.</p>"""
                       if getattr(p_, "aspecto", None) is None)
     ficha_mayor = None
     tabla_morfotipo = tablas = recuento = metodo = ejemplo = ""
+    # Independiente de "forma": es su propia seccion opcional en el informe
+    # (ver SECCIONES mas abajo), asi que no entra en forma_html.
+    por_carpeta_html = ""
     if formas:
         con_talla = [(d, ruta) for d, ruta in formas if d.largo_um]
         fibras = sum(1 for d, _ in formas if d.morfotipo == "fibra")
@@ -1600,6 +1755,65 @@ entraría entero en todos los tamaños reportados.</p>"""
                 Path(ruta_mayor).name)
             um_mayor = cal_mayor.um_por_px if cal_mayor and cal_mayor.valida else None
             ficha_mayor = (mayor, ruta_mayor, um_mayor)
+
+            # ── Talla por carpeta, y por foto dentro de cada carpeta ──
+            # Generaliza la comparacion "por estacion/tramo" del pipeline del
+            # paper (que dependia de un patron de nombre de archivo especifico
+            # de un estudio) a lo unico que CUALQUIER lote tiene: de que
+            # carpeta vino cada foto. Sirve para comparar sitios de muestreo,
+            # tratamientos, o cualquier otra agrupacion que el usuario haya
+            # expresado como carpetas al elegir las imagenes.
+            grupos_carpeta: Dict[str, List[float]] = {}
+            for d, ruta in con_talla:
+                carpeta = Path(ruta).parent.name or str(Path(ruta).parent)
+                grupos_carpeta.setdefault(carpeta, []).append(d.largo_um)
+
+            if len(grupos_carpeta) >= 2:
+                fig_carpeta = _fig_boxplot_grupos(
+                    grupos_carpeta, "Talla por carpeta", "carpeta de origen")
+                veredicto_carpeta = _texto_kruskal(
+                    _kruskal_wallis(list(grupos_carpeta.values())), len(grupos_carpeta))
+                por_carpeta_html = (
+                    f"<h3>{NUM}.1 Talla por carpeta</h3>"
+                    f"<p>Compara la talla entre las carpetas del lote analizado -- "
+                    f"cada carpeta como un grupo distinto. Útil cuando cada carpeta es "
+                    f"un sitio de muestreo, una estación o una condición.</p>"
+                    f"<img src='{fig_carpeta}' style='max-width:100%'>"
+                    f"<p>{veredicto_carpeta}</p>")
+
+                # -- Por foto, dentro de las carpetas con mas de una imagen --
+                piezas_foto = []
+                for carpeta in sorted(grupos_carpeta, key=lambda c: -len(grupos_carpeta[c])):
+                    if len(piezas_foto) >= _MAX_CARPETAS_POR_FOTO:
+                        break
+                    fotos_de_carpeta: Dict[str, List[float]] = {}
+                    for d, ruta in con_talla:
+                        if Path(ruta).parent.name == carpeta:
+                            fotos_de_carpeta.setdefault(Path(ruta).name, []).append(d.largo_um)
+                    if len(fotos_de_carpeta) < 2:
+                        continue
+                    fig_foto = _fig_boxplot_grupos(
+                        fotos_de_carpeta, f"Talla por foto — {carpeta}", "foto",
+                        max_grupos=20)
+                    veredicto_foto = _texto_kruskal(
+                        _kruskal_wallis(list(fotos_de_carpeta.values())), len(fotos_de_carpeta))
+                    piezas_foto.append(
+                        f"<p><strong>{carpeta}</strong> ({len(fotos_de_carpeta)} fotos)</p>"
+                        f"<img src='{fig_foto}' style='max-width:100%'>"
+                        f"<p>{veredicto_foto}</p>")
+                if piezas_foto:
+                    n_carpetas_con_fotos = sum(
+                        1 for c in grupos_carpeta
+                        if len({Path(r).name for d, r in con_talla if Path(r).parent.name == c}) >= 2)
+                    nota_tope = (f" Se muestran las {_MAX_CARPETAS_POR_FOTO} carpetas con más "
+                                f"partículas de las {n_carpetas_con_fotos} que tienen más de una foto."
+                                if n_carpetas_con_fotos > _MAX_CARPETAS_POR_FOTO else "")
+                    por_carpeta_html += (
+                        f"<h3>{NUM}.2 Talla por foto, dentro de cada carpeta</h3>"
+                        f"<p>Compara la talla entre las fotos individuales de una misma "
+                        f"carpeta -- por ejemplo, si el tamaño cambia con la profundidad "
+                        f"o el momento de muestreo dentro de un mismo sitio.{nota_tope}</p>"
+                        + "".join(piezas_foto))
 
         # ── Recuento fibra/fragmento por foto ──
     # Va dentro de la seccion de forma: responde "cuantas fibras y cuantos
@@ -1731,6 +1945,15 @@ subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensay
                 if d.largo_um and um:
                     cuenta = (f"{m.largo_px:.1f} px &times; {um:.4f} = "
                               f"<strong>{d.largo_um:.0f} µm</strong>")
+                # d.aspecto/morfotipo se llenan con solo segmentar (no necesitan
+                # calibracion), pero d.ancho_um solo si la foto tenia um_por_px
+                # valido cuando se midio -- una foto sin placa detectada deja
+                # aspecto con dato y ancho_um en None. Sin este guard, esa
+                # combinacion revienta el formato ":.0f" sobre None.
+                detalle = [f"ancho {d.ancho_um:.0f} µm"] if d.ancho_um else []
+                if d.aspecto:
+                    detalle.append(f"aspecto {d.aspecto:.1f}")
+                detalle.append(f"medido por {m.metodo}")
                 color = "#1f6b5e" if d.morfotipo == "fibra" else "#656d76"
                 tarjetas += (
                     f"<div style='display:inline-block;vertical-align:top;margin:0 14px 18px 0;"
@@ -1739,8 +1962,7 @@ subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensay
                     f"<span style='color:{color}'>{d.morfotipo}</span></div>"
                     f"<img src='{_img_b64(buf.tobytes())}' style='max-width:100%'>"
                     f"<div style='font-size:9pt;color:#656d76'>{cuenta}<br>"
-                    f"ancho {d.ancho_um:.0f} µm · aspecto {d.aspecto:.1f} · "
-                    f"medido por {m.metodo}</div></div>")
+                    f"{' · '.join(detalle)}</div></div>")
             if tarjetas:
                 piezas.append(f"<h3>{Path(ruta).name}</h3>{tarjetas}")
         if piezas:
@@ -1781,6 +2003,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
 {methods_para}""",
         "calibracion": calib_html,
         "forma": forma_html,
+        "talla_carpetas": por_carpeta_html,
         "fichas": fichas_html,
         "resultados": figures_html,
         "modelos": f"""
@@ -1799,7 +2022,7 @@ fue <strong>{total_dets}</strong> con una confianza media de <strong>{avg_conf:.
     # Un id en ``pedidas`` con cuerpo vacio se cae aqui: se marco la casilla pero
     # no habia con que llenarla (errores sin ground truth, conteo sin muestras).
     ancla = {"resumen": "abstract", "metodos": "methods", "calibracion": "calib",
-             "forma": "forma", "fichas": "fichas",
+             "forma": "forma", "talla_carpetas": "talla_carpetas", "fichas": "fichas",
              "resultados": "results", "modelos": "models", "errores": "errors",
              "comparacion": "compare", "galeria": "gallery", "conteo": "conteo",
              "referencias": "refs"}

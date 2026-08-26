@@ -92,6 +92,10 @@ class ReportePage(DetectorPage):
             "<li><b>Calibración de escala</b> — de dónde salió el µm/px de cada foto.</li>"
             "<li><b>Forma y talla</b> — reparto fibra/fragmento, distribución de tallas, "
             "la mayor y la menor, recuento por imagen y cómo se mide el largo.</li>"
+            "<li><b>Talla por carpeta y por foto</b> (opcional, desmarcada de fábrica) — "
+            "compara el tamaño entre las carpetas del lote y, dentro de cada una, entre "
+            "sus fotos, con una prueba de significancia. Sirve cuando cada carpeta es un "
+            "sitio de muestreo distinto.</li>"
             "<li><b>Fichas</b> — una muestra de partículas con su medición dibujada.</li>"
             "<li><b>Resultados generales</b> — clases, confianza y tamaños.</li>"
             "<li><b>Resumen por modelo</b> (tabla comparativa)</li>"
@@ -417,6 +421,12 @@ class ReportePage(DetectorPage):
         # base64 dentro del propio HTML.
         self.chk_secciones["galeria"].setText(
             tr("Galería por imagen  (es lo que más pesa)"))
+
+        # A diferencia del resto, esta no viene marcada de fábrica: solo tiene
+        # sentido cuando las imágenes analizadas están repartidas en varias
+        # carpetas (sitios, tratamientos...) y el usuario quiere esa
+        # comparación en particular, no en cualquier informe.
+        self.chk_secciones["talla_carpetas"].setChecked(False)
         return c
 
     def _aplicar_preset(self, clave: str):
