@@ -110,9 +110,30 @@ data/                     # Otros datasets
 | **pyqtgraph** | 0.13.7 | Plots en vivo (trainer) |
 
 **Hardware:**
-- Windows 10/11
+- Windows 10/11 · macOS 11 Big Sur o posterior
 - 8 GB RAM mínimo
-- GPU NVIDIA opcional (recomendada): Auto-detecta CUDA → PyTorch GPU
+- Aceleración: se elige sola en `core/plataforma.py` → **CUDA** (NVIDIA) →
+  **MPS** (GPU integrada de los Mac con Apple Silicon) → **CPU**
+
+**Portabilidad.** Todo lo que difiere entre sistemas está concentrado en
+`polyx/core/plataforma.py`, no repartido por el código:
+
+| Antes (solo Windows) | Ahora |
+|---|---|
+| `os.startfile` (11 sitios) | `abrir_en_el_sistema()` → `startfile` / `open` / `xdg-open` |
+| `cmd /c start` | `lanzar_actualizador()` |
+| `device = "0"` (CUDA fija) | `dispositivo_disponible()` |
+| `actualizar.bat` fijo | `nombre_actualizador()` |
+
+> **Mac Intel:** PyTorch dejó de publicar ruedas x86_64 para macOS desde la 2.3;
+> el instalador fija **2.2.2**, la última que existe. Sin MPS (requiere Apple
+> Silicon), así que corre en CPU.
+
+> **`.gitattributes` no es cosmético:** fuerza LF en `*.command` y `*.sh`. Con
+> `core.autocrlf=true` en Windows y sin él, el script llega al Mac con CRLF y
+> bash lo rechaza con `/bin/bash^M: bad interpreter`, un síntoma que no se
+> parece en nada a su causa. Los `.command` van con modo `100755`: sin el bit
+> de ejecución el doble clic en Finder no hace nada.
 
 ---
 
@@ -164,16 +185,30 @@ observación del autor.
 
 ## 🚀 Instalación y uso
 
-### Primera vez
-```batch
-SETUP.bat
-```
-Crea `.venv`, detecta GPU, instala PyTorch + ultralytics + PySide6.
+### 🪟 Windows
 
-### Uso diario
 ```batch
-iniciar_polyx.bat
+SETUP.bat            :: primera vez — crea .venv, detecta GPU, instala todo
+iniciar_polyx.bat    :: uso diario
+actualizar.bat       :: traer lo nuevo de GitHub
 ```
+
+### 🍎 macOS
+
+```bash
+Lanzar_macOS.command       # instala la 1ª vez, arranca las siguientes
+actualizar_macOS.command   # traer lo nuevo de GitHub
+construir_app_macOS.command  # empaquetar Poly-X.app (opcional)
+```
+
+Clic **derecho** → Abrir la primera vez (Gatekeeper bloquea los scripts
+descargados sin firma de Apple).
+
+Instalador y lanzador van en **un solo archivo** a propósito: en macOS cada
+`.command` exige su propia aprobación de seguridad la primera vez, y separarlos
+obligaría a pasar dos veces por ese aviso — la segunda, con el programa ya
+instalado, es cuando más parece que algo se rompió.
+
 Abre **Launcher** → selecciona módulo.
 
 ---

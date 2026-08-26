@@ -9,8 +9,15 @@ Plataforma de detección y clasificación de microplásticos
 (PET, PP y LDPE) por fluorescencia Nile Red bajo luz UV (254 nm)
 e inteligencia artificial (YOLO v8 / v11).
 
-INSTALACIÓN (PRIMERA VEZ)
--------------------------
+Funciona en WINDOWS y en macOS.
+
+  Windows ......  SETUP.bat        (instalar)  ·  iniciar_polyx.bat (usar)
+  macOS ........  Lanzar_macOS.command  (instala la 1a vez y luego arranca)
+
+Si usas Mac, salta a la seccion INSTALACION EN macOS mas abajo.
+
+INSTALACIÓN EN WINDOWS (PRIMERA VEZ)
+------------------------------------
 1. Instala Python 3.11.x (NO 3.12+) desde
    https://www.python.org/downloads/release/python-3119/
    Marca "Add Python to PATH" y "tcl/tk and IDLE".
@@ -29,18 +36,51 @@ INSTALACIÓN (PRIMERA VEZ)
    por su tamaño. Copia tu archivo .pt dentro de la carpeta  models\
    para usar el Detector y el Visor.
 
+INSTALACIÓN EN macOS (PRIMERA VEZ)
+----------------------------------
+1. Comprueba que tienes Python 3.9 o superior. En Terminal:
+      python3 --version
+   Si no lo tienes: https://www.python.org/downloads/
+
+2. CLIC DERECHO sobre  Lanzar_macOS.command  ->  Abrir  ->  Abrir
+
+   IMPORTANTE: macOS dira "no se puede abrir porque es de un
+   desarrollador no identificado". ES LO ESPERABLE, NO ESTA ROTO.
+   Bloquea cualquier script descargado que no venga firmado con una
+   cuenta de Apple de pago. Por eso hay que abrirlo con clic DERECHO
+   la primera vez; despues el doble clic normal funciona.
+
+   Si aun asi se resiste, en Terminal:
+      xattr -d com.apple.quarantine Lanzar_macOS.command
+
+3. Ese mismo archivo instala (10-15 min) y despues arranca el programa.
+   No hay un instalador aparte: es a proposito, para pasar una sola vez
+   por el aviso de seguridad.
+
+   Detecta solo si el Mac es Apple Silicon o Intel:
+     - Apple Silicon (M1/M2/M3/M4) -> usa la GPU integrada (MPS). Rapido.
+     - Intel                       -> solo CPU. Cuenta ~1 min por foto.
+
+   Detalle completo en  LEEME_macOS.md
+
 ACTUALIZAR (TRAER LO NUEVO DE GITHUB)
 -------------------------------------
-Doble clic en  actualizar.bat
+Doble clic en:
+     Windows ...  actualizar.bat
+     macOS .....  actualizar_macOS.command
+
   - Mira si hay una version nueva en GitHub y la descarga.
   - Reemplaza solo el codigo del programa.
-  - CONSERVA tu .venv, tus modelos models\*.pt, tus runs\ y datos.
+  - CONSERVA tu .venv, tus modelos models/*.pt, tus runs/ y datos.
   - No necesita Git, solo internet.
+
+  Da igual desde que sistema actualices: cada actualizador tambien deja
+  al dia los archivos del otro.
 
 USO DIARIO
 ----------
 Doble clic en el acceso directo "Poly-X" del Escritorio
-(o en  iniciar_polyx.bat).
+(o en  iniciar_polyx.bat  en Windows / Lanzar_macOS.command  en Mac).
 Se abre el menú principal con 4 módulos:
 
    🔬 Detector     · Analiza imágenes con un modelo .pt entrenado
@@ -70,8 +110,12 @@ ESTRUCTURA DE CARPETAS
   legacy/             Versiones anteriores del código (referencia)
   manual_screenshots/ Capturas usadas por el manual
   Manual_PolyX.html   Manual de usuario completo (abrir en navegador)
-  SETUP.bat           Instalación
-  iniciar_polyx.bat   Lanzador
+  LEEME_macOS.md      Guia especifica de macOS
+  SETUP.bat                 [Win] Instalación
+  iniciar_polyx.bat         [Win] Lanzador
+  actualizar.bat            [Win] Actualizador
+  Lanzar_macOS.command      [Mac] Instalación + lanzador
+  actualizar_macOS.command  [Mac] Actualizador
 
 REGENERAR EL MANUAL CON LA UI ACTUAL
 ------------------------------------
@@ -85,6 +129,16 @@ PROBLEMAS COMUNES
 • "CUDA not available"       →  no es error, solo CPU es más lento.
 • Detector no detecta nada   →  baja confianza a 0.10 en Parámetros.
 • OOM en entrenamiento       →  baja batch a 4 o 2, e imgsz a 640.
+
+Solo en macOS:
+• "desarrollador no identificado" →  clic DERECHO sobre el archivo,
+                                     luego Abrir. Solo la 1a vez.
+• "bad interpreter: /bin/bash^M"  →  el archivo llego con finales de
+                                     linea de Windows. Descargalo otra
+                                     vez desde GitHub, no lo copies por
+                                     correo ni WhatsApp.
+• Doble clic y no pasa nada       →  falta permiso de ejecucion:
+                                     chmod +x Lanzar_macOS.command
 
 CONTACTO
 --------

@@ -6,7 +6,7 @@
 > por fluorescencia Nile Red bajo luz UV (254 nm) con modelos YOLO v8/v11.**
 
 **Autor:** Cristofher Ferrada · Doctorado en Ciencias mención Química · PUCV · 2026  
-**Versión:** 2.0.0 · Windows 10/11 · Python 3.11
+**Versión:** 2.0.0 · **Windows 10/11 y macOS** · Python 3.9+
 
 ---
 
@@ -237,21 +237,30 @@ Para ver qué falta por traducir:
 
 ## Requisitos
 
-| Componente | Versión |
-|---|---|
-| Windows | 10 / 11 |
-| Python | **3.11.x** (no 3.12+) |
-| RAM | 8 GB mínimo |
-| GPU | NVIDIA opcional (20–30× más rápido para entrenamiento). El instalador elige la versión de CUDA según la arquitectura de la tarjeta |
+| Componente | Windows | macOS |
+|---|---|---|
+| Sistema | 10 / 11 | 11 Big Sur o posterior |
+| Python | **3.11.x** (no 3.12+) | 3.9 o superior |
+| RAM | 8 GB mínimo | 8 GB mínimo |
+| Aceleración | GPU NVIDIA opcional (20–30× más rápido para entrenar). El instalador elige la versión de CUDA según la tarjeta | **Apple Silicon:** GPU integrada vía MPS. **Intel:** solo CPU |
 
 Dependencias principales: `PySide6 6.7`, `Ultralytics 8.3`, `OpenCV 4.10`, `NumPy 1.26`, `Matplotlib 3.9`
+
+> **Mac Intel:** PyTorch dejó de publicar versiones para procesadores Intel a partir
+> de la 2.3, así que el instalador fija la **2.2.2**, la última con soporte x86_64.
+> Funciona correctamente, pero sin aceleración por GPU: cuenta ~1 minuto por foto
+> en lotes con troceo.
 
 ---
 
 ## Instalación
 
-Tras descargar el proyecto desde GitHub (botón **Code → Download ZIP**, y descomprimir;
-o `git clone`), haz **doble clic en**:
+Descarga el proyecto desde GitHub (botón **Code → Download ZIP**, y descomprimir;
+o `git clone`) y sigue las instrucciones de tu sistema.
+
+### 🪟 Windows
+
+Doble clic en:
 
 ```bat
 SETUP.bat
@@ -273,7 +282,34 @@ El instalador:
    (ver más abajo).
 7. Te ofrece **crear un acceso directo "Poly-X" en el Escritorio** y **te dice cómo iniciarlo**.
 
-### Abrir sin consola
+### 🍎 macOS
+
+**Clic derecho** sobre `Lanzar_macOS.command` → **Abrir** → **Abrir**.
+
+Ese archivo hace las dos cosas: la primera vez instala (10–15 min) y después
+arranca. No hay un instalador aparte a propósito — en macOS cada `.command`
+necesita su propia aprobación de seguridad la primera vez, y con un solo archivo
+eso ocurre una sola vez.
+
+El instalador detecta si el Mac es Apple Silicon o Intel, elige el PyTorch que
+corresponde, comprueba que todo importe y te ofrece crear un acceso directo en el
+Escritorio.
+
+> #### ⚠️ «No se puede abrir porque es de un desarrollador no identificado»
+>
+> **Es lo esperable y no significa que esté roto.** macOS bloquea por defecto
+> cualquier script descargado que no venga firmado con una cuenta de desarrollador
+> de Apple (USD 99/año).
+>
+> **Solución:** clic **derecho** → **Abrir** → confirmar **Abrir**. Solo la primera
+> vez; después el doble clic normal funciona. Si se resiste, en Terminal:
+> `xattr -d com.apple.quarantine Lanzar_macOS.command`
+
+Detalle completo en **[LEEME_macOS.md](LEEME_macOS.md)**.
+
+---
+
+### Abrir sin consola (Windows)
 
 Doble clic en **`Poly-X.vbs`** (raíz del proyecto): abre el Launcher directamente,
 sin ventana negra. Resuelve su propia ubicación, así que funciona desde cualquier
@@ -294,17 +330,15 @@ mensajes de error si algo falla al arrancar.
 
 ## Uso
 
-Doble clic en el acceso directo **Poly-X** del Escritorio, o en:
-
-```bat
-iniciar_polyx.bat
-```
+Doble clic en el acceso directo **Poly-X** del Escritorio, o en `iniciar_polyx.bat`
+(Windows) / `Lanzar_macOS.command` (macOS).
 
 Abre el **Launcher** → selecciona el módulo.
 
 O directamente desde terminal:
 
-```bash
+```bat
+REM Windows
 .venv\Scripts\python.exe -m polyx.launcher
 .venv\Scripts\python.exe -m polyx.detector
 .venv\Scripts\python.exe -m polyx.trainer
@@ -312,18 +346,32 @@ O directamente desde terminal:
 .venv\Scripts\python.exe -m polyx.visor
 ```
 
+```bash
+# macOS
+.venv/bin/python -m polyx.launcher
+.venv/bin/python -m polyx.detector
+.venv/bin/python -m polyx.trainer
+.venv/bin/python -m polyx.etiquetador
+.venv/bin/python -m polyx.visor
+```
+
 ## Actualizar
 
 Para traer la última versión publicada en GitHub **sin reinstalar nada**, doble clic en:
 
-```bat
-actualizar.bat
-```
+| Sistema | Archivo |
+|---|---|
+| 🪟 Windows | `actualizar.bat` |
+| 🍎 macOS | `actualizar_macOS.command` |
 
 Comprueba si hay un commit nuevo en `main`; si lo hay, descarga y reemplaza solo los
-archivos del programa. **Conserva** tu entorno `.venv`, tus modelos `models\*.pt`, tus
-`runs\` y cualquier dato local. No necesita tener Git instalado (descarga por HTTPS) —
+archivos del programa. **Conserva** tu entorno `.venv`, tus modelos `models/*.pt`, tus
+`runs/` y cualquier dato local. No necesita tener Git instalado (descarga por HTTPS) —
 solo conexión a internet.
+
+Cada actualizador se protege a sí mismo mientras corre, pero **sí actualiza los
+archivos de la otra plataforma**: da igual desde cuál actualices, el proyecto queda
+completo para ambas.
 
 ### Aviso automático
 
@@ -357,7 +405,7 @@ instalación vieja, y retirarlo se llevaría el trabajo sin versionar.
 polyx/
 ├── launcher.py          # Menú principal
 ├── core/                # Módulos compartidos (theme, yolo_wrap, metrics, report_html,
-│                        #   calibracion, morfologia, procedencia, i18n)
+│                        #   calibracion, morfologia, procedencia, i18n, plataforma)
 ├── detector/            # Módulo 2: análisis en lote (9 páginas)
 ├── trainer/             # Módulo 3: entrenamiento YOLO (9 páginas)
 ├── etiquetador/         # Módulo 4: anotación interactiva
@@ -365,8 +413,19 @@ polyx/
 models/                  # Pesos .pt entrenados
 runs/                    # Resultados de cada ejecución
 data_microplastico/      # Dataset YOLO (images/ + labels/)
-tests/                   # Suite de pruebas de medida y calibración
+tests/                   # Suite de pruebas de medida, calibración y portabilidad
+
+SETUP.bat                # 🪟 Instalador
+iniciar_polyx.bat        # 🪟 Lanzador
+actualizar.bat           # 🪟 Actualizador
+Lanzar_macOS.command     # 🍎 Instalador + lanzador (los dos en uno)
+actualizar_macOS.command # 🍎 Actualizador
+construir_app_macOS.command  # 🍎 Empaquetar Poly-X.app (opcional)
 ```
+
+Las diferencias entre sistemas —abrir carpetas, lanzar el actualizador, elegir el
+dispositivo de cómputo— están concentradas en `polyx/core/plataforma.py`, no
+repartidas por el código.
 
 ---
 

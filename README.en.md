@@ -6,7 +6,7 @@
 > by Nile Red fluorescence under UV light (254 nm), using YOLO v8/v11 models.**
 
 **Author:** Cristofher Ferrada · PhD in Chemistry · PUCV · 2026
-**Version:** 2.0.0 · Windows 10/11 · Python 3.11
+**Version:** 2.0.0 · **Windows 10/11 and macOS** · Python 3.9+
 
 ---
 
@@ -201,21 +201,30 @@ To see what is still untranslated:
 
 ## Requirements
 
-| Component | Version |
-|---|---|
-| Windows | 10 / 11 |
-| Python | **3.11.x** (not 3.12+) |
-| RAM | 8 GB minimum |
-| GPU | NVIDIA optional (20–30× faster for training). The installer picks the CUDA build that matches the card's architecture |
+| Component | Windows | macOS |
+|---|---|---|
+| System | 10 / 11 | 11 Big Sur or later |
+| Python | **3.11.x** (not 3.12+) | 3.9 or later |
+| RAM | 8 GB minimum | 8 GB minimum |
+| Acceleration | NVIDIA GPU optional (20–30× faster for training). The installer picks the CUDA build that matches the card | **Apple Silicon:** built-in GPU via MPS. **Intel:** CPU only |
 
 Main dependencies: `PySide6 6.7`, `Ultralytics 8.3`, `OpenCV 4.10`, `NumPy 1.26`,
 `Matplotlib 3.9`
+
+> **Intel Macs:** PyTorch stopped shipping builds for Intel processors from 2.3
+> onwards, so the installer pins **2.2.2**, the last release with x86_64 support.
+> It works correctly, but without GPU acceleration: expect about 1 minute per photo
+> on tiled batches.
 
 ---
 
 ## Installation
 
-Clone or download the repository, then run once:
+Clone or download the repository, then follow the instructions for your system.
+
+### 🪟 Windows
+
+Run once:
 
 ```bat
 SETUP.bat
@@ -224,24 +233,55 @@ SETUP.bat
 It creates `.venv`, detects the GPU and installs PyTorch, Ultralytics and
 PySide6. Nothing else has to be installed by hand.
 
+### 🍎 macOS
+
+**Right-click** `Lanzar_macOS.command` → **Open** → **Open**.
+
+That single file does both jobs: the first run installs everything (10–15 min),
+later runs just start the app. There is deliberately no separate installer — on
+macOS every `.command` file needs its own security approval the first time, and
+keeping it to one file means that only happens once.
+
+The installer detects whether the Mac is Apple Silicon or Intel, picks the matching
+PyTorch build, verifies that everything imports, and offers to create a Desktop
+shortcut.
+
+> #### ⚠️ "cannot be opened because it is from an unidentified developer"
+>
+> **This is expected and does not mean anything is broken.** macOS blocks any
+> downloaded script that is not signed with an Apple developer account (USD 99/year).
+>
+> **Fix:** **right-click** → **Open** → confirm **Open**. Only needed the first time;
+> a normal double-click works afterwards. If it still refuses, in Terminal:
+> `xattr -d com.apple.quarantine Lanzar_macOS.command`
+
+Full details in **[LEEME_macOS.md](LEEME_macOS.md)**.
+
 ---
 
 ## Usage
 
-Double-click the **Poly-X** shortcut on the Desktop, or:
-
-```bat
-iniciar_polyx.bat
-```
+Double-click the **Poly-X** Desktop shortcut, or `iniciar_polyx.bat` (Windows) /
+`Lanzar_macOS.command` (macOS).
 
 That opens the **Launcher** → pick a module. Or straight from a terminal:
 
-```bash
+```bat
+REM Windows
 .venv\Scripts\python.exe -m polyx.launcher
 .venv\Scripts\python.exe -m polyx.detector
 .venv\Scripts\python.exe -m polyx.trainer
 .venv\Scripts\python.exe -m polyx.etiquetador
 .venv\Scripts\python.exe -m polyx.visor
+```
+
+```bash
+# macOS
+.venv/bin/python -m polyx.launcher
+.venv/bin/python -m polyx.detector
+.venv/bin/python -m polyx.trainer
+.venv/bin/python -m polyx.etiquetador
+.venv/bin/python -m polyx.visor
 ```
 
 ---
@@ -251,14 +291,18 @@ That opens the **Launcher** → pick a module. Or straight from a terminal:
 To pull the latest version published on GitHub **without reinstalling anything**,
 double-click:
 
-```bat
-actualizar.bat
-```
+| System | File |
+|---|---|
+| 🪟 Windows | `actualizar.bat` |
+| 🍎 macOS | `actualizar_macOS.command` |
 
 It checks whether there is a new commit on `main`; if there is, it downloads and
 replaces only the program files. It **keeps** your `.venv` environment, your
-`models\*.pt`, your `runs\` and any local data. Git does not need to be installed
+`models/*.pt`, your `runs/` and any local data. Git does not need to be installed
 (it downloads over HTTPS).
+
+Each updater protects itself while running, but **does update the other platform's
+files**: whichever one you run, the project stays complete for both.
 
 ---
 
@@ -268,7 +312,7 @@ replaces only the program files. It **keeps** your `.venv` environment, your
 polyx/
 ├── launcher.py          # Main menu
 ├── core/                # Shared modules (theme, yolo_wrap, metrics, report_html,
-│                        #   calibracion, morfologia, procedencia, i18n)
+│                        #   calibracion, morfologia, procedencia, i18n, plataforma)
 ├── detector/            # Module 2: batch analysis (9 pages)
 ├── trainer/             # Module 3: YOLO training (9 pages)
 ├── etiquetador/         # Module 4: interactive annotation
@@ -276,8 +320,19 @@ polyx/
 models/                  # Trained .pt weights
 runs/                    # Results of each run
 data_microplastico/      # YOLO dataset (images/ + labels/)
-tests/                   # Test suite for measurement and calibration
+tests/                   # Test suite for measurement, calibration and portability
+
+SETUP.bat                # 🪟 Installer
+iniciar_polyx.bat        # 🪟 Launcher
+actualizar.bat           # 🪟 Updater
+Lanzar_macOS.command     # 🍎 Installer + launcher (both in one)
+actualizar_macOS.command # 🍎 Updater
+construir_app_macOS.command  # 🍎 Build Poly-X.app (optional)
 ```
+
+Everything that differs between systems — opening folders, launching the updater,
+picking the compute device — lives in `polyx/core/plataforma.py` rather than being
+scattered across the code.
 
 ---
 

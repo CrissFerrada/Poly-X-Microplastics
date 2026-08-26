@@ -13,6 +13,9 @@
 
 cd "$(dirname "$0")" || exit 1
 
+# Ruta absoluta: el enlace del Escritorio no puede apuntar a una ruta
+# relativa -- quedaria roto en cuanto se abriera desde otro sitio.
+INSTALL_DIR_ABS="$(pwd)"
 VENV_PY=".venv/bin/python"
 
 alerta() {
@@ -138,6 +141,32 @@ PY
 if [ $? -ne 0 ]; then
     alerta "La instalación terminó pero algo no se puede cargar.\nRevisa la ventana de Terminal para ver el detalle."
     read -r -p "  Pulsa Enter para cerrar..."; exit 1
+fi
+
+# ── Acceso directo en el Escritorio (opcional) ──
+# Equivalente del Poly-X.lnk que ofrece SETUP.bat en Windows. Sin esto hay
+# que recordar en que carpeta quedo el programa, que es justo lo que se
+# olvida. Se pregunta en vez de imponerlo: no todo el mundo quiere cosas
+# nuevas en su Escritorio.
+ESCRITORIO="$HOME/Desktop"
+if [ -d "$ESCRITORIO" ] && [ ! -e "$ESCRITORIO/Poly-X" ]; then
+    echo ""
+    read -r -p "  ¿Crear un acceso directo a Poly-X en el Escritorio? [S/n] " crear
+    case "$crear" in
+        n|N) echo "  De acuerdo, sin acceso directo." ;;
+        *)
+            # Enlace simbolico y no alias de Finder: un alias hay que crearlo
+            # con AppleScript y se rompe si la carpeta se mueve, mientras que
+            # el enlace se arregla recreandolo. Ademas conserva el permiso de
+            # ejecucion, asi que el doble clic funciona igual.
+            if ln -sf "$INSTALL_DIR_ABS/Lanzar_macOS.command" "$ESCRITORIO/Poly-X" 2>/dev/null; then
+                echo "  [OK] Acceso directo creado: Escritorio → Poly-X"
+            else
+                echo "  [AVISO] No se pudo crear el acceso directo. No es grave:"
+                echo "          abre Poly-X desde esta misma carpeta."
+            fi
+            ;;
+    esac
 fi
 
 echo ""
