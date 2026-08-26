@@ -688,6 +688,54 @@ def _chi2_sf(h: float, df: int) -> float:
     return min(1.0, max(0.0, q))
 
 
+# Tabla t de Student a dos colas, 95% (alfa=0.05), para el intervalo de
+# confianza de la escala media del lote. Mismo motivo que _chi2_sf para no
+# usar scipy.stats.t. Valores exactos de tabla estandar para gl 1-30, mas
+# los puntos de referencia habituales 40/60/120 para lotes grandes.
+_TABLA_T95 = {
+    1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365,
+    8: 2.306, 9: 2.262, 10: 2.228, 11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145,
+    15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
+    21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056,
+    27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042, 40: 2.021, 60: 2.000,
+    120: 1.980,
+}
+
+
+def _t_critico_95(df: int) -> float:
+    """t crítico a dos colas (95%) para ``df`` grados de libertad.
+
+    Más allá de gl=30 no hay una entrada por cada gl: se usa el escalón
+    tabulado más chico que sea >= el real. Como t decrece con los grados de
+    libertad, ese escalón da un intervalo algo más ancho que el exacto, nunca
+    más angosto -- conservador en vez de optimista.
+    """
+    if df <= 0:
+        return float("nan")
+    if df in _TABLA_T95:
+        return _TABLA_T95[df]
+    for umbral in (40, 60, 120):
+        if df <= umbral:
+            return _TABLA_T95[umbral]
+    return 1.960
+
+
+def _media_ic95(valores: List[float]) -> Optional[Tuple[float, float, int]]:
+    """(media, margen del IC 95%, n), o None si no hay con qué estimarlo.
+
+    El margen es t-critico * desvio_muestral / sqrt(n); el IC se reporta
+    como media ± margen. Con un solo valor no hay dispersión que estimar.
+    """
+    a = np.asarray(valores, dtype=float)
+    n = len(a)
+    if n < 2:
+        return None
+    media = float(a.mean())
+    std = float(a.std(ddof=1))
+    margen = _t_critico_95(n - 1) * std / math.sqrt(n)
+    return media, margen, n
+
+
 def _kruskal_wallis(grupos: List[np.ndarray]) -> Optional[Tuple[float, float, int]]:
     """(H, p, grados de libertad), o None si no hay datos suficientes.
 
@@ -1551,6 +1599,26 @@ def generate_report(state, output_path: Path,
 
     # ── Métodos ──
     p = state.params
+    # Cuando la calibracion es por foto (medir_placa) no hay UN valor de
+    # um_per_px que reportar aqui -- p.um_per_px se queda en 0 a proposito.
+    # En vez de un "—" que no dice nada, se da la media del lote con su
+    # intervalo de confianza del 95%: un numero que sirve para citar en un
+    # metodo aunque la calibracion real sea foto a foto (eso se explica en
+    # detalle en la seccion "Calibracion de escala", con el minimo y el
+    # maximo que muestran cuanto varia).
+    if p.um_per_px > 0:
+        um_px_txt = f"{p.um_per_px:g}"
+    else:
+        _ums_metodos = [c.um_por_px for c in (getattr(state, "calibraciones", None) or {}).values()
+                        if getattr(c, "valida", False)]
+        _mic = _media_ic95(_ums_metodos)
+        if _mic:
+            _media_m, _margen_m, _n_m = _mic
+            um_px_txt = f"{_media_m:.4f} ± {_margen_m:.4f} (IC 95%, n={_n_m} fotos)"
+        elif _ums_metodos:
+            um_px_txt = f"{_ums_metodos[0]:.4f} (una sola foto calibrada, sin IC)"
+        else:
+            um_px_txt = "—"
     methods_rows = [
         ("Modelos cargados", ", ".join(s.alias for s in active) or "—"),
         ("Confianza mínima", f"{p.conf:g}"),
@@ -1558,7 +1626,7 @@ def generate_report(state, output_path: Path,
         ("IoU para emparejar Verdaderos Positivos", f"{p.iou_tp:g}"),
         ("Tamaño de imagen (imgsz)", f"{p.imgsz}"),
         ("Dispositivo", p.device),
-        ("μm por píxel", f"{p.um_per_px:g}" if p.um_per_px > 0 else "—"),
+        ("μm por píxel", um_px_txt),
         ("Filtro tamaño (μm)", f"{p.size_min_um} – {p.size_max_um}" if (p.size_min_um or p.size_max_um) else "sin filtro"),
         ("Imágenes procesadas", str(total_imgs)),
         ("Total de detecciones", str(total_dets)),
@@ -1632,6 +1700,13 @@ def generate_report(state, output_path: Path,
                          f"Por eso cada imagen se convierte con su propio factor; usar uno "
                          f"solo para todas daría tamaños con hasta un "
                          f"{100 * (res['variacion'] - 1):.0f}% de error.</p>")
+            _mic_calib = _media_ic95(
+                [c.um_por_px for c in cals.values() if getattr(c, "valida", False)])
+            _fila_media = ""
+            if _mic_calib:
+                _media_c, _margen_c, _n_c = _mic_calib
+                _fila_media = (f"<tr><td>media ± IC 95%</td>"
+                               f"<td>{_media_c:.4f} ± {_margen_c:.4f} (n={_n_c})</td></tr>")
             calib_html = f"""
 <table class='data'><tr><th>Procedencia de la escala</th><th>Imágenes</th></tr>{filas}</table>
 <table class='data'>
@@ -1639,6 +1714,7 @@ def generate_report(state, output_path: Path,
 <tr><td>mínimo</td><td>{res['min']:.4f}</td></tr>
 <tr><td>mediana</td><td>{res['mediana']:.4f}</td></tr>
 <tr><td>máximo</td><td>{res['max']:.4f}</td></tr>
+{_fila_media}
 </table>
 {aviso}
 <p>El patrón de longitud es el diámetro externo nominal de la placa Petri. El radio

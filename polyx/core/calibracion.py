@@ -373,6 +373,10 @@ def resumen_lote(calibraciones) -> dict:
         "n": len(ums),
         "min": float(a.min()),
         "max": float(a.max()),
+        "media": float(a.mean()),
+        # ddof=1 (desviacion muestral): con n fotos se esta estimando la
+        # dispersion de la poblacion de fotos, no describiendo solo estas n.
+        "std": float(a.std(ddof=1)) if len(a) > 1 else 0.0,
         "mediana": float(np.median(a)),
         "variacion": float(a.max() / a.min()) if a.min() > 0 else 0.0,
         "origenes": origenes,
