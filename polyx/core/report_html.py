@@ -818,7 +818,7 @@ def _ficha_particula(det, ruta_imagen, um_por_px: Optional[float],
         ok, buf = cv2.imencode(".png", par)
         if not ok:
             return ""
-        img = f"<img src='{_img_b64(buf.tobytes())}' style='max-width:100%'>"
+        img = f"<img src='data:image/png;base64,{_img_b64(buf.tobytes())}' style='max-width:100%'>"
     except Exception:
         # Una particula que no se deja recortar no puede tumbar el informe
         # entero: la ficha es ilustrativa y las tablas ya estan calculadas.
@@ -1670,6 +1670,7 @@ entraría entero en todos los tamaños reportados.</p>"""
     n_sin_forma = sum(1 for r in all_results for p_ in r.predictions
                       if getattr(p_, "aspecto", None) is None)
     ficha_mayor = None
+    ficha_menor = None
     tabla_morfotipo = tablas = recuento = metodo = ejemplo = ""
     # Independiente de "forma": es su propia seccion opcional en el informe
     # (ver SECCIONES mas abajo), asi que no entra en forma_html.
@@ -1704,7 +1705,7 @@ entraría entero en todos los tamaños reportados.</p>"""
                         f"<td style='font-size:9pt'>{Path(ruta).name}</td></tr>")
 
             tablas = f"""
-<h3>{NUM}.3 Partícula mayor y menor</h3>
+<h3>{NUM}.4 Partícula mayor y menor</h3>
 <table class='data'>
 <tr><th></th><th>Clase</th><th>Largo<br>(µm)</th><th>Ancho<br>(µm)</th>
 <th>Área<br>(µm²)</th><th>Aspecto</th><th>Curvatura</th><th>Morfotipo</th><th>Imagen</th></tr>
@@ -1712,7 +1713,7 @@ entraría entero en todos los tamaños reportados.</p>"""
 {_fila("Menor", menor, ruta_menor)}
 </table>
 
-<h3>{NUM}.4 Distribución de tallas</h3>
+<h3>{NUM}.5 Distribución de tallas</h3>
 <table class='data'>
 <tr><th>Estadístico</th><th>Largo (µm)</th></tr>
 <tr><td>mínimo</td><td>{largos.min():.0f}</td></tr>
@@ -1728,7 +1729,7 @@ entraría entero en todos los tamaños reportados.</p>"""
                 por_clase.setdefault(d.class_name, []).append(d.largo_um)
             fig = _fig_tallas_por_tramo(por_clase)
             if fig:
-                tablas += f"<img src='{fig}' style='max-width:100%'>"
+                tablas += f"<img src='data:image/png;base64,{fig}' style='max-width:100%'>"
 
             # ── Tabla por clase, con su mayor ──
             filas_cls = ""
@@ -1743,7 +1744,7 @@ entraría entero en todos los tamaños reportados.</p>"""
                               f"<td>{v[-1]:.0f}</td><td>{nf}</td></tr>")
             if filas_cls:
                 tablas += (
-                    f"<h3>{NUM}.5 Talla por tipo de plástico</h3>"
+                    f"<h3>{NUM}.6 Talla por tipo de plástico</h3>"
                     f"<table class='data'><tr><th>Clase</th><th>n</th>"
                     f"<th>menor<br>(µm)</th><th>mediana<br>(µm)</th>"
                     f"<th>mayor<br>(µm)</th><th>Fibras</th></tr>{filas_cls}</table>")
@@ -1755,6 +1756,15 @@ entraría entero en todos los tamaños reportados.</p>"""
                 Path(ruta_mayor).name)
             um_mayor = cal_mayor.um_por_px if cal_mayor and cal_mayor.valida else None
             ficha_mayor = (mayor, ruta_mayor, um_mayor)
+
+            # La menor tambien se enseña, no solo se tabula: una talla minima
+            # sin foto no se puede distinguir de ruido o ficha de forma quede
+            # y un lector no tiene como comprobar que de verdad hay una
+            # particula ahi y no una mota del fondo mal segmentada.
+            cal_menor = (getattr(state, "calibraciones", {}) or {}).get(
+                Path(ruta_menor).name)
+            um_menor = cal_menor.um_por_px if cal_menor and cal_menor.valida else None
+            ficha_menor = (menor, ruta_menor, um_menor)
 
             # ── Talla por carpeta, y por foto dentro de cada carpeta ──
             # Generaliza la comparacion "por estacion/tramo" del pipeline del
@@ -1778,7 +1788,7 @@ entraría entero en todos los tamaños reportados.</p>"""
                     f"<p>Compara la talla entre las carpetas del lote analizado -- "
                     f"cada carpeta como un grupo distinto. Útil cuando cada carpeta es "
                     f"un sitio de muestreo, una estación o una condición.</p>"
-                    f"<img src='{fig_carpeta}' style='max-width:100%'>"
+                    f"<img src='data:image/png;base64,{fig_carpeta}' style='max-width:100%'>"
                     f"<p>{veredicto_carpeta}</p>")
 
                 # -- Por foto, dentro de las carpetas con mas de una imagen --
@@ -1799,7 +1809,7 @@ entraría entero en todos los tamaños reportados.</p>"""
                         _kruskal_wallis(list(fotos_de_carpeta.values())), len(fotos_de_carpeta))
                     piezas_foto.append(
                         f"<p><strong>{carpeta}</strong> ({len(fotos_de_carpeta)} fotos)</p>"
-                        f"<img src='{fig_foto}' style='max-width:100%'>"
+                        f"<img src='data:image/png;base64,{fig_foto}' style='max-width:100%'>"
                         f"<p>{veredicto_foto}</p>")
                 if piezas_foto:
                     n_carpetas_con_fotos = sum(
@@ -1834,7 +1844,7 @@ entraría entero en todos los tamaños reportados.</p>"""
                 f"<td>{(f'{np.median(largos_i):.0f}' if largos_i else '—')}</td>"
                 f"<td>{(f'{max(largos_i):.0f}' if largos_i else '—')}</td></tr>")
         recuento = (
-            f"<h3>{NUM}.6 Recuento por imagen</h3>"
+            f"<h3>{NUM}.7 Recuento por imagen</h3>"
             f"<table class='data'><tr><th>Imagen</th><th>Partículas</th>"
             f"<th>Fibras</th><th>Fragmentos</th><th>Largo mediano<br>(µm)</th>"
             f"<th>Mayor<br>(µm)</th></tr>{filas_img}</table>")
@@ -1893,10 +1903,16 @@ subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensay
                 f"<p>En {n_sin_forma} partículas no se pudo separar la partícula del fondo; "
                 f"su talla proviene de la caja y no es comparable con el resto.</p>")
 
-        # ── El ejemplo, ya explicado el método ──
+        # ── Los ejemplos, ya explicado el método ──
+        # Las dos, no solo la mayor: una talla minima sin foto no se puede
+        # distinguir a ojo de ruido mal segmentado, y es la que mas facil se
+        # cuestiona en una revision.
         if ficha_mayor is not None:
             ejemplo = _ficha_particula(
                 *ficha_mayor, "2 Un ejemplo: la partícula mayor, medida")
+        if ficha_menor is not None:
+            ejemplo += _ficha_particula(
+                *ficha_menor, "3 Un ejemplo: la partícula menor, medida")
 
     # Orden de la sección: primero cómo se mide, luego un caso medido, y al
     # final las cifras. Al revés, las tablas llegan antes de que nada haya
@@ -1955,12 +1971,18 @@ subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensay
                     detalle.append(f"aspecto {d.aspecto:.1f}")
                 detalle.append(f"medido por {m.metodo}")
                 color = "#1f6b5e" if d.morfotipo == "fibra" else "#656d76"
+                # En la ficha individual "fragmento" se muestra como "particula":
+                # el reparto fibra/fragmento ya esta en la tabla de morfotipo de
+                # mas arriba, y aqui repetirlo por cada tarjeta leia raro cuando
+                # casi todo el lote es fragmento. La clasificacion real sigue
+                # intacta en d.morfotipo para el resto del informe.
+                etiqueta_morfo = "partícula" if d.morfotipo == "fragmento" else (d.morfotipo or "—")
                 tarjetas += (
                     f"<div style='display:inline-block;vertical-align:top;margin:0 14px 18px 0;"
                     f"max-width:290px'>"
                     f"<div style='font-weight:700'>#{d.numero} · {d.class_name} · "
-                    f"<span style='color:{color}'>{d.morfotipo}</span></div>"
-                    f"<img src='{_img_b64(buf.tobytes())}' style='max-width:100%'>"
+                    f"<span style='color:{color}'>{etiqueta_morfo}</span></div>"
+                    f"<img src='data:image/png;base64,{_img_b64(buf.tobytes())}' style='max-width:100%'>"
                     f"<div style='font-size:9pt;color:#656d76'>{cuenta}<br>"
                     f"{' · '.join(detalle)}</div></div>")
             if tarjetas:
