@@ -6,6 +6,8 @@ from typing import List, Dict, Optional
 
 from PySide6.QtCore import QObject, Signal
 
+from ..core.plataforma import dispositivo_disponible
+
 
 # ────────────────────────────────────────────────────────────────────
 # Presets de entrenamiento (Suave/Balanceado/Estricto)
@@ -111,7 +113,9 @@ class TrainParams:
     # lo dominan las placas de laboratorio: el dominio equivocado para detectar
     # en fotos de terreno. Ver polyx/trainer/dominio.py.
     elegir_por_dominio_real: bool = True
-    device: str = "0"
+    # Ver el comentario equivalente en detector/state.py: "0" es CUDA y no
+    # existe en un Mac. Se elige el mejor disponible al construir el estado.
+    device: str = field(default_factory=dispositivo_disponible)
     workers: int = 8
     project_name: str = "polyx_train"
     run_name: str = ""             # vacío = auto-fecha

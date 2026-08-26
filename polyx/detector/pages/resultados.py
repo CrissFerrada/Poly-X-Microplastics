@@ -2,7 +2,6 @@
 from __future__ import annotations
 import csv
 import io
-import os
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +18,7 @@ from ...core import theme as T
 from ...core.widgets import KPICard
 from ...core.metrics import LABEL_TP, LABEL_FP, LABEL_FN, LABEL_MISCLS, match_image
 from ...core.i18n import tr
+from ...core.plataforma import abrir_en_el_sistema
 
 
 class ResultadosPage(DetectorPage):
@@ -514,7 +514,7 @@ class ResultadosPage(DetectorPage):
         img = Path(self.table.item(row, 1).data(Qt.UserRole))
         annot = self.state.run_dir / alias / f"{img.stem}_annot.png"
         if annot.exists():
-            os.startfile(str(annot))
+            abrir_en_el_sistema(str(annot))
 
     def _revisar_en_visor(self):
         """Abre la imagen seleccionada en el Visor, con sus detecciones puestas.

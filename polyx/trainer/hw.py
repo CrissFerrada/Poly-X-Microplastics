@@ -26,7 +26,18 @@ class GPUInfo:
     # Es el fallo más común y el más confuso: la máquina tiene GPU y el
     # entrenador decía "no hay GPU" sin explicar por qué.
     gpu_sin_torch: bool = False
+    # GPU integrada de un Mac con Apple Silicon, vía Metal (MPS). No es CUDA:
+    # no tiene VRAM propia (comparte la RAM del sistema) ni compute capability,
+    # así que las recomendaciones basadas en VRAM se interpretan distinto.
+    es_mps: bool = False
     detalle: str = ""
+
+    @property
+    def dispositivo(self) -> str:
+        """El valor que hay que pasarle a YOLO como ``device``."""
+        if self.es_mps:
+            return "mps"
+        return str(self.index) if self.available else "cpu"
 
 
 def _nvidia_smi() -> Optional[dict]:
@@ -97,6 +108,34 @@ def detect_gpu() -> GPUInfo:
                 torch_version=torch_v, torch_cuda=torch_cuda,
                 driver=(smi or {}).get("driver", ""),
             )
+        # ── Mac con Apple Silicon: la GPU se usa por Metal (MPS) ──
+        # Va despues de CUDA porque una maquina no tiene las dos, y antes de
+        # nvidia-smi porque en un Mac ese binario no existe y solo gastaria
+        # un timeout de subprocess.
+        mps = getattr(torch.backends, "mps", None)
+        if mps is not None and mps.is_available():
+            # Memoria unificada: la GPU comparte la RAM del sistema, no tiene
+            # una VRAM propia que consultar. Se reporta la RAM total como cota
+            # superior, que es lo que de verdad limita el entrenamiento.
+            total_gb = libre_gb = 0.0
+            try:
+                import psutil
+                vm = psutil.virtual_memory()
+                total_gb = vm.total / (1024 ** 3)
+                libre_gb = vm.available / (1024 ** 3)
+            except Exception:
+                pass
+            import platform as _pl
+            return GPUInfo(
+                available=True, es_mps=True,
+                name=f"GPU integrada de Apple ({_pl.machine()})",
+                vram_total_gb=total_gb, vram_free_gb=libre_gb,
+                n_gpus=1, torch_version=torch_v,
+                detalle=("Memoria unificada: la GPU comparte la RAM del sistema, "
+                         "asi que la cifra de arriba es la RAM total y no una VRAM "
+                         "dedicada. MPS no soporta todas las operaciones de CUDA; "
+                         "si el entrenamiento falla, prueba con CPU."),
+            )
     except Exception as e:
         torch_v = torch_v or "no importable"
         return GPUInfo(available=False, torch_version=torch_v,
@@ -115,6 +154,20 @@ def detect_gpu() -> GPUInfo:
                      f"torch {torch_v} está compilado "
                      f"{'sin CUDA' if not torch_cuda else f'para CUDA {torch_cuda}'}."),
         )
+    # En un Mac hablar de "GPU NVIDIA" no significa nada: ahi la via es MPS y
+    # solo existe con Apple Silicon. Decirlo asi evita que alguien se ponga a
+    # buscar drivers de NVIDIA en un equipo que nunca los va a tener.
+    import sys as _sys
+    if _sys.platform == "darwin":
+        import platform as _pl
+        intel = _pl.machine().lower() not in ("arm64", "aarch64")
+        return GPUInfo(
+            available=False, torch_version=torch_v,
+            detalle=("Este Mac tiene procesador Intel: no dispone de MPS, que "
+                     "requiere Apple Silicon (M1 o posterior). Se entrena y "
+                     "detecta por CPU." if intel else
+                     "Apple Silicon detectado pero torch no expone MPS. "
+                     "Reinstala PyTorch desde el instalador de Poly-X."))
     return GPUInfo(available=False, torch_version=torch_v, torch_cuda=torch_cuda,
                    detalle="Ni torch ni nvidia-smi encuentran una GPU NVIDIA.")
 

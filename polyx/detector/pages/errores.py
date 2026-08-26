@@ -4,7 +4,6 @@ Lista filtrable + preview. Internamente se siguen usando los códigos cortos
 FP/FN/MISCLS para la lógica; al usuario se le muestran los nombres completos.
 """
 from __future__ import annotations
-import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QByteArray
@@ -18,6 +17,7 @@ from ._base import DetectorPage
 from ...core import theme as T
 from ...core.metrics import match_image, LABEL_FP, LABEL_FN, LABEL_MISCLS
 from ...core.i18n import tr
+from ...core.plataforma import abrir_en_el_sistema
 
 
 class ErroresPage(DetectorPage):
@@ -148,4 +148,4 @@ class ErroresPage(DetectorPage):
         img = Path(self.table.item(row, 1).data(Qt.UserRole))
         annot = self.state.run_dir / alias / f"{img.stem}_annot.png"
         if annot.exists():
-            os.startfile(str(annot))
+            abrir_en_el_sistema(str(annot))

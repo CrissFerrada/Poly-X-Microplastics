@@ -1,6 +1,5 @@
 """Página 9 — Informe de detección en HTML."""
 from __future__ import annotations
-import os
 import shutil
 from pathlib import Path
 
@@ -16,6 +15,7 @@ from ...core import theme as T
 from ...core import pdf_export
 from ...core.report_html import generate_report, SECCIONES, PRESETS
 from ...core.i18n import tr
+from ...core.plataforma import abrir_en_el_sistema
 
 
 class ReportePage(DetectorPage):
@@ -261,7 +261,7 @@ class ReportePage(DetectorPage):
             self.lbl_fotos.setText(msg)
             if copiadas and not fallos:
                 try:
-                    os.startfile(str(destino))
+                    abrir_en_el_sistema(str(destino))
                 except Exception:
                     pass
             if fallos:
@@ -499,7 +499,7 @@ class ReportePage(DetectorPage):
                 "✓ " + tr("{} informe(s) generado(s) en {}").format(len(generados), out_dir))
             for p in generados:
                 try:
-                    os.startfile(str(p))
+                    abrir_en_el_sistema(str(p))
                 except Exception:
                     pass
         except Exception as e:
@@ -560,7 +560,7 @@ class ReportePage(DetectorPage):
                     "✓ " + tr("{} PDF generado(s) en {}").format(len(hechos), pdf_base.parent))
                 for p in hechos:
                     try:
-                        os.startfile(str(p))
+                        abrir_en_el_sistema(str(p))
                     except Exception:
                         pass
             if fallidos:

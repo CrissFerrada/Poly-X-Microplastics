@@ -5,9 +5,10 @@ internet, si GitHub responde lento o si la instalacion no vino de un ZIP, el
 launcher simplemente no muestra nada. Un aviso de actualizacion no justifica
 demorar el arranque ni molestar con un error.
 
-Quien aplica la actualizacion es `actualizar.bat`; aca solo se detecta y se
-avisa. La marca de version instalada es el SHA del ultimo commit, guardado en
-`.polyx_version` por el instalador y por el propio actualizador.
+Quien aplica la actualizacion es un script externo, distinto en cada sistema
+(`actualizar.bat` en Windows, `actualizar_macOS.command` en Mac); aca solo se
+detecta y se avisa. La marca de version instalada es el SHA del ultimo commit,
+guardado en `.polyx_version` por el instalador y por el propio actualizador.
 """
 from __future__ import annotations
 
@@ -19,12 +20,15 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal
 
 from .paths import ROOT
+from .plataforma import nombre_actualizador
 
 REPO = "CrissFerrada/Poly-X-Microplastics"
 RAMA = "main"
 API = f"https://api.github.com/repos/{REPO}/commits/{RAMA}"
 ARCHIVO_VERSION = ROOT / ".polyx_version"
-ACTUALIZADOR = ROOT / "actualizar.bat"
+# El nombre depende del sistema: cada uno necesita su propio shell para
+# descomprimir y sobrescribir. Ver plataforma.nombre_actualizador().
+ACTUALIZADOR = ROOT / nombre_actualizador()
 
 # Corto a proposito: si GitHub no responde rapido, no vale la pena insistir.
 TIMEOUT_S = 6

@@ -1,6 +1,5 @@
 """Página 5 — Entrenar. Control + tabs (Métricas en vivo · Curvas · Log)."""
 from __future__ import annotations
-import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
@@ -14,6 +13,7 @@ from ...core import theme as T
 from ...core.widgets import KPICard
 from ..runner import TrainerRunner
 from ...core.i18n import tr
+from ...core.plataforma import abrir_en_el_sistema
 
 
 class _HwProbeWorker(QThread):
@@ -306,12 +306,12 @@ class EntrenarPage(TrainerPage):
     def _open_results(self):
         d = self.state.run_dir
         if d and d.exists():
-            os.startfile(str(d))
+            abrir_en_el_sistema(str(d))
         else:
             # carpeta runs_train
             root = Path(__file__).resolve().parents[3] / "runs_train"
             if root.exists():
-                os.startfile(str(root))
+                abrir_en_el_sistema(str(root))
             else:
                 QMessageBox.information(self, tr("Sin resultados"), tr("Aún no se han generado runs."))
 

@@ -20,6 +20,7 @@ from .core import theme as T
 from .core.i18n import tr, idioma, set_idioma, IDIOMAS
 from .core.widgets import LogoBadge, HLine
 from .core.updates import ACTUALIZADOR, BuscadorActualizaciones, puede_actualizar
+from .core.plataforma import abrir_en_el_sistema, lanzar_actualizador
 from . import __version__
 
 
@@ -439,9 +440,9 @@ class LauncherWindow(QMainWindow):
         if not puede_actualizar():
             QMessageBox.information(
                 self, tr("Actualizar"),
-                tr("No se encontró actualizar.bat en la carpeta de "
-                   "instalación. Descarga la versión nueva manualmente "
-                   "desde GitHub."))
+                tr("No se encontró {} en la carpeta de instalación. Descarga "
+                   "la versión nueva manualmente desde GitHub.").format(
+                       ACTUALIZADOR.name))
             return
         if QMessageBox.question(
                 self, tr("Actualizar"),
@@ -451,8 +452,12 @@ class LauncherWindow(QMainWindow):
             return
         # El actualizador sobrescribe archivos del programa; hay que soltar
         # Poly-X antes para no chocar con los .py que estan en uso.
-        subprocess.Popen(["cmd", "/c", "start", "", str(ACTUALIZADOR)],
-                         cwd=str(ACTUALIZADOR.parent))
+        if not lanzar_actualizador(ACTUALIZADOR):
+            QMessageBox.warning(
+                self, tr("Actualizar"),
+                tr("No se pudo lanzar {}. Ejecútalo a mano desde la carpeta "
+                   "de instalación.").format(ACTUALIZADOR.name))
+            return
         self.close()
 
     # ── Lanzadores ──────────────────────────────────────────────
@@ -488,8 +493,7 @@ class LauncherWindow(QMainWindow):
     def open_leeme(self):
         leeme = Path(__file__).resolve().parents[1] / "LEEME.txt"
         if leeme.exists():
-            import os
-            os.startfile(str(leeme))
+            abrir_en_el_sistema(str(leeme))
         else:
             self._toast("LEEME.txt no encontrado")
 

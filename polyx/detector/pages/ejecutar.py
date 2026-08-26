@@ -1,6 +1,5 @@
 """Página 5 — Ejecutar. Inicia la inferencia en background y muestra previews."""
 from __future__ import annotations
-import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QByteArray
@@ -14,6 +13,7 @@ from ._base import DetectorPage
 from ...core import theme as T
 from ..runner import DetectorRunner
 from ...core.i18n import tr
+from ...core.plataforma import abrir_en_el_sistema
 
 
 class _PreviewSlot(QFrame):
@@ -228,7 +228,7 @@ class EjecutarPage(DetectorPage):
     def _open_results(self):
         d = self.state.run_dir
         if d and d.exists():
-            os.startfile(str(d))
+            abrir_en_el_sistema(str(d))
         else:
             QMessageBox.information(self, tr("Sin resultados"), tr("Aún no se ha ejecutado ninguna corrida."))
 

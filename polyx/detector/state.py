@@ -12,6 +12,7 @@ from PySide6.QtCore import QObject, Signal
 
 from ..core.yolo_wrap import Detection, YoloModel
 from ..core.i18n import tr
+from ..core.plataforma import dispositivo_disponible
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -32,7 +33,10 @@ class InferenceParams:
     # colapsan bajo el stride de la red, así que de fábrica no se detectaba nada.
     # Coincide con el perfil «Rápido» de la página de Parámetros.
     imgsz: int = 1280
-    device: str = "0"               # "0", "cpu", ...
+    # No se fija "0" (CUDA) a secas: en un Mac no existe esa tarjeta y el
+    # analisis fallaba al arrancar. Se resuelve al crear los parametros
+    # eligiendo lo mejor que haya -- CUDA, luego MPS (GPU del Mac), luego CPU.
+    device: str = field(default_factory=dispositivo_disponible)
     um_per_px: float = 0.0          # 0 = no hay calibración; respaldo manual
     size_min_um: float = 0.0        # 0 = sin filtro inferior
     size_max_um: float = 0.0        # 0 = sin filtro superior

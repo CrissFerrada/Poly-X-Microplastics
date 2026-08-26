@@ -1,6 +1,5 @@
 """Página 7 — Comparar. Tabla de todos los runs anteriores con sus métricas."""
 from __future__ import annotations
-import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -12,6 +11,7 @@ from PySide6.QtWidgets import (
 from ._base import TrainerPage
 from ...core import theme as T
 from ...core.i18n import tr
+from ...core.plataforma import abrir_en_el_sistema
 
 
 def _runs_root() -> Path:
@@ -107,9 +107,9 @@ class CompararPage(TrainerPage):
     def _open_run(self, row: int, col: int):
         path = self.table.item(row, 0).data(Qt.UserRole)
         if path and Path(path).exists():
-            os.startfile(path)
+            abrir_en_el_sistema(path)
 
     def _open_root(self):
         root = _runs_root()
         root.mkdir(parents=True, exist_ok=True)
-        os.startfile(str(root))
+        abrir_en_el_sistema(str(root))

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 from ._base import DetectorPage
 from ...core.i18n import tr
 from ...core import theme as T
+from ...core.plataforma import ES_MAC, arquitectura_mac, etiqueta_dispositivos
 
 
 def _hint(text: str) -> QLabel:
@@ -127,11 +128,19 @@ class ParametrosPage(DetectorPage):
         ), 2, 2)
 
         # device
-        g.addWidget(QLabel(tr("Device (0/cpu):")), 3, 0)
+        # El rotulo y la pista dependen del sistema: en un Mac no hay ninguna
+        # GPU "0" que elegir, y ofrecerla solo lleva a que el analisis falle.
+        g.addWidget(QLabel(tr(etiqueta_dispositivos())), 3, 0)
         self.ed_device = QLineEdit(state.params.device)
         self.ed_device.editingFinished.connect(self._on_change)
         g.addWidget(self.ed_device, 3, 1)
-        g.addWidget(_hint(tr("'0' = primera GPU. 'cpu' = CPU. '0,1' = GPU 0 y 1.")), 3, 2)
+        if ES_MAC:
+            pista = (tr("'mps' = GPU del Mac (Apple Silicon). 'cpu' = procesador.")
+                     if arquitectura_mac() == "Apple Silicon"
+                     else tr("Este Mac es Intel: solo 'cpu'. MPS necesita Apple Silicon."))
+        else:
+            pista = tr("'0' = primera GPU. 'cpu' = CPU. '0,1' = GPU 0 y 1.")
+        g.addWidget(_hint(pista), 3, 2)
 
         l1.addLayout(g)
         self.body.addWidget(c1)

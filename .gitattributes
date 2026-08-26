@@ -1,0 +1,36 @@
+# Finales de linea por tipo de archivo.
+#
+# Existe porque el proyecto se desarrolla en Windows con core.autocrlf=true y
+# se distribuye tambien a macOS. Sin esto, un script de shell puede llegar al
+# Mac con finales CRLF y bash lo rechaza con un error que no se entiende:
+#
+#     /bin/bash^M: bad interpreter: No such file or directory
+#
+# El sintoma parece un problema de permisos o de Python, y no lo es.
+
+# Por defecto, que git decida y normalice a LF dentro del repositorio.
+* text=auto
+
+# ── Scripts de macOS y Linux: LF SIEMPRE ──
+# No negociable: con CRLF no arrancan.
+*.command  text eol=lf
+*.sh       text eol=lf
+
+# ── Scripts de Windows: CRLF ──
+# El interprete de .bat trata mal los finales LF en etiquetas y saltos GOTO,
+# y PowerShell aqui se comporta igual de bien con CRLF.
+*.bat      text eol=crlf
+*.ps1      text eol=crlf
+*.vbs      text eol=crlf
+
+# ── Binarios: que git no toque nada ──
+*.pt       binary
+*.onnx     binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.ico      binary
+*.icns     binary
+*.pdf      binary
+*.zip      binary
+*.rar      binary
