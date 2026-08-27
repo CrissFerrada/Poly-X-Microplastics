@@ -1927,8 +1927,31 @@ entraría entero en todos los tamaños reportados.</p>
         curvas = sum(1 for d, _ in formas if d.curvatura and d.curvatura >= 1.15)
         pc_f = 100.0 * fibras / len(formas)
 
+        # ── Particulas cuya talla pide un vistazo ──
+        # Se declara en la seccion, no solo en cada ficha: quien lee las cifras
+        # de talla tiene que saber cuantas de ellas pueden estar infladas por
+        # varias particulas medidas como una. El sesgo va hacia ARRIBA, y afecta
+        # sobre todo al extremo grande de la distribucion, que es justo el que
+        # se reporta como "la particula mayor".
+        n_revisar = sum(1 for d, _ in formas if getattr(d, "revisar", False))
+        aviso_revisar = ""
+        if n_revisar:
+            # Un decimal por debajo del 1%: con ":.0f" una proporcion de 4 sobre
+            # 909 salia como "(0 %)" junto a "4 particulas", que se lee como si
+            # la cifra estuviera rota.
+            _pc = 100.0 * n_revisar / len(formas)
+            _pc_txt = f"{_pc:.1f}" if _pc < 1 else f"{_pc:.0f}"
+            aviso_revisar = (
+                f"<p style='border-left:3px solid {T.WARN};padding:6px 12px;"
+                f"background:#fff8e6'><strong>{n_revisar} de {len(formas)} "
+                f"partículas ({_pc_txt}&nbsp;%) tienen una "
+                f"talla que pide comprobación</strong>: miden bastante más que la "
+                f"diagonal de su caja, lo que casi siempre significa varias "
+                f"partículas en contacto medidas como una sola. La talla de esas "
+                f"queda <em>sobreestimada</em>. Van marcadas con ⚠ en sus fichas.</p>")
+
         # ── Reparto por morfotipo ──
-        tabla_morfotipo = f"""
+        tabla_morfotipo = aviso_revisar + f"""
 <table class='data'><tr><th>Morfotipo</th><th>Cuántas</th><th>%</th></tr>
 <tr><td>Fibra (relación de aspecto ≥ 3)</td><td>{fibras}</td><td>{pc_f:.1f} %</td></tr>
 <tr><td>Partícula (no fibrosa)</td><td>{len(formas) - fibras}</td><td>{100 - pc_f:.1f} %</td></tr>
@@ -2250,6 +2273,19 @@ subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensay
                 detalle.append(f"medido por {m.metodo}")
                 color = "#1f6b5e" if d.morfotipo == "fibra" else "#656d76"
                 etiqueta_morfo = _morfotipo(d.morfotipo, minuscula=True)
+                # El aviso se ENSEÑA. Antes se calculaba y se tiraba: una talla
+                # inflada por varias particulas en contacto llegaba al informe
+                # como un numero limpio, y quien lo leia no tenia como saberlo.
+                # Se lee de la Detection, NO de la Morfologia que devuelve
+                # dibujar_medicion: esa viene de medir(), y el aviso lo pone
+                # medir_deteccion() al comparar con la diagonal de la caja. En
+                # la Morfologia de aqui el campo esta siempre en False, asi que
+                # mirarlo hacia que el ⚠ no apareciera nunca.
+                alerta = ""
+                if getattr(d, "revisar", False):
+                    alerta = (
+                        f"<div style='font-size:8.5pt;color:{T.WARN};margin-top:3px'>"
+                        f"⚠ {d.aviso_forma or 'la talla puede estar inflada'}</div>")
                 tarjetas += (
                     f"<div style='display:inline-block;vertical-align:top;margin:0 14px 18px 0;"
                     f"max-width:290px'>"
@@ -2257,7 +2293,7 @@ subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensay
                     f"<span style='color:{color}'>{etiqueta_morfo}</span></div>"
                     f"<img src='data:image/png;base64,{_img_b64(buf.tobytes())}' style='max-width:100%'>"
                     f"<div style='font-size:9pt;color:#656d76'>{cuenta}<br>"
-                    f"{' · '.join(detalle)}</div></div>")
+                    f"{' · '.join(detalle)}</div>{alerta}</div>")
             if tarjetas:
                 piezas.append(f"<h3>{Path(ruta).name}</h3>{tarjetas}")
         if piezas:

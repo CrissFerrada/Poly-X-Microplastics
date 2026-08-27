@@ -37,6 +37,12 @@ class Detection:
     geodesico_um: Optional[float] = None  # camino más largo por dentro
     largo_rect_eq_um: Optional[float] = None
     metodo_largo: Optional[str] = None
+    # La medida salio, pero pide un vistazo: tipicamente varias particulas en
+    # contacto medidas como una, lo que INFLA la talla. Viaja en la Detection
+    # -- y no solo en la Morfologia que la produjo -- porque si no, el informe
+    # no tiene forma de avisarlo sin volver a medir todo el lote.
+    revisar: bool = False
+    aviso_forma: Optional[str] = None
     # Numero de la partícula dentro de SU imagen, empezando en 1. Es lo que
     # permite ir de una fila de la tabla a la partícula concreta en la foto: sin
     # él, «la mayor mide 5878 µm» no se puede ir a comprobar.

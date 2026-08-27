@@ -192,9 +192,17 @@ def margen_de_caja(ancho_caja: float, alto_caja: float) -> int:
     el resultado ya no cambia.
 
     Se expone como funcion para que las pruebas usen el mismo numero que el
-    codigo en vez de repetirlo, que es como se desincronizan.
+    codigo en vez de repetirlo, que es como se desincronizan. Por el mismo
+    motivo la usa ``dibujar_medicion``: si cada uno calculara su margen, la
+    mascara y la foto de debajo se dibujarian desde origenes distintos.
+
+    SE MIDE SOBRE EL LADO MAYOR, no el menor. Con el menor, el recorte de una
+    fibra se calculaba a partir de su GROSOR: para una caja de 72x18 daba 9 px
+    de margen, y entonces el recorte de trabajo ni siquiera contenia la fibra
+    entera -- se perdia antes de segmentar nada. En una particula compacta los
+    dos lados son parecidos y el numero no cambia.
     """
-    return int(max(3, round(0.50 * min(max(1.0, ancho_caja),
+    return int(max(3, round(0.50 * max(max(1.0, ancho_caja),
                                        max(1.0, alto_caja)))))
 
 
@@ -214,6 +222,44 @@ def _recorte(bgr: np.ndarray, x1, y1, x2, y2, margen: int):
     if bx - ax < 3 or by - ay < 3:
         return None, 0, 0
     return bgr[ay:by, ax:bx], ax, ay
+
+
+# A partir de esta elongacion -- largo/ancho del rectangulo minimo que la
+# contiene -- una mascara se trata como alargada, y eso cambia dos decisiones:
+# no se parte por watershed, y se le permite salirse mas de la caja.
+#
+# 3.0 no es un numero elegido de la nada: es el mismo corte con que
+# ASPECTO_FIBRA separa fibra de particula, y ademas deja fuera el caso que
+# motivo el recorte a la caja. Dos circulos de 20 px de radio unidos por un
+# puente forman un conjunto de unos 90x40 px -> elongacion 2.25, por debajo del
+# umbral, asi que ese caso se sigue recortando y separando como antes.
+ELONGACION_ALARGADA = 3.0
+
+
+def _elongacion(mascara: np.ndarray) -> float:
+    """Cuantas veces mas larga que gruesa es la mascara. 1.0 si no se puede.
+
+    Se calcula como ``area / grosor**2``, con el grosor tomado del mayor
+    circulo inscrito (transformada de distancia). Para una forma de largo L y
+    grosor w el area vale del orden de L*w, asi que el cociente da L/w.
+
+    NO se usa el rectangulo minimo, que seria lo evidente, porque **falla justo
+    en las fibras curvas**: el rectangulo que envuelve un arco es casi cuadrado
+    y da elongacion cercana a 1. Con esa medida, la fibra curva de la placa
+    10.3 -- la que se veia cortada en el informe -- quedaba clasificada como
+    compacta y se seguia recortando.
+
+    Al depender solo del area y del grosor, esta version no cambia con la
+    curvatura ni con la orientacion.
+    """
+    if mascara is None or not mascara.any():
+        return 1.0
+    area = float(np.count_nonzero(mascara))
+    dt = cv2.distanceTransform((mascara > 0).astype(np.uint8), cv2.DIST_L2, 5)
+    grosor = 2.0 * float(dt.max())
+    if grosor <= 0:
+        return 1.0
+    return area / (grosor * grosor)
 
 
 def separar_pegadas(mascara: np.ndarray, semilla) -> np.ndarray:
@@ -237,6 +283,24 @@ def separar_pegadas(mascara: np.ndarray, semilla) -> np.ndarray:
     """
     if mascara is None or not mascara.any():
         return mascara
+
+    # Una mascara claramente alargada no se parte. Una fibra de grosor
+    # irregular tiene VARIAS zonas gruesas, y cada una pasa el umbral de nucleo
+    # y se convierte en un centro de watershed: entonces la fibra se corta por
+    # su propio adelgazamiento, como si fueran dos particulas en contacto. Se
+    # midio sobre una fibra real de la placa 10.3: de 369 px de area quedaban
+    # 254, un 31% menos, y el largo caia con ella.
+    #
+    # El umbral 0.80 se calibro sobre CIRCULOS pegados, que es el caso para el
+    # que existe esta funcion. Una fibra no es ese caso.
+    #
+    # El riesgo de no partir -- dos fibras que de verdad se tocan quedan como
+    # una -- ya lo cubre medir_deteccion(), que marca para revisar cualquier
+    # particula mas larga que 1.5 veces la diagonal de su caja. Entre subestimar
+    # en silencio y sobreestimar avisando, avisar es lo correcto.
+    if _elongacion(mascara) >= ELONGACION_ALARGADA:
+        return mascara
+
     dt = cv2.distanceTransform(mascara, cv2.DIST_L2, 5)
     if dt.max() < 2:
         return mascara
@@ -383,22 +447,46 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
     # actuar nunca.
     mascara = separar_pegadas(mascara, (cx, cy))
 
-    # Recortar a la caja. El margen existe para que Otsu tenga fondo con que
-    # comparar, no para medir en el: sin este recorte, una particula pegada a
-    # otra forma con ella una sola componente conexa y se mide el conjunto. Se
+    # Recortar a la caja. El margen existe para que el umbral tenga fondo con
+    # que comparar, no para medir en el: sin este recorte, una particula pegada
+    # a otra forma con ella una sola componente conexa y se mide el conjunto. Se
     # observo en placas reales una mascara 1.71 veces mas ancha que su caja, y
     # de ahi salian tallas de 8.9 mm que ninguna caja de 97 px puede contener.
     #
     # Se deja una holgura: el detector suele ajustar la caja algo por dentro del
     # borde real, y cortar a ras amputaria la punta de la particula.
-    holgura = max(2, int(round(0.10 * min(ancho_caja, alto_caja))))
-    hx1 = max(0, int(x1) - ox - holgura)
-    hy1 = max(0, int(y1) - oy - holgura)
-    hx2 = min(mascara.shape[1], int(np.ceil(x2)) - ox + holgura)
-    hy2 = min(mascara.shape[0], int(np.ceil(y2)) - oy + holgura)
-    fuera = np.ones_like(mascara, dtype=bool)
-    fuera[hy1:hy2, hx1:hx2] = False
-    mascara[fuera] = 0
+    #
+    # LA HOLGURA DEPENDE DE LO ALARGADA QUE SEA LA MASCARA, y eso no es un
+    # refinamiento: con la holgura fija del 10% las FIBRAS salian cortadas por
+    # un borde recto. Medido sobre dos fibras reales de la placa 10.3, el
+    # recorte se llevaba el 31% y el 34% del area, y con ella parte del largo.
+    #
+    # La razon es que el detector encajona corto justamente las particulas
+    # alargadas: una fibra de 36 px entraba en una caja de 29x24. Recortar a esa
+    # caja no corrige el error del detector, lo copia.
+    #
+    # Lo que distingue una fibra que sigue de una VECINA que se colo es la
+    # forma, no el tamaño: la vecina es un bulto al lado y al unirse el conjunto
+    # queda rechoncho; la fibra sigue siendo delgada por larga que sea.
+    #
+    # Por eso una mascara alargada NO se recorta. Ampliar la holgura no bastaba:
+    # es una fraccion del lado MENOR de la caja, que en una fibra es su grosor,
+    # de modo que por mucho que se amplie nunca alcanza a lo largo. Sobre una
+    # fibra sintetica de 120 px la holgura ampliada al maximo dejaba 94.
+    #
+    # La proteccion sigue en pie donde importa: dos circulos de 20 px unidos por
+    # un puente dan elongacion 1.7 -- rechonchos -- y se recortan igual que
+    # antes. Es el caso que motivo este recorte y del que salian tallas de
+    # 8.9 mm.
+    if _elongacion(mascara) < ELONGACION_ALARGADA:
+        holgura = max(2, int(round(0.10 * min(ancho_caja, alto_caja))))
+        hx1 = max(0, int(x1) - ox - holgura)
+        hy1 = max(0, int(y1) - oy - holgura)
+        hx2 = min(mascara.shape[1], int(np.ceil(x2)) - ox + holgura)
+        hy2 = min(mascara.shape[0], int(np.ceil(y2)) - oy + holgura)
+        fuera = np.ones_like(mascara, dtype=bool)
+        fuera[hy1:hy2, hx1:hx2] = False
+        mascara[fuera] = 0
     return mascara if mascara.any() else None
 
 
@@ -783,6 +871,11 @@ def aplicar_a_deteccion(det, bgr: np.ndarray,
     det.curvatura = m.curvatura
     det.morfotipo = m.morfotipo
     det.metodo_largo = m.metodo
+    # Se copia el aviso a la Detection para que el informe pueda mostrarlo. Sin
+    # esto, una talla inflada por dos particulas pegadas llegaba al documento
+    # como un numero limpio, indistinguible de una medida buena.
+    det.revisar = m.revisar
+    det.aviso_forma = m.aviso or None
     if um_por_px and um_por_px > 0:
         det.area_um2 = m.area_um2
         det.largo_um = m.largo_um
