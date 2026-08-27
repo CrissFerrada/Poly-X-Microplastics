@@ -45,7 +45,16 @@ class InferenceParams:
     # sin marcar nada a mano. Importa porque la distancia de disparo varía entre
     # tomas: en este material la escala va de 31 a 49 µm/px, un factor 1.5, y un
     # valor único para todo el lote daría tamaños con hasta 50 % de error.
-    medir_placa: bool = False
+    # Encendido de fabrica. Estuvo apagado, y la casilla que lo controla se
+    # llama "(recomendado)": la aplicacion recomendaba algo que no hacia. El
+    # efecto era que TODA la seccion de tallas del informe salia con guiones
+    # -- las particulas se median en pixeles pero sin µm/px no hay como pasarlas
+    # a micrometros -- y nada explicaba por que.
+    #
+    # Fallar aqui es barato: si la placa no se ve en la foto (recortes, por
+    # ejemplo) la calibracion se declara invalida, se hereda del indice.csv si
+    # lo hay, y el analisis sigue. Cuesta ~1-2 s por foto.
+    medir_placa: bool = True
     diametro_placa_mm: float = 100.0
     # El aro de la placa esta MAS CERCA de la cámara que el fondo donde reposan
     # las partículas, así que se proyecta más grande y la escala sale pequeña:

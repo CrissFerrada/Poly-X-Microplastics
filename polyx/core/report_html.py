@@ -822,6 +822,175 @@ def _fig_boxplot_grupos(grupos: Dict[str, List[float]], titulo: str, xlabel: str
     return _fig_to_b64(fig)
 
 
+# ── Como se llama cada morfotipo de cara al usuario ──
+# El codigo distingue "fibra" y "fragmento" (morfologia.FIBRA / FRAGMENTO) y
+# eso NO cambia: es la clasificacion con la que se mide y se decide si el largo
+# sale por Feret o por geodesico. Lo que cambia es la palabra que se imprime.
+#
+# Va en una funcion y no repetido en cada tabla porque ya paso una vez: se
+# renombro solo en las fichas y el informe quedo llamando "particula" y
+# "fragmento" a la misma cosa en paginas distintas.
+#
+# NOTA PARA EL PAPER: en la literatura de microplasticos el termino estandar es
+# "fragment" (fibra / fragmento / film / pellet). Para el manuscrito en ingles
+# conviene volver a "fragment"; aqui se usa "particula" por decision del autor,
+# porque en este material casi todo es fragmento y repetir la palabra en cada
+# ficha no aportaba nada.
+_NOMBRE_MORFOTIPO = {"fibra": "Fibra", "fragmento": "Partícula"}
+
+
+def _morfotipo(valor: Optional[str], minuscula: bool = False) -> str:
+    """Nombre presentable de un morfotipo. '—' si no se pudo determinar."""
+    if not valor:
+        return "—"
+    nombre = _NOMBRE_MORFOTIPO.get(valor, valor)
+    return nombre.lower() if minuscula else nombre
+
+
+def elegir_fichas(formas: List[tuple], max_fichas: int) -> List[tuple]:
+    """Que particulas se enseñan con su medicion dibujada, y en que orden.
+
+    ``formas`` es una lista de ``(Detection, ruta)``. Devuelve como mucho
+    ``max_fichas`` de ellas.
+
+    Antes entraban las PRIMERAS que aparecieran, por orden de nombre de
+    archivo, y eso tenia dos consecuencias malas:
+
+      * La particula MAYOR -- la que sostiene cualquier afirmacion sobre talla
+        maxima -- podia quedarse fuera por estar en una foto de nombre alto.
+      * Las fibras no salian NUNCA en la practica. Son ~1% del material, asi
+        que el corte llegaba mucho antes de encontrar una. Y la fibra es
+        justamente el caso donde actua el diametro geodesico: si no se ve
+        ninguna medida, no hay como juzgar si ese metodo funciona.
+
+    Ahora la muestra se reparte entre los dos morfotipos, a mitades, y dentro
+    de cada uno manda el tamaño. Asi la mayor de cada tipo entra siempre.
+
+    El reparto no es rigido: si no hay fibras suficientes -- lo normal -- el
+    hueco lo ocupan las particulas mas grandes, en vez de devolver una muestra
+    corta. Y al reves tambien.
+
+    Es una muestra SESGADA a proposito, no representativa del lote; el informe
+    lo declara donde la enseña.
+    """
+    if max_fichas <= 0:
+        return []
+
+    def talla(par) -> float:
+        return par[0].largo_um or 0.0
+
+    fibras = sorted([t for t in formas if t[0].morfotipo == "fibra"],
+                    key=talla, reverse=True)
+    otras = sorted([t for t in formas if t[0].morfotipo != "fibra"],
+                   key=talla, reverse=True)
+
+    mitad = max(1, max_fichas // 2)
+    elegidas = fibras[:mitad]
+    elegidas += otras[:max_fichas - len(elegidas)]
+    # Huecos que dejo el grupo escaso los cubre el otro, para no entregar una
+    # muestra mas corta de lo pedido habiendo material.
+    if len(elegidas) < max_fichas:
+        ya = {id(d) for d, _ in elegidas}
+        sobrantes = [t for t in fibras + otras if id(t[0]) not in ya]
+        elegidas += sobrantes[:max_fichas - len(elegidas)]
+    return elegidas
+
+
+def _figura_calibracion(state) -> str:
+    """Foto de una placa con el circulo ajustado dibujado encima.
+
+    El informe declaraba la escala -- "32.86 µm/px, placa de 100 mm" -- pero no
+    la ENSEÑABA. Toda la cadena de tallas del estudio cuelga de ese numero, y
+    hasta aqui habia que creerselo: si el ajuste hubiera agarrado el borde
+    equivocado (la sombra de la placa, el reflejo del anillo, el borde del
+    filtro de dentro) nada en el documento lo delataria.
+
+    Con la circunferencia dibujada sobre la foto se ve de un vistazo si el
+    ajuste cayo donde debia. Es el mismo criterio que ya se aplica a cada
+    particula en las fichas: una medida que no se puede ver medida no se puede
+    verificar.
+
+    Se elige la foto de MEDIANA escala, no la primera: la primera puede ser
+    justo la atipica del lote, y entonces la figura ilustraria el caso raro.
+
+    Devuelve "" si no hay ninguna placa medida sobre la que dibujar.
+    """
+    from .calibracion import ORIGEN_PLACA, DIAMETRO_PLACA_MM
+
+    cals = getattr(state, "calibraciones", None) or {}
+    medidas = [(nombre, c) for nombre, c in cals.items()
+               if getattr(c, "valida", False)
+               and getattr(c, "origen", "") == ORIGEN_PLACA
+               and getattr(c, "radio_px", 0) > 0]
+    if not medidas:
+        return ""
+
+    # La de escala mediana representa al lote; la primera por nombre no.
+    medidas.sort(key=lambda t: t[1].um_por_px)
+    nombre, cal = medidas[len(medidas) // 2]
+
+    # Hay que volver a la foto original: la calibracion guarda cx/cy/radio pero
+    # no los pixeles. Se busca entre las imagenes analizadas por nombre.
+    ruta = None
+    for r in [x for rs in state.results.values() for x in rs]:
+        if Path(r.image_path).name == nombre:
+            ruta = Path(r.image_path)
+            break
+    if ruta is None or not ruta.exists():
+        return ""
+
+    try:
+        import cv2
+        from .calibracion import leer_imagen
+        bgr = leer_imagen(ruta)
+        if bgr is None:
+            return ""
+
+        vis = bgr.copy()
+        cx, cy, r_px = float(cal.cx), float(cal.cy), float(cal.radio_px)
+        # Grosores proporcionales al tamano de la foto: un trazo de 2 px es
+        # invisible en una imagen de 4096, y uno de 20 tapa el borde que
+        # justamente se quiere enseñar.
+        grosor = max(2, int(round(min(vis.shape[:2]) / 500)))
+
+        # Circunferencia ajustada + centro.
+        cv2.circle(vis, (int(cx), int(cy)), int(r_px), (0, 255, 0), grosor)
+        cv2.drawMarker(vis, (int(cx), int(cy)), (0, 255, 0),
+                       cv2.MARKER_CROSS, grosor * 14, grosor)
+        # El diametro, que es la magnitud conocida (100 mm nominales).
+        cv2.line(vis, (int(cx - r_px), int(cy)), (int(cx + r_px), int(cy)),
+                 (0, 210, 255), grosor)
+
+        escala = 900.0 / max(vis.shape[:2])
+        if escala < 1:
+            vis = cv2.resize(vis, None, fx=escala, fy=escala,
+                             interpolation=cv2.INTER_AREA)
+        ok, buf = cv2.imencode(".jpg", vis, [cv2.IMWRITE_JPEG_QUALITY, 88])
+        if not ok:
+            return ""
+        img64 = base64.b64encode(buf.tobytes()).decode("ascii")
+    except Exception:
+        # Una figura ilustrativa no puede tumbar el informe entero.
+        return ""
+
+    diam_px = 2.0 * r_px
+    diam_mm = getattr(cal, "diametro_mm", 0) or DIAMETRO_PLACA_MM
+    return f"""
+<h3>{NUM}.1 Cómo se obtiene la escala, sobre una placa real</h3>
+<p>En verde, la circunferencia que el ajuste encontró para el borde externo del
+anillo; en amarillo, su diámetro. Ese diámetro es la magnitud conocida
+—<strong>{diam_mm:g} mm</strong>— y de ahí sale todo lo demás.</p>
+<img src='data:image/jpeg;base64,{img64}' style='max-width:100%'>
+<p style='font-family:monospace;font-size:10pt'>
+{diam_mm:g} mm ÷ {diam_px:.1f} px = <strong>{cal.um_por_px:.4f} µm/px</strong>
+&nbsp;&nbsp;<span style='font-family:inherit;color:#656d76'>({nombre},
+{cal.n_puntos} puntos de borde)</span></p>
+<p>Conviene mirar si el círculo verde sigue el borde del anillo y no otra cosa
+—la sombra de la placa, un reflejo, o el borde del filtro de dentro—. Si cayera
+mal, <strong>todas</strong> las tallas de esa foto saldrían escaladas por el
+mismo factor equivocado, y ninguna otra cifra del informe lo delataría.</p>"""
+
+
 def _ficha_particula(det, ruta_imagen, um_por_px: Optional[float],
                      titulo: str) -> str:
     """Recorte de una particula con su mascara y la cuenta de px a µm.
@@ -1721,7 +1890,8 @@ def generate_report(state, output_path: Path,
 en píxeles se obtiene ajustando un círculo por mínimos cuadrados al borde del anillo
 muestreado en 720 direcciones, con rechazo de atípicos; la transformada de Hough solo
 aporta el centro aproximado, porque su radio llega a errar un 12&nbsp;% y ese error
-entraría entero en todos los tamaños reportados.</p>"""
+entraría entero en todos los tamaños reportados.</p>
+{_figura_calibracion(state)}"""
             if res["avisos"]:
                 items = "".join(f"<li>{a}</li>" for a in res["avisos"][:12] if a)
                 if items:
@@ -1759,9 +1929,9 @@ entraría entero en todos los tamaños reportados.</p>"""
 
         # ── Reparto por morfotipo ──
         tabla_morfotipo = f"""
-<table class='data'><tr><th>Morfotipo</th><th>Partículas</th><th>%</th></tr>
+<table class='data'><tr><th>Morfotipo</th><th>Cuántas</th><th>%</th></tr>
 <tr><td>Fibra (relación de aspecto ≥ 3)</td><td>{fibras}</td><td>{pc_f:.1f} %</td></tr>
-<tr><td>Fragmento</td><td>{len(formas) - fibras}</td><td>{100 - pc_f:.1f} %</td></tr>
+<tr><td>Partícula (no fibrosa)</td><td>{len(formas) - fibras}</td><td>{100 - pc_f:.1f} %</td></tr>
 </table>"""
 
         if con_talla:
@@ -1777,7 +1947,7 @@ entraría entero en todos los tamaños reportados.</p>"""
                 return (f"<tr><td><strong>{rotulo}</strong></td><td>{d.class_name}</td>"
                         f"<td>{_num(d.largo_um)}</td><td>{_num(d.ancho_um)}</td>"
                         f"<td>{_num(d.area_um2)}</td><td>{_num(d.aspecto, 1)}</td>"
-                        f"<td>{_num(d.curvatura, 2)}</td><td>{d.morfotipo or '—'}</td>"
+                        f"<td>{_num(d.curvatura, 2)}</td><td>{_morfotipo(d.morfotipo)}</td>"
                         f"<td style='font-size:9pt'>{Path(ruta).name}</td></tr>")
 
             tablas = f"""
@@ -1919,18 +2089,49 @@ entraría entero en todos los tamaños reportados.</p>"""
                 f"<td>{nf}</td><td>{len(ds) - nf}</td>"
                 f"<td>{(f'{np.median(largos_i):.0f}' if largos_i else '—')}</td>"
                 f"<td>{(f'{max(largos_i):.0f}' if largos_i else '—')}</td></tr>")
+        # La primera columna pasa a llamarse "Total" y no "Partículas": con el
+        # cambio de nomenclatura habria dos columnas con el mismo nombre, una
+        # como suma y otra como morfotipo. Total = Fibras + Partículas.
         recuento = (
             f"<h3>{NUM}.7 Recuento por imagen</h3>"
-            f"<table class='data'><tr><th>Imagen</th><th>Partículas</th>"
-            f"<th>Fibras</th><th>Fragmentos</th><th>Largo mediano<br>(µm)</th>"
+            f"<table class='data'><tr><th>Imagen</th><th>Total</th>"
+            f"<th>Fibras</th><th>Partículas</th><th>Largo mediano<br>(µm)</th>"
             f"<th>Mayor<br>(µm)</th></tr>{filas_img}</table>")
+
+        # Un "—" en las columnas de talla no es un fallo del analisis: la
+        # particula SI se midio, en pixeles, pero sin µm/px no hay forma de
+        # convertirlo a micrometros. Antes el guion aparecia sin explicacion y
+        # parecia que la medicion habia fallado. Se dice que falta y como se
+        # arregla, en vez de inventar un numero o callarse.
+        sin_escala = [n for n, ds in por_img.items()
+                      if not any(d.largo_um for d in ds)]
+        if sin_escala:
+            todas = len(sin_escala) == len(por_img)
+            cuales = ("<strong>Ninguna imagen tiene escala</strong>"
+                      if todas else
+                      f"<strong>{len(sin_escala)} de {len(por_img)} imágenes no tienen "
+                      f"escala</strong> ({', '.join(sorted(sin_escala)[:6])}"
+                      f"{', …' if len(sin_escala) > 6 else ''})")
+            recuento += (
+                f"<p>{cuales}, y por eso su largo aparece como «—». Las partículas "
+                f"<em>sí</em> se midieron —el conteo y la forma de la tabla son "
+                f"correctos—, pero una medida en píxeles no se puede pasar a "
+                f"micrómetros sin saber cuántos µm mide cada píxel.</p>"
+                f"<p>Para obtenerlo, en <em>Parámetros</em>: activa "
+                f"<strong>«Medir la placa Petri»</strong> —cada foto obtiene su propia "
+                f"escala del anillo de la placa, que es lo más fiable— o escribe un "
+                f"valor de <strong>µm/píxel</strong>"
+                + ("." if todas else
+                   ". Si ya está activo, en esas fotos concretas no se encontró el "
+                   "anillo de la placa: revisa que se vea entero en el encuadre.")
+                + "</p>")
 
         metodo = f"""
 <h3>{NUM}.1 Cómo se mide el largo</h3>
 <p>Las magnitudes se miden sobre la <strong>máscara de cada partícula</strong>, no sobre la caja
 del detector. La caja de una partícula alargada está casi vacía y depende de cómo haya caído:
 una fibra tumbada en diagonal tiene caja cuadrada, de modo que medir sobre la caja la
-reportaría como fragmento y con una talla equivocada. La máscara se obtiene umbralizando cada
+reportaría como si no fuera fibra, y con una talla equivocada. La máscara se obtiene umbralizando cada
 recorte a medio camino entre el nivel del fondo —la mediana del anillo que rodea la caja— y el
 de la partícula —el percentil 90 dentro de ella—.</p>
 
@@ -2005,13 +2206,14 @@ subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensay
     if formas and max_fichas:
         import cv2
         from .morfologia import dibujar_medicion
+
+        elegidas = elegir_fichas(formas, max_fichas)
+        n_fibras_muestra = sum(1 for d, _ in elegidas if d.morfotipo == "fibra")
         por_img_f: Dict[str, list] = {}
-        for d, ruta in formas:
+        for d, ruta in elegidas:
             por_img_f.setdefault(str(ruta), []).append(d)
         piezas, hechas = [], 0
         for ruta in sorted(por_img_f):
-            if hechas >= max_fichas:
-                break
             bgr = None
             try:
                 from .calibracion import leer_imagen
@@ -2047,12 +2249,7 @@ subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensay
                     detalle.append(f"aspecto {d.aspecto:.1f}")
                 detalle.append(f"medido por {m.metodo}")
                 color = "#1f6b5e" if d.morfotipo == "fibra" else "#656d76"
-                # En la ficha individual "fragmento" se muestra como "particula":
-                # el reparto fibra/fragmento ya esta en la tabla de morfotipo de
-                # mas arriba, y aqui repetirlo por cada tarjeta leia raro cuando
-                # casi todo el lote es fragmento. La clasificacion real sigue
-                # intacta en d.morfotipo para el resto del informe.
-                etiqueta_morfo = "partícula" if d.morfotipo == "fragmento" else (d.morfotipo or "—")
+                etiqueta_morfo = _morfotipo(d.morfotipo, minuscula=True)
                 tarjetas += (
                     f"<div style='display:inline-block;vertical-align:top;margin:0 14px 18px 0;"
                     f"max-width:290px'>"
@@ -2064,18 +2261,30 @@ subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensay
             if tarjetas:
                 piezas.append(f"<h3>{Path(ruta).name}</h3>{tarjetas}")
         if piezas:
+            # Se declara COMO se eligio la muestra. Sin esto, un lector podria
+            # tomarla por representativa del lote y no lo es: esta sesgada a
+            # proposito hacia lo grande y hacia las fibras.
+            n_otras_muestra = hechas - n_fibras_muestra
+            if n_fibras_muestra:
+                criterio = (f"Se muestran las <strong>{n_fibras_muestra} fibra(s) y las "
+                            f"{n_otras_muestra} partículas más grandes</strong>")
+            else:
+                criterio = (f"Se muestran las <strong>{n_otras_muestra} partículas más "
+                            f"grandes</strong>. En este lote no se detectó ninguna fibra, "
+                            f"así que la muestra no incluye ninguna")
             fichas_html = (
                 "<p>Cada partícula con el número que lleva en la imagen anotada, su recorte y "
                 "la medida dibujada <strong>sobre ella</strong>: en amarillo la recta de Feret, "
                 "en magenta el camino geodésico, según cuál de las dos haya decidido su talla. "
                 "El contorno verde es la máscara que se midió. A la izquierda va la partícula "
                 "sin marcas, para poder juzgar si el contorno la sigue.</p>"
+                f"<p>{criterio}. El reparto es deliberado: las fibras son el caso donde actúa "
+                f"el método geodésico —y son minoría, de modo que una muestra tomada al azar "
+                f"podría no enseñar ninguna—, y la mayor de cada tipo es la "
+                f"que sostiene cualquier afirmación sobre talla máxima. "
+                f"<strong>No es una muestra representativa del lote</strong>, sino la selección "
+                f"que permite comprobar el método donde más puede fallar.</p>"
                 + "".join(piezas))
-            if hechas >= max_fichas:
-                fichas_html += (
-                    f"<p>Se muestran las primeras {max_fichas} partículas. El límite existe "
-                    f"porque cada ficha lleva su imagen incrustada y un lote completo haría "
-                    f"un archivo inabrible.</p>")
 
     # ── Ensamblar HTML ──
     # Cada bloque es (id, cuerpo). El cuerpo NO lleva su <h2>: el titulo y el
