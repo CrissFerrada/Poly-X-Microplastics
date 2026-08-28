@@ -2087,8 +2087,7 @@ def generate_report(state, output_path: Path,
                     + tr("<p>Compara la talla entre las carpetas del lote analizado: "
                          "cada carpeta como un grupo distinto. Útil cuando cada carpeta "
                          "es un sitio de muestreo, una estación o una condición.</p>")
-                    + 
-                    f"<img src='data:image/png;base64,{fig_carpeta}' style='max-width:100%'>"
+                    + f"<img src='data:image/png;base64,{fig_carpeta}' style='max-width:100%'>"
                     f"<p>{veredicto_carpeta}</p>")
 
                 # -- Por foto, dentro de las carpetas con mas de una imagen --
@@ -2129,7 +2128,6 @@ def generate_report(state, output_path: Path,
                              "misma carpeta: por ejemplo, si el tamaño cambia con la "
                              "profundidad o el momento de muestreo dentro de un mismo "
                              "sitio.{nota}</p>").format(nota=nota_tope)
-                        + 
                         + "".join(piezas_foto))
 
         # ── Recuento fibra/fragmento por foto ──

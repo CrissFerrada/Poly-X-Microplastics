@@ -168,3 +168,111 @@ def test_ninguna_traduccion_se_congela_al_importar():
     assert not congeladas, (
         f"tr() en el cuerpo del modulo, lineas {congeladas}: se resuelve al "
         f"importar y no sigue al idioma elegido")
+
+
+# ── Lote que obliga a construir todas las secciones ────────────────────
+#
+# El lote minimo de arriba deja media docena de secciones sin construir: sin
+# dos carpetas no hay talla por carpeta, sin dos modelos no hay comparacion y
+# sin ground truth no hay matriz de confusion. Ahi se escondio un `+ +` que
+# Python acepta como mas unario y que solo reventaba al generar el informe de
+# un lote real, en la exportacion a PDF:
+#
+#     TypeError: bad operand type for unary +: 'str'
+#
+# Sintacticamente valido, de modo que ni ast.parse ni el lote minimo lo veian.
+
+
+def _estado_completo(tmp_path):
+    """Dos carpetas, tres fotos cada una, dos modelos y ground truth."""
+    import cv2
+    from polyx.detector.state import DetectorState, ImageResult, ModelSlot
+    from polyx.core import morfologia
+
+    clases = ["PET", "PP", "LDPE"]
+    st = DetectorState()
+    st.model_slots[0] = ModelSlot(alias="yolov8n", path=Path("a.pt"))
+    st.model_slots[1] = ModelSlot(alias="yolo11n", path=Path("b.pt"))
+    st.results = {0: [], 1: []}
+
+    n = 0
+    for carpeta in ("Chiu Chiu", "Desembocadura"):
+        for foto in range(3):
+            rng = np.random.default_rng(n)
+            img = np.full((520, 640, 3), 18, np.uint8)
+            cajas = []
+            for _ in range(5):
+                cx, cy = int(rng.integers(70, 570)), int(rng.integers(70, 450))
+                r = int(rng.integers(9, 26))
+                cv2.circle(img, (cx, cy), r, (60, 210, 240), -1)
+                cajas.append((cx - r, cy - r, cx + r, cy + r))
+            # Una fibra por foto: las fichas reparten 6 fibras + 6 particulas,
+            # y sin ninguna fibra esa rama no se ejercita.
+            y = int(rng.integers(80, 440))
+            cv2.line(img, (60, y), (300, y + 40), (60, 210, 240), 6)
+            cajas.append((60, y - 8, 300, y + 48))
+
+            ruta = tmp_path / carpeta / f"{foto + 1}.1.png"
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(ruta), img)
+
+            escala = 30.0 + 4.0 * foto          # escala distinta en cada foto
+            for mi in (0, 1):
+                preds, gt = [], []
+                for k, (x1, y1, x2, y2) in enumerate(cajas):
+                    cid = k % 3
+                    d = Detection(class_id=cid, class_name=clases[cid],
+                                  conf=0.6 + 0.05 * k, x1=x1, y1=y1, x2=x2, y2=y2)
+                    morfologia.aplicar_a_deteccion(d, img, escala)
+                    n += 1
+                    d.numero = n
+                    # El segundo modelo se salta una caja: si los dos dieran lo
+                    # mismo, la comparacion no tendria nada que enseñar.
+                    if not (mi == 1 and k == 0):
+                        preds.append(d)
+                    # Y el ground truth confunde una clase, para que la matriz
+                    # de confusion tenga algo fuera de la diagonal.
+                    cid_gt = (cid + 1) % 3 if k == 2 else cid
+                    gt.append(Detection(class_id=cid_gt, class_name=clases[cid_gt],
+                                        conf=1.0, x1=x1, y1=y1, x2=x2, y2=y2))
+                st.results[mi].append(ImageResult(
+                    image_path=ruta, model_idx=mi, predictions=preds,
+                    gt=gt, has_gt=True))
+    return st
+
+
+def _informe_completo(tmp_path, lang):
+    os.environ["POLYX_IDIOMA"] = lang
+    import polyx.core.i18n as i18n
+    importlib.reload(i18n)
+    import polyx.core.report_html as rh
+    importlib.reload(rh)
+    salida = tmp_path / f"completo_{lang}.html"
+    rh.generate_report(_estado_completo(tmp_path), salida,
+                       secciones=list(rh.IDS_SECCIONES))
+    return salida.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_un_lote_con_todas_las_secciones_se_genera(tmp_path, lang):
+    """Que ninguna seccion reviente al construirse, en ninguno de los dos
+    idiomas. Es la prueba que habria cazado el mas unario."""
+    html = _informe_completo(tmp_path, lang)
+    assert html.count("<h2") >= 10, "faltan secciones por construir"
+    assert "{tr(" not in html
+
+
+def test_en_el_lote_completo_tampoco_se_cuela_español(tmp_path):
+    """El mismo barrido de antes, pero sobre las secciones que el lote minimo
+    no llega a construir: comparacion, errores, galeria y talla por carpeta."""
+    import re
+    es = set(_texto_visible(_informe_completo(tmp_path, "es")))
+    en = set(_texto_visible(_informe_completo(tmp_path, "en")))
+    marca = re.compile(r"[áéíóúñÁÉÍÓÚÑ¿¡]|\b(el|la|los|las|del|que|con|para|"
+                       r"por|una|un|se|es|su|sus|como|cada|sobre|entre|sin|no)\b",
+                       re.I)
+    sospechosas = [t for t in es & en
+                   if marca.search(t) and len(t) > 2 and "(2024)" not in t]
+    assert not sospechosas, (
+        "texto sin traducir en el informe en ingles:\n  "
+        + "\n  ".join(sorted(sospechosas)[:15]))
