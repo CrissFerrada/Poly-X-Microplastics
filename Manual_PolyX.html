@@ -177,12 +177,22 @@
       <h3>2.1 Requisitos</h3>
       <table class="data">
         <tr><th>Componente</th><th>Mínimo</th><th>Recomendado</th></tr>
-        <tr><td>Sistema operativo</td><td>Windows 10</td><td>Windows 11</td></tr>
+        <tr><td>Sistema operativo</td><td>Windows 10 · macOS 12 Monterey</td><td>Windows 11 · macOS 14 Sonoma</td></tr>
         <tr><td>Python</td><td>3.11.x (NO 3.12+)</td><td>3.11.9</td></tr>
         <tr><td>RAM</td><td>8 GB</td><td>16 GB</td></tr>
-        <tr><td>GPU</td><td>—</td><td>NVIDIA RTX (el instalador elige la versión de CUDA)</td></tr>
+        <tr><td>GPU</td><td>—</td><td>Windows: NVIDIA RTX (el instalador elige la versión de CUDA) · macOS Apple Silicon: MPS, se usa solo</td></tr>
         <tr><td>Espacio en disco</td><td>5 GB</td><td>10 GB</td></tr>
       </table>
+
+      <div class="callout">
+        <strong>macOS.</strong> Poly-X corre igual en Mac. Cambia el instalador
+        (<code>construir_app_macOS.command</code> en vez de <code>SETUP.bat</code>)
+        y el lanzador (<code>Lanzar_macOS.command</code>). En un Mac con
+        <strong>Apple Silicon</strong> el cálculo va por <strong>MPS</strong>, la
+        GPU integrada, sin configurar nada. En un Mac <strong>Intel</strong> va
+        por CPU: funciona, pero entrenar es lento — para eso conviene un equipo
+        con NVIDIA. Los detalles están en <code>LEEME_macOS.md</code>.
+      </div>
 
       <div class="callout warn">
         <strong>Importante sobre Python:</strong> debe ser <strong>3.11.x</strong>
@@ -212,6 +222,25 @@
         <li>Para empezar a usar el programa, doble clic en
             <strong><code>iniciar_polyx.bat</code></strong>.</li>
       </ol>
+
+      <p><strong>En macOS</strong> los pasos son tres:</p>
+      <ol class="steps">
+        <li>Instala <strong>Python 3.11</strong> desde python.org (el que trae el
+            sistema no sirve: le falta Tk).</li>
+        <li>Abre la carpeta en el Finder y haz doble clic en
+            <strong><code>construir_app_macOS.command</code></strong>. Crea el
+            <code>.venv</code>, instala las dependencias y elige la rueda de
+            PyTorch que corresponde: en Intel se fija
+            <code>torch 2.2.2</code>, la última con rueda para x86_64.</li>
+        <li>Para usarlo, doble clic en
+            <strong><code>Lanzar_macOS.command</code></strong>.</li>
+      </ol>
+      <div class="callout warn">
+        La primera vez macOS puede decir que el archivo «no se puede abrir porque
+        procede de un desarrollador no identificado». Es Gatekeeper, no un fallo:
+        clic derecho sobre el <code>.command</code> → <strong>Abrir</strong> →
+        <strong>Abrir</strong>. Solo hace falta una vez por archivo.
+      </div>
 
       <div class="callout warn">
         <strong>Tarjetas RTX 50xx (Blackwell).</strong> Estas GPU usan la
@@ -256,7 +285,9 @@
       conservando <code>.venv</code>, modelos, resultados y datos.</p>
       <p>La comprobación no retrasa el arranque y se calla ante cualquier fallo:
       sin internet o con GitHub caído, simplemente no aparece el aviso. También
-      puedes forzarla con <code>actualizar.bat</code>.</p>
+      puedes forzarla con <code>actualizar.bat</code>, o con
+      <code>actualizar_macOS.command</code> si estás en Mac. El botón del launcher
+      llama solo al que corresponde a tu sistema.</p>
 
     </section>
     <section id="workflow">
@@ -441,11 +472,24 @@
       <code>reporte_paper.html</code> dentro de la carpeta del run.
       <strong>Contiene:</strong></p>
       <ol>
-        <li>Resumen (abstract) con detecciones, conf media y tamaño medio.</li>
-        <li>Métodos: modelo, params, calibración, dispositivo, fecha.</li>
+        <li>Resumen con detecciones, confianza media y tamaño medio.</li>
+        <li>Métodos: modelo, parámetros, dispositivo, equipo y fecha.</li>
+        <li><strong>Calibración de escala:</strong> de dónde salieron los μm/px de
+            cada foto, su mínimo / mediana / máximo y la media con intervalo de
+            confianza al 95 %, más una figura sobre una placa real con el círculo
+            ajustado y su diámetro dibujados encima.</li>
+        <li><strong>Forma y talla de las partículas:</strong> cómo se mide el
+            largo, reparto fibra / partícula, histograma de tallas y recuento
+            por imagen.</li>
+        <li><strong>Talla por carpeta y por foto</strong> (opcional): compara la
+            distribución de tallas entre carpetas —cada carpeta como un sitio de
+            muestreo, una estación o una condición— con diagramas de caja y una
+            prueba de Kruskal-Wallis.</li>
+        <li><strong>Ficha de partículas medidas:</strong> las 6 fibras y las 6
+            partículas mayores, cada una con su recorte y la medida dibujada
+            encima.</li>
         <li>Resultados generales: distribución de clases, histograma de
-            confianza, distribución de tamaños (μm), tabla por clase
-            con P/R/F1.</li>
+            confianza, distribución de tamaños (μm).</li>
         <li>Tabla resumen por modelo.</li>
         <li>Análisis de errores: matriz de confusión, P/R/F1 por clase,
             galería de imágenes con más errores.</li>
@@ -453,8 +497,29 @@
             las detecciones de cada modelo y, si hay ground truth, sus TP/FP/FN
             y el F1 global.</li>
         <li>Galería completa por imagen anotada.</li>
+        <li>Conteo por muestra y tipo de plástico.</li>
         <li>Referencias bibliográficas.</li>
       </ol>
+
+      <h4>Qué secciones se incluyen</h4>
+      <p>Cada sección tiene su casilla, y hay tres presets:
+      <strong>Completo</strong>, <strong>Resumen breve</strong> y
+      <strong>Metodológico</strong>. Al desmarcar una, las demás se
+      <strong>renumeran solas</strong> y el índice se ajusta, de modo que nunca
+      queda un hueco tipo «4, 6, 7» que se lee como un error. Una sección marcada
+      pero sin datos se omite igualmente.</p>
+      <div class="callout tip">
+        <strong>Talla por carpeta</strong> viene desmarcada por defecto y solo
+        tiene sentido si las fotos vinieron de <strong>dos carpetas o más</strong>:
+        compara los grupos entre sí. Si todo el lote está en una carpeta, la
+        sección no aparece aunque la marques.
+      </div>
+
+      <h4>El idioma del informe</h4>
+      <p>El informe sale en el idioma que tenga la aplicación. Cámbialo en el
+      launcher (<em>Idioma</em>, arriba a la derecha), reinicia y vuelve a
+      generarlo: títulos, tablas, pies de figura y el texto de los métodos salen
+      todos en el idioma elegido.</p>
 
       <h4>Alcance: qué fotos entran en el informe</h4>
       <p>En la tarjeta <strong>Alcance del informe</strong> eliges entre tres
@@ -797,13 +862,46 @@ comprobaciones están fijadas como pruebas automáticas y se ejecutan con
 <h3>Dónde verlo partícula a partícula</h3>
 
 <p>En el <b>Visor</b>, la tabla lista cada partícula con su número, su clase y su
-tipo (fibra o fragmento). Al seleccionar una fila aparece <b>sobre qué se midió</b>:
+tipo (fibra o partícula). Al seleccionar una fila aparece <b>sobre qué se midió</b>:
 el recorte sin marcas a la izquierda y, a la derecha, el contorno de la máscara en
 verde con la medida dibujada encima — en amarillo la recta de Feret, en magenta el
 camino geodésico —, más la cuenta completa de píxeles a micrómetros. Desde la
 pestaña <b>Resultados</b> del Detector, el botón «Revisar partícula a partícula»
 abre allí la imagen seleccionada con esas mismas detecciones.</p>
 
+
+<h3>De píxeles a micrómetros: la escala</h3>
+
+<p>Todo lo anterior se mide en <b>píxeles</b>. Para pasarlo a micrómetros hace
+falta saber cuántos μm mide cada píxel, y ese número <b>no es el mismo en todas
+las fotos</b>: depende de la distancia de disparo. En el material de este estudio
+la escala real va de 31 a 50 μm/px, un factor 1,6; usar un valor único para todo
+el lote daría tallas con hasta un 50 % de error.</p>
+
+<p>Por eso cada foto se calibra con la suya. La referencia es el <b>anillo de la
+placa Petri</b>, cuyo diámetro se conoce. Se encuentra el centro aproximado con
+la transformada de Hough, se muestrea el borde en <b>720 direcciones</b> y se
+ajusta una circunferencia por mínimos cuadrados con rechazo de atípicos. El radio
+de Hough no se usa: llega a errar un 12 %, y ese error entraría entero en todos
+los tamaños del informe.</p>
+
+<div class="callout warn">
+<p><b>Qué borde son los 100 mm, y hacia dónde puede fallar.</b> El anillo de la
+placa tiene una pared de unos <b>2 mm</b> — medido sobre las fotos del estudio: el
+borde interno cae en 0,960 del radio ajustado y el externo en 1,000. El diámetro
+nominal de una placa Petri es ambiguo a ese nivel: puede referirse al diámetro
+<b>externo</b> o al <b>útil interior</b>.</p>
+<p>Aquí se toma el <b>externo</b>, que es el borde al que ajusta el círculo. Si el
+nominal se refiriera al interior, la escala correcta sería un <b>4,2 % mayor</b> y
+todas las tallas estarían <b>subestimadas</b> en esa cifra. El sesgo solo puede ir
+en ese sentido, porque el externo es el mayor de los dos bordes posibles. Queda
+declarado en el informe, en la sección de calibración.</p>
+</div>
+
+<p>Si una foto no tiene escala, su largo aparece como «—» en las tablas. No es un
+fallo de la medición: la partícula sí se midió, en píxeles, pero sin μm/px no hay
+forma de convertirlo. Se arregla activando <b>«Medir la placa Petri»</b> en
+<em>Parámetros</em>, o escribiendo un valor de μm/píxel a mano.</p>
 
 <h3>Partículas que se tocan</h3>
 

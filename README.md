@@ -34,7 +34,7 @@
   escala real va de 31 a 50 μm/px, un factor 1.6, y un valor único para todo el
   lote daría tallas con hasta un 50 % de error
 - **Talla y forma medidas sobre la partícula, no sobre su caja**: largo, ancho,
-  área, relación de aspecto y clasificación **fibra / fragmento**. La caja de una
+  área, relación de aspecto y clasificación **fibra / partícula**. La caja de una
   partícula alargada está casi vacía y depende de cómo haya caído — una fibra
   tumbada en diagonal tiene caja cuadrada — así que sobre 7.129 partículas
   anotadas sobreestimaba el área **1,87×**
@@ -49,9 +49,21 @@
   imágenes de galería se recodifican y se limita su número para que el archivo
   siga siendo abrible en un navegador; las métricas cubren todas las imágenes
 - **Exportación a PDF** del reporte (un clic), listo para enviar por correo
-- **Secciones del informe elegibles**: once casillas y tres presets (Completo ·
+- **Secciones del informe elegibles**: trece casillas y tres presets (Completo ·
   Resumen breve · Metodológico). Al desmarcar, las secciones se **renumeran solas**
   y el índice se ajusta; una sección marcada sin datos se omite igualmente
+- **Sección de calibración**: de dónde salió la escala de cada foto, su mínimo /
+  mediana / máximo, la **media con intervalo de confianza al 95 %** y una figura
+  sobre una placa real con el círculo ajustado y su diámetro dibujados encima
+- **Talla por carpeta y por foto** (opcional): compara la distribución de tallas
+  entre carpetas —cada carpeta como sitio de muestreo, estación o condición— con
+  diagramas de caja y una prueba de **Kruskal-Wallis**
+- **Ficha de partículas medidas**: las **6 fibras y las 6 partículas mayores**,
+  cada una con su recorte al lado y la medida dibujada encima (Feret en amarillo,
+  geodésico en magenta, máscara en verde). El reparto es deliberado: las fibras
+  son minoría y son justo donde actúa el método geodésico
+- **El informe sale en el idioma de la aplicación**, español o inglés: títulos,
+  tablas, pies de figura y la prosa de métodos
 - **Alcance del informe elegible**: trabajo completo, solo las fotos que marques, o
   ambos de una vez. Las cifras, los gráficos y la matriz de confusión se recalculan
   sobre lo elegido, así que el informe siempre describe las fotos que muestra
@@ -179,12 +191,40 @@ fijado en `tests/test_morfologia.py`.
 > que *P*² < 16*A*. Se reporta como descriptor porque comparada con las otras dos
 > delata bordes irregulares, pero no se usa como talla.
 
+### De píxeles a micrómetros: la escala
+
+Todo lo anterior se mide en **píxeles**. La conversión a micrómetros no es un
+factor único para el lote: depende de la distancia de disparo, y en el material de
+este estudio la escala real va de 31 a 50 µm/px, un factor 1,6. Por eso **cada
+foto se calibra con la suya**, contra el anillo de la placa Petri: se localiza el
+centro aproximado con Hough, se muestrea el borde en **720 direcciones** y se
+ajusta una circunferencia por mínimos cuadrados con rechazo de atípicos. El radio
+de Hough no se usa, porque llega a errar un 12 % y ese error entraría entero en
+todos los tamaños.
+
+> **Qué borde son los 100 mm, y hacia dónde puede fallar.** El anillo tiene una
+> pared de unos **2 mm** — medido sobre las fotos del estudio: el borde interno
+> cae en 0,960 del radio ajustado y el externo en 1,000. El diámetro nominal de
+> una placa Petri es ambiguo a ese nivel: puede referirse al **externo** o al
+> **útil interior**. Aquí se toma el **externo**, que es el borde al que ajusta el
+> círculo. Si el nominal se refiriera al interior, la escala correcta sería un
+> **4,2 % mayor** y todas las tallas estarían **subestimadas** en esa cifra. El
+> sesgo solo puede ir en ese sentido, porque el externo es el mayor de los dos
+> bordes posibles. Queda declarado en el propio informe.
+
 **Partículas en contacto.** Dos partículas que se tocan forman una sola mancha,
 y medirlas juntas sumaría sus tallas. Se separan por *watershed* sobre la
 transformada de distancia: el centro de cada una queda lejos del fondo y el cuello
 que las une queda cerca, de modo que el corte cae por el cuello. Sobre círculos de
 talla conocida las separa hasta un **27 % de solapamiento del diámetro**, sin
 partir ninguna partícula de una sola pieza.
+
+**La fibra se mide entera.** La máscara no se recorta a la caja del detector
+cuando la partícula es alargada, ni se pasa por el separador de partículas
+pegadas: las dos cosas cortaban fibras reales. En la que lo destapó se perdía un
+53 % del largo — 369 px de componente conexa quedaban en 174 —, y una talla
+subestimada no se nota en las cifras, solo en la imagen. Está fijado en
+`tests/test_fibra_no_se_trunca.py`.
 
 **Limitaciones declaradas.** Dos partículas solapadas más allá de un 40 % de su
 diámetro se siguen midiendo como una sola: a esa altura ya no hay un cuello por el
@@ -226,6 +266,11 @@ idioma del sistema; `POLYX_IDIOMA=en` lo fuerza sin tocar la interfaz.
 
 Los módulos son procesos aparte y leen el idioma al abrirse, así que el cambio
 surte efecto en cuanto abras el siguiente módulo.
+
+**El informe de detección sale en el idioma elegido**, no solo la interfaz:
+títulos, tablas, pies de figura, ejes de los gráficos y la prosa de métodos. El
+atributo `lang` del HTML se ajusta también, para que el corrector del navegador y
+los lectores de pantalla lo traten bien.
 
 Para ver qué falta por traducir:
 

@@ -36,7 +36,7 @@
   1.6, so a single value for the whole batch would give sizes off by as much as
   50 %
 - **Size and shape measured on the particle, not on its box**: length, width,
-  area, aspect ratio and **fibre / fragment** classification. The box of an
+  area, aspect ratio and **fibre / particle** classification. The box of an
   elongated particle is nearly empty and depends on how it happened to land — a
   fibre lying diagonally has a square box — so across 7,129 annotated particles
   it overestimated area by **1.87×**
@@ -51,10 +51,22 @@
   re-encoded and capped in number so the file stays openable in a browser; the
   metrics still cover every image
 - **PDF export** of the report in one click, ready to email
-- **Selectable report sections**: eleven tick boxes and three presets (Full ·
+- **Selectable report sections**: thirteen tick boxes and three presets (Full ·
   Short summary · Methodological). Unticking renumbers the sections **on its
   own** and adjusts the table of contents; a ticked section with no data is left
   out anyway
+- **Calibration section**: where each photograph's scale came from, its minimum /
+  median / maximum, the **mean with a 95 % confidence interval** and a figure over
+  a real dish with the fitted circle and its diameter drawn on it
+- **Size per folder and per photograph** (optional): compares the size
+  distribution across folders — each folder as a sampling site, a station or a
+  condition — with box plots and a **Kruskal-Wallis** test
+- **Measured particle cards**: the **6 fibres and the 6 largest particles**, each
+  with its crop beside it and the measurement drawn on top (Feret in yellow,
+  geodesic in magenta, mask in green). The split is deliberate: fibres are a
+  minority and are exactly where the geodesic method comes into play
+- **The report comes out in the application's language**, Spanish or English:
+  headings, tables, figure captions and the methods prose
 - **Selectable report scope**: the whole job, only the photos you tick, or both
   at once. Figures, charts and the confusion matrix are recomputed over what you
   chose, so the report always describes the photos it shows
@@ -149,12 +161,41 @@ worst case**. This is pinned down in `tests/test_morfologia.py`.
 > compared against the other two it exposes irregular outlines, but it is not
 > used as a size.
 
+### From pixels to micrometres: the scale
+
+Everything above is measured in **pixels**. Converting to micrometres is not one
+factor for the whole batch: it depends on the shooting distance, and in this
+study's material the real scale ranges from 31 to 50 µm/px, a factor of 1.6. So
+**each photograph is calibrated on its own**, against the Petri dish's rim: the
+approximate centre is located with Hough, the edge is sampled in **720
+directions** and a circle is fitted by least squares with outlier rejection.
+Hough's radius is not used, because it can be off by 12 % and that error would go
+straight into every size.
+
+> **Which edge the 100 mm are, and which way it can be wrong.** The rim has a wall
+> about **2 mm** thick — measured on this study's photographs: the inner edge falls
+> at 0.960 of the fitted radius and the outer edge at 1.000. The nominal diameter
+> of a Petri dish is ambiguous at that level: it may refer to the **outer** one or
+> to the **usable inner** one. Here the **outer** is taken, since that is the edge
+> the circle is fitted to. If the nominal figure referred to the inner edge, the
+> correct scale would be **4.2 % larger** and every size would be
+> **underestimated** by that amount. The bias can only run in that direction,
+> because the outer edge is the larger of the two. This is stated in the report
+> itself.
+
 **Touching particles.** Two particles in contact form a single blob, and
 measuring them together would add their sizes up. They are separated by
 *watershed* on the distance transform: the centre of each one sits far from the
 background while the neck joining them sits close, so the cut falls on the neck.
 Against circles of known size it separates them up to **27 % overlap of the
 diameter**, without splitting any particle that is a single piece.
+
+**A fibre is measured whole.** The mask is not clipped to the detector's box
+when the particle is elongated, nor passed through the touching-particle splitter:
+both of those cut real fibres short. On the one that exposed it, 53 % of the
+length was lost — 369 px of connected component came out as 174 — and an
+underestimated size does not show in the figures, only in the image. It is pinned
+down in `tests/test_fibra_no_se_trunca.py`.
 
 **Stated limitations.** Two particles overlapping by more than 40 % of their
 diameter are still measured as one: past that point there is no neck left to cut
@@ -190,6 +231,11 @@ interface.
 
 Modules are separate processes and read the language when they open, so the
 change takes effect as soon as you open the next module.
+
+**The detection report comes out in the chosen language**, not just the
+interface: headings, tables, figure captions, chart axes and the methods prose.
+The HTML `lang` attribute follows too, so the browser's spell checker and screen
+readers treat it correctly.
 
 To see what is still untranslated:
 

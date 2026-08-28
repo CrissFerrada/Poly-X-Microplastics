@@ -31,11 +31,35 @@ import numpy as np
 # suficientes para que el ajuste sobreviva a reflejos y oclusiones parciales.
 N_ANGULOS = 720
 
-# Diametro externo de la placa Petri del estudio. NO es un supuesto: el autor lo
-# tiene medido fisicamente y de forma repetida sobre las placas reales. Se anota
-# porque las Petri estandar vienen en 90 y en 100 mm, y confundirlas metaria un
-# 11% en todas las tallas del estudio sin dar ningun sintoma.
+# Diametro de la placa Petri del estudio, en mm. Medido sobre las placas reales.
+# Se anota porque las Petri estandar vienen en 90 y en 100 mm, y confundirlas
+# metaria un 11% en todas las tallas sin dar ningun sintoma.
+#
+# ESTE VALOR VA CON EL BORDE **EXTERNO** DEL ANILLO, que es al que ajusta
+# puntos_del_borde() -- camina hacia AFUERA desde el pico de brillo. Cambiar uno
+# sin el otro descoloca toda la escala del estudio.
 DIAMETRO_PLACA_MM = 100.0
+
+# Espesor de la pared del anillo, medido sobre las fotos del estudio: el borde
+# interno cae en 0.960 del radio ajustado y el externo en 1.000, unos 2.0 mm de
+# pared (1.95 / 2.02 / 2.02 mm en tres placas distintas).
+#
+# DE AQUI SALE LA INCERTIDUMBRE DE LA ESCALA, y no es simetrica. El nominal de
+# una Petri es ambiguo a nivel de la pared: puede referirse al diametro externo
+# o al util interior. Aqui se toma el EXTERNO. Si en realidad se refiriera al
+# interno -- 96 mm en vez de 100 --, la escala correcta seria un 4.2% mayor
+# (100/96) y TODAS las tallas del estudio estarian subestimadas en esa cifra.
+#
+# El error solo puede ir en ese sentido, nunca al reves, porque el externo es el
+# mayor de los dos bordes posibles.
+#
+# No se resolvio a favor del interno porque: (a) las fotos con huincha dan
+# 98-100 mm en el borde externo, (b) el catalogo de placas Petri suele nombrar
+# el diametro externo, y (c) el borde interno no sirve para calibrar -- es una
+# transicion gradual que no se ve en 3 de cada 14 placas, tapada por el
+# sedimento. Queda declarado en el informe en vez de disimulado.
+ESPESOR_PARED_MM = 2.0
+SESGO_MAXIMO_PARED_PCT = 4.2
 
 # De donde salio la escala, de mas fiable a menos. Va al informe: una medida sin
 # su procedencia no es verificable.

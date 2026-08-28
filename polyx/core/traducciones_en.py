@@ -683,4 +683,414 @@ EN: dict[str, str] = {
     'Intel CPU/iGPU.': 'Intel CPU/iGPU.',
     'Mobile/Edge devices.': 'Mobile/edge devices.',
     'Apple Silicon (M1/M2/M3) y iOS.': 'Apple Silicon (M1/M2/M3) and iOS.',
+
+    # ── Soporte macOS y secciones nuevas del informe (agosto 2026) ──
+    "'mps' = GPU del Mac (Apple Silicon). 'cpu' = procesador.":
+        "'mps' = the Mac's built-in GPU (Apple Silicon). 'cpu' = processor.",
+    "Este Mac es Intel: solo 'cpu'. MPS necesita Apple Silicon.":
+        "This is an Intel Mac: 'cpu' only. MPS requires Apple Silicon.",
+    'No se encontró {} en la carpeta de instalación. Descarga la versión nueva manualmente desde GitHub.':
+        'Could not find {} in the installation folder. Download the new version manually from GitHub.',
+    'No se pudo lanzar {}. Ejecútalo a mano desde la carpeta de instalación.':
+        'Could not launch {}. Run it by hand from the installation folder.',
+    '<ol><li><b>Resumen</b> con detecciones, confianza media y tamaño medio.</li><li><b>Métodos</b> — modelo, parámetros, calibración y dispositivo.</li><li><b>Calibración de escala</b> — de dónde salió el µm/px de cada foto.</li><li><b>Forma y talla</b> — reparto fibra/fragmento, distribución de tallas, la mayor y la menor, recuento por imagen y cómo se mide el largo.</li><li><b>Talla por carpeta y por foto</b> (opcional, desmarcada de fábrica) — compara el tamaño entre las carpetas del lote y, dentro de cada una, entre sus fotos, con una prueba de significancia. Sirve cuando cada carpeta es un sitio de muestreo distinto.</li><li><b>Fichas</b> — una muestra de partículas con su medición dibujada.</li><li><b>Resultados generales</b> — clases, confianza y tamaños.</li><li><b>Resumen por modelo</b> (tabla comparativa)</li><li><b>Análisis de errores</b> (solo si hay ground truth) — matriz de confusión y P/R/F1 por clase.</li><li><b>Comparación entre modelos</b></li><li><b>Galería por imagen</b> — predicción y ground truth lado a lado.</li><li><b>Conteo por muestra y tipo de plástico</b> — por imagen, por tramo y por estación.</li><li><b>Referencias bibliográficas</b></li></ol><p>Todas las secciones son opcionales: se eligen arriba.</p>':
+        '<ol><li><b>Summary</b> with detections, mean confidence and mean size.</li><li><b>Methods</b> — model, parameters, calibration and device.</li><li><b>Scale calibration</b> — where the µm/px of each photo came from.</li><li><b>Shape and size</b> — fibre/particle split, size distribution, the largest and the smallest, per-image counts and how length is measured.</li><li><b>Size by folder and by photo</b> (optional, off by default) — compares size across the folders of the batch and, within each one, across its photos, with a significance test. Useful when each folder is a different sampling site.</li><li><b>Cards</b> — a sample of particles with their measurement drawn on them.</li><li><b>General results</b> — classes, confidence and sizes.</li><li><b>Per-model summary</b> (comparison table)</li><li><b>Error analysis</b> (only with ground truth) — confusion matrix and per-class P/R/F1.</li><li><b>Model comparison</b></li><li><b>Per-image gallery</b> — prediction and ground truth side by side.</li><li><b>Counts by sample and polymer type</b> — per image, per depth section and per station.</li><li><b>References</b></li></ol><p>Every section is optional: you pick them above.</p>',
+
+    # ── Informe de deteccion: tablas y rotulos ──
+    '<th>Parámetro</th><th>Valor</th>':
+        '<th>Parameter</th><th>Value</th>',
+    '<th>Componente</th><th>Detalle</th>':
+        '<th>Component</th><th>Detail</th>',
+    '<th>Procedencia de la escala</th><th>Imágenes</th>':
+        '<th>Source of the scale</th><th>Images</th>',
+    '<th>µm por píxel</th><th>Valor</th>':
+        '<th>µm per pixel</th><th>Value</th>',
+    '<th>Morfotipo</th><th>Cuántas</th><th>%</th>':
+        '<th>Morphotype</th><th>How many</th><th>%</th>',
+    '<th>Estadístico</th><th>Largo (µm)</th>':
+        '<th>Statistic</th><th>Length (µm)</th>',
+    '<th>Medida</th><th>µm</th>':
+        '<th>Measure</th><th>µm</th>',
+    '<th>Forma de la partícula</th><th>Qué se reporta como largo</th>':
+        '<th>Particle shape</th><th>What is reported as length</th>',
+    '<td>mínimo</td>':
+        '<td>minimum</td>',
+    '<td>mediana</td>':
+        '<td>median</td>',
+    '<td>máximo</td>':
+        '<td>maximum</td>',
+    '<td>percentil 10</td>':
+        '<td>10th percentile</td>',
+    '<td>percentil 90</td>':
+        '<td>90th percentile</td>',
+    '<td>media ± IC 95%</td>':
+        '<td>mean ± 95% CI</td>',
+    '<td>Fibra (relación de aspecto ≥ 3)</td>':
+        '<td>Fibre (aspect ratio ≥ 3)</td>',
+    '<td>Partícula (no fibrosa)</td>':
+        '<td>Particle (non-fibrous)</td>',
+    '<td>Compacta o irregular, pero no doblada</td><td>Feret máximo (la recta más larga)</td>':
+        '<td>Compact or irregular, but not bent</td><td>Maximum Feret (the longest straight line)</td>',
+    '<td>Alargada y contorsionada (fibra)</td><td>Diámetro geodésico (sigue la curva)</td>':
+        '<td>Elongated and contorted (fibre)</td><td>Geodesic diameter (follows the curve)</td>',
+    'Sistema operativo':
+        'Operating system',
+    'Procesador':
+        'Processor',
+    'Memoria RAM':
+        'RAM',
+    'no disponible':
+        'not available',
+
+    # ── Informe: galeria ──
+    'Sin Ground Truth para esta imagen':
+        'No ground truth for this image',
+
+    # ── Informe: portada, pie y titulos de seccion ──
+    'Informe de detección de microplásticos':
+        'Microplastics detection report',
+    'por fluorescencia Nile Red':
+        'by Nile Red fluorescence',
+    'Autor:':
+        'Author:',
+    'Modelos:':
+        'Models:',
+    'Índice':
+        'Contents',
+    'Generado por Poly-X':
+        'Generated by Poly-X',
+    'Suite de detección de microplásticos por fluorescencia Nile Red (254 nm) e IA (YOLO v8/v11).':
+        'Microplastics detection suite by Nile Red fluorescence (254 nm) and AI (YOLO v8/v11).',
+    'Talla por carpeta y por foto (comparación entre sitios)':
+        'Size by folder and by photo (comparison between sites)',
+
+    # ── Informe: prosa de metodo y calibracion ──
+    'Cómo se mide el largo':
+        'How length is measured',
+    'Un ejemplo: la partícula mayor, medida':
+        'An example: the largest particle, measured',
+    'Un ejemplo: la partícula menor, medida':
+        'An example: the smallest particle, measured',
+    'Partícula mayor y menor':
+        'Largest and smallest particle',
+    'Distribución de tallas':
+        'Size distribution',
+    'Talla por tipo de plástico':
+        'Size by polymer type',
+    'Recuento por imagen':
+        'Per-image counts',
+    'Talla por carpeta':
+        'Size by folder',
+    'Talla por foto, dentro de cada carpeta':
+        'Size by photo, within each folder',
+    'Cómo se obtiene la escala, sobre una placa real':
+        'How the scale is obtained, on a real dish',
+    'Equipo de cómputo':
+        'Computing hardware',
+    'Entrenamiento de cada modelo':
+        'Training of each model',
+    'Se reporta la mayor de las dos primeras':
+        'The larger of the first two is reported',
+    'El patrón de longitud es el diámetro externo nominal de la placa Petri. El radio en píxeles se obtiene ajustando un círculo por mínimos cuadrados al borde del anillo muestreado en 720 direcciones, con rechazo de atípicos; la transformada de Hough solo aporta el centro aproximado, porque su radio llega a errar un 12&nbsp;% y ese error entraría entero en todos los tamaños reportados.':
+        'The length standard is the nominal outer diameter of the Petri dish. The radius in pixels comes from least-squares fitting a circle to the rim edge sampled in 720 directions, with outlier rejection; the Hough transform only supplies the approximate centre, because its radius can be off by 12&nbsp;% and that error would carry straight into every reported size.',
+    'En verde, la circunferencia que el ajuste encontró para el borde externo del anillo; en amarillo, su diámetro. Ese diámetro es la magnitud conocida':
+        'In green, the circle the fit found for the outer edge of the rim; in yellow, its diameter. That diameter is the known quantity',
+    'Conviene mirar si el círculo verde sigue el borde del anillo y no otra cosa —la sombra de la placa, un reflejo, o el borde del filtro de dentro—. Si cayera mal, <strong>todas</strong> las tallas de esa foto saldrían escaladas por el mismo factor equivocado, y ninguna otra cifra del informe lo delataría.':
+        "It is worth checking that the green circle follows the rim edge and not something else —the dish's shadow, a reflection, or the inner edge of the filter—. If it landed wrong, <strong>every</strong> size in that photo would be scaled by the same wrong factor, and no other figure in the report would reveal it.",
+
+    # ── Informe: tabla de particula mayor y menor ──
+    '<th></th><th>Clase</th><th>Largo</th><th>Ancho</th><th>Área</th><th>Aspecto</th><th>Curvatura</th><th>Morfotipo</th><th>Imagen</th>':
+        '<th></th><th>Class</th><th>Length</th><th>Width</th><th>Area</th><th>Aspect</th><th>Curvature</th><th>Morphotype</th><th>Image</th>',
+    'Mayor':
+        'Largest',
+    'Menor':
+        'Smallest',
+
+    # ── Informe: incertidumbre de la escala (lleva {pared} y {sesgo}) ──
+    '<strong>Incertidumbre de la escala, y en qué dirección.</strong> El anillo de la placa tiene una pared de unos <strong>{pared:g}&nbsp;mm</strong> (medido sobre las fotos de este estudio: el borde interno cae en 0,960 del radio ajustado y el externo en 1,000). El diámetro nominal de una placa Petri es ambiguo a ese nivel: puede referirse al diámetro <em>externo</em> o al <em>útil interior</em>. Aquí se toma el <strong>externo</strong>, que es el borde al que ajusta el círculo. Si el nominal se refiriera al interior, la escala correcta sería un <strong>{sesgo:g}&nbsp;% mayor</strong> y todas las tallas de este informe estarían <strong>subestimadas</strong> en esa cifra. El sesgo solo puede ir en ese sentido, porque el externo es el mayor de los dos bordes posibles.':
+        '<strong>Uncertainty of the scale, and in which direction.</strong> The rim of the dish has a wall about <strong>{pared:g}&nbsp;mm</strong> thick (measured on the photographs of this study: the inner edge falls at 0.960 of the fitted radius and the outer edge at 1.000). The nominal diameter of a Petri dish is ambiguous at that level: it may refer to the <em>outer</em> diameter or to the <em>usable inner</em> one. Here the <strong>outer</strong> is taken, since that is the edge the circle is fitted to. If the nominal figure referred to the inner edge, the correct scale would be <strong>{sesgo:g}&nbsp;% larger</strong> and every size in this report would be <strong>underestimated</strong> by that amount. The bias can only run in that direction, because the outer edge is the larger of the two possible ones.',
+
+    # -- Informe: metodo de medida del largo --
+    '<p>Las magnitudes se miden sobre la <strong>máscara de cada partícula</strong>, no sobre la caja del detector. La caja de una partícula alargada está casi vacía y depende de cómo haya caído: una fibra tumbada en diagonal tiene caja cuadrada, de modo que medir sobre la caja la reportaría como si no fuera fibra, y con una talla equivocada. La máscara se obtiene umbralizando cada recorte a medio camino entre el nivel del fondo —la mediana del anillo que rodea la caja— y el de la partícula —el percentil 90 dentro de ella—.</p>':
+        "<p>Every magnitude is measured on <strong>each particle's mask</strong>, not on the detector's box. The box of an elongated particle is almost empty and depends on how it happened to land: a fibre lying diagonally has a square box, so measuring on the box would report it as if it were not a fibre, and with the wrong size. The mask is obtained by thresholding each crop halfway between the background level —the median of the ring surrounding the box— and the particle's own —the 90th percentile inside it—.</p>",
+    '<p><strong>El criterio general es la línea recta más larga que cabe en la partícula</strong>, es decir la mayor distancia entre dos puntos de su contorno: el <em>diámetro de Feret máximo</em>. Para una partícula de forma irregular pero no doblada, esa recta es su talla, y tiene dos propiedades que la hacen fiable: no depende de la orientación con que la partícula haya caído, y un borde dentado no la altera.</p>':
+        '<p><strong>The general criterion is the longest straight line that fits inside the particle</strong>, that is the greatest distance between two points of its outline: the <em>maximum Feret diameter</em>. For a particle of irregular but unbent shape, that line is its size, and it has two properties that make it reliable: it does not depend on the orientation the particle happened to land in, and a jagged edge does not disturb it.</p>',
+    '<p><strong>Esa recta deja de servir cuando la partícula está contorsionada.</strong> En una fibra doblada la distancia entre sus extremos es la cuerda, no su longitud: en un arco de media circunferencia se queda un 35&nbsp;% corta. Para esos casos se mide el <em>diámetro geodésico</em>, que es el camino más largo que cabe <strong>dentro</strong> de la partícula. Al no poder salirse de la máscara, ese camino rodea la curva y devuelve la longitud recorrida.</p>':
+        '<p><strong>That straight line stops working when the particle is contorted.</strong> In a bent fibre the distance between its ends is the chord, not its length: on a half-circle arc it falls 35&nbsp;% short. For those cases the <em>geodesic diameter</em> is measured, which is the longest path that fits <strong>inside</strong> the particle. Since it cannot leave the mask, that path follows the curve and returns the distance travelled.</p>',
+    '<p>La distinción se hace por el <strong>grosor</strong>: solo se usa el geodésico si el largo supera al menos cuatro veces el grosor máximo inscrito de la partícula. La razón es que en una partícula gruesa cualquier concavidad obliga al camino geodésico a bordearla en vez de atravesarla, y entonces el número se infla; en una fibra delgada eso no puede ocurrir.</p>':
+        "<p>The distinction is made by <strong>thickness</strong>: the geodesic is used only if the length exceeds at least four times the particle's maximum inscribed thickness. The reason is that in a thick particle any concavity forces the geodesic path to skirt around it instead of crossing it, and the number is then inflated; in a thin fibre that cannot happen.</p>",
+    '<p>Contrastado con formas de talla conocida —rectas, rectas giradas 45&nbsp;°, arcos de 60, 120 y 180&nbsp;°, un círculo y una recta de borde dentado— el largo así medido da un <strong>error mediano del 0,8&nbsp;% y del 4,7&nbsp;% en el peor caso</strong>.</p>':
+        '<p>Checked against shapes of known size —straight bars, bars rotated 45&nbsp;°, arcs of 60, 120 and 180&nbsp;°, a circle and a bar with a jagged edge— the length measured this way gives a <strong>median error of 0.8&nbsp;% and 4.7&nbsp;% in the worst case</strong>.</p>',
+    '<p><em>Partículas en contacto.</em> Dos partículas que se tocan forman una sola mancha, y medirlas juntas sumaría sus tallas. Se separan por <em>watershed</em> sobre la transformada de distancia: el centro de cada una queda lejos del fondo y el cuello que las une queda cerca, de modo que el corte cae por el cuello. Sobre círculos de talla conocida las separa hasta un 27&nbsp;% de solapamiento del diámetro, sin partir ninguna partícula de una sola pieza.</p>':
+        '<p><em>Touching particles.</em> Two particles in contact form a single blob, and measuring them together would add their sizes up. They are separated by <em>watershed</em> on the distance transform: the centre of each one sits far from the background while the neck joining them sits close, so the cut falls on the neck. Against circles of known size it separates them up to 27&nbsp;% overlap of the diameter, without splitting any particle that is a single piece.</p>',
+    '<p><em>Limitaciones conocidas.</em> Dos partículas solapadas más allá de un 40&nbsp;% de su diámetro se siguen midiendo como una sola: a esa altura ya no hay un cuello por el que cortar. Y en una fibra muy enroscada el camino geodésico ataja por el interior de cada codo, subestimando la longitud hasta un 19&nbsp;% en el caso más cerrado que se ensayó.</p>':
+        '<p><em>Known limitations.</em> Two particles overlapping by more than 40&nbsp;% of their diameter are still measured as one: past that point there is no neck left to cut along. And in a tightly coiled fibre the geodesic path cuts the corner at each bend, underestimating the length by up to 19&nbsp;% in the tightest case tested.</p>',
+    '<p><strong>{n} partículas ({pct} %) están contorsionadas</strong>, entendiendo por tal que su largo supera en más de un 15&nbsp;% su extensión en línea recta.</p>':
+        '<p><strong>{n} particles ({pct} %) are contorted</strong>, meaning that their length exceeds their straight-line extent by more than 15&nbsp;%.</p>',
+
+    # -- Informe: rotulos de figuras, tablas y secciones --
+    'Umbral de confianza':
+        'Confidence threshold',
+    'F1 (con clase)':
+        'F1 (with class)',
+    'Valor':
+        'Value',
+    'F1 por clase':
+        'F1 per class',
+    'Distribución por clase':
+        'Detections per class',
+    'Confianza':
+        'Confidence',
+    'Histograma de confianza':
+        'Confidence histogram',
+    'Diámetro equivalente (μm)':
+        'Equivalent diameter (μm)',
+    'Distribución de tamaños':
+        'Size distribution',
+    'talla (µm, dimensión mayor siguiendo la curva)':
+        'size (µm, longest dimension following the curve)',
+    'partículas':
+        'particles',
+    'talla (µm, escala log)':
+        'size (µm, log scale)',
+    'Predicción':
+        'Prediction',
+    'Matriz de confusión':
+        'Confusion matrix',
+    'Modelos cargados':
+        'Models loaded',
+    'Confianza mínima':
+        'Minimum confidence',
+    'IoU para emparejar Verdaderos Positivos':
+        'IoU for matching true positives',
+    'Tamaño de imagen (imgsz)':
+        'Image size (imgsz)',
+    'Dispositivo':
+        'Device',
+    'μm por píxel':
+        'μm per pixel',
+    'Filtro tamaño (μm)':
+        'Size filter (μm)',
+    'sin filtro':
+        'no filter',
+    'Imágenes procesadas':
+        'Images processed',
+    'Total de detecciones':
+        'Total detections',
+    'medida sobre la placa Petri de esta foto':
+        "measured on this photograph's Petri dish",
+    'heredada del recorte (índice de calibración)':
+        'inherited from the crop (calibration index)',
+    'introducida a mano en Parámetros':
+        'entered by hand in Parameters',
+    'Partícula':
+        'Particle',
+    'Estación':
+        'Station',
+    'la talla puede estar inflada':
+        'the size may be inflated',
+    'sin diferencia significativa':
+        'no significant difference',
+
+    # -- Informe: prosa de conteo, comparacion y fichas --
+    '<tr><th>Polímero</th><th>Conteo manual</th><th>Detectadas por el modelo</th><th>Diferencia</th></tr>':
+        '<tr><th>Polymer</th><th>Manual count</th><th>Detected by the model</th><th>Difference</th></tr>',
+    '<tr><th>Polímero</th><th>Detectadas por el modelo</th></tr>':
+        '<tr><th>Polymer</th><th>Detected by the model</th></tr>',
+    '<p>Configuración y métricas de validación con que se entrenó cada peso, leídas del propio archivo <code>.pt</code>.</p>':
+        '<p>Validation settings and metrics each weight was trained with, read from the <code>.pt</code> file itself.</p>',
+    '<tr><th>Modelo</th><th>Arquitectura base</th><th>imgsz</th><th>batch</th><th>épocas</th><th>optimizador</th><th>Precisión</th><th>Recall</th><th>mAP@50</th><th>mAP@50-95</th></tr>':
+        '<tr><th>Model</th><th>Base architecture</th><th>imgsz</th><th>batch</th><th>epochs</th><th>optimiser</th><th>Precision</th><th>Recall</th><th>mAP@50</th><th>mAP@50-95</th></tr>',
+    'Kruskal-Wallis entre los {n} grupos: {frase} (H={h}, gl={gl}, p={p}). No dice CUÁL grupo difiere de cuál, solo que no todos comparten la misma distribución de talla.':
+        'Kruskal-Wallis across the {n} groups: {frase} (H={h}, df={gl}, p={p}). It does not say WHICH group differs from which, only that not all of them share the same size distribution.',
+    '<strong>diferencia significativa</strong>':
+        '<strong>significant difference</strong>',
+    ' (las {n} con más partículas)':
+        ' (the {n} with the most particles)',
+    ', en este caso por <strong>{metodo}</strong>':
+        ', here by <strong>{metodo}</strong>',
+    '<p>A la izquierda la partícula; a la derecha, en verde, el contorno que se midió sobre ella.</p>':
+        '<p>On the left the particle; on the right, in green, the outline that was measured on it.</p>',
+    'imágenes':
+        'images',
+    'imagen':
+        'image',
+    '<p>Las placas del mismo tramo se <strong>suman</strong>: son submuestras de la misma masa de sedimento, no repeticiones fotográficas. El tramo es la unidad de análisis.</p>':
+        '<p>Dishes from the same depth interval are <strong>added together</strong>: they are subsamples of the same mass of sediment, not repeated photographs. The interval is the unit of analysis.</p>',
+    'Por tramo de profundidad':
+        'By depth interval',
+    'Tramo':
+        'Interval',
+    'Por estación':
+        'By station',
+    '{n} imagen(es) no siguen la nomenclatura <code>tramo.testigo</code> y quedan fuera de las tablas agrupadas; sí están en la tabla por imagen.':
+        '{n} image(s) do not follow the <code>interval.core</code> naming and are left out of the grouped tables; they are still in the per-image table.',
+    '<p>Partículas contadas en cada muestra, desglosadas por polímero. La columna <em>manual</em> es la anotación humana (Ground Truth) y la columna <em>modelo</em> son todas las detecciones de <strong>{alias}</strong>{coletilla}</p>':
+        '<p>Particles counted in each sample, broken down by polymer. The <em>manual</em> column is the human annotation (ground truth) and the <em>model</em> column is every detection made by <strong>{alias}</strong>{coletilla}</p>',
+    ', el primer modelo activo.':
+        ', the first active model.',
+    '<p><strong>Léase como conteo, no como evaluación.</strong> La columna del modelo no descuenta falsos positivos ni empareja caja a caja: es cuántas partículas de cada polímero reportó. Coincidir en el total no implica haber acertado partícula por partícula; para eso está el análisis de errores.</p>':
+        "<p><strong>Read it as a count, not as an evaluation.</strong> The model's column does not subtract false positives nor match box to box: it is how many particles of each polymer it reported. Agreeing on the total does not imply getting each particle right; that is what the error analysis is for.</p>",
+
+    # -- Informe: errores, comparacion entre modelos y galeria --
+    'Sin fila para {clases}: no aparece ni en la anotación manual ni entre las predicciones de este lote, de modo que no hay métrica que informar. El modelo sí está entrenado para esa clase.':
+        "No row for {clases}: it appears neither in the manual annotation nor among this batch's predictions, so there is no metric to report. The model is trained for that class all the same.",
+    'Figura. Matriz de confusión (modelo principal: {modelo}, IoU = {iou}).':
+        'Figure. Confusion matrix (main model: {modelo}, IoU = {iou}).',
+    'Precisión / Recall / F1 por clase':
+        'Precision / recall / F1 per class',
+    '<th>Clase</th>':
+        '<th>Class</th>',
+    '<th>Precisión</th><th>Recall</th><th>F1</th>':
+        '<th>Precision</th><th>Recall</th><th>F1</th>',
+    '<p><strong>Los dos F1 miden cosas distintas.</strong> <em>Localización</em> responde si el detector encuentra la partícula (P {pl} · R {rl} · <strong>F1 {fl}</strong>). <em>Con clase</em> exige además acertar el polímero, contando cada caja mal clasificada como falso positivo de la clase predicha y falso negativo de la real (P {pc} · R {rc} · <strong>F1 {fc}</strong>).</p><p>La diferencia corresponde a <strong>{mc}</strong> partícula(s) bien localizada(s) pero asignada(s) a la clase incorrecta. Es la cifra que concilia esta tabla con la de precisión por clase de la sección de errores.</p>':
+        '<p><strong>The two F1 figures measure different things.</strong> <em>Localisation</em> answers whether the detector finds the particle (P {pl} · R {rl} · <strong>F1 {fl}</strong>). <em>With class</em> also requires getting the polymer right, counting each misclassified box as a false positive of the predicted class and a false negative of the real one (P {pc} · R {rc} · <strong>F1 {fc}</strong>).</p><p>The difference corresponds to <strong>{mc}</strong> particle(s) located correctly but assigned to the wrong class. It is the figure that reconciles this table with the per-class precision in the error section.</p>',
+    '<p><strong>Mejor desempeño: {alias}</strong>, con F1 {f1} al umbral {umbral} (P {p} · R {r}).</p>':
+        '<p><strong>Best performance: {alias}</strong>, with F1 {f1} at threshold {umbral} (P {p} · R {r}).</p>',
+    '<p>La diferencia con {otro} es de <strong>{d}</strong> de F1. Con un solo entrenamiento por arquitectura, una diferencia pequeña no distingue el diseño de la red del azar de inicialización: haría falta repetir con distintas semillas para afirmar que una es superior.</p>':
+        '<p>The gap against {otro} is <strong>{d}</strong> of F1. With a single training run per architecture, a small difference does not tell the network design apart from initialisation luck: it would take repeating with different seeds to claim one is better.</p>',
+    '<p><b>Mejor F1 de localización:</b> {alias} ({f1}) — encontrar la partícula, sin exigir que acierte el polímero. El veredicto con clase está más arriba.</p>':
+        '<p><b>Best localisation F1:</b> {alias} ({f1}) — finding the particle, without requiring the polymer to be right. The with-class verdict is further up.</p>',
+    'Sin ground truth no se puede declarar un ganador: un modelo con más detecciones puede estar acertando o inventando. Carga anotaciones para obtener F1 por modelo.':
+        'Without ground truth no winner can be declared: a model with more detections may be getting them right or making them up. Load annotations to obtain F1 per model.',
+    'Figura. Precisión, Recall y F1 de cada modelo al umbral {umbral}, en los dos criterios. La distancia entre paneles es la confusión entre polímeros.':
+        'Figure. Precision, recall and F1 of each model at threshold {umbral}, under both criteria. The gap between panels is the confusion between polymers.',
+    'Figura. F1 por clase. Un modelo puede ganar en el agregado y perder en el polímero que interesa.':
+        'Figure. F1 per class. A model can win overall and lose on the polymer that matters.',
+    'Figura. Detecciones por imagen de un modelo frente al otro; la diagonal es el acuerdo exacto. Escala simétrica-logarítmica, porque casi todas las placas tienen pocas partículas y unas pocas cientos.':
+        'Figure. Detections per image of one model against the other; the diagonal is exact agreement. Symmetric-log scale, because almost every dish has few particles and a handful have hundreds.',
+    'Figura. F1 (con clase) frente al umbral de confianza; la estrella marca el máximo de cada modelo. La curva arranca en {umbral}, el umbral con que se ejecutó: por debajo las detecciones no se calcularon.':
+        "Figure. F1 (with class) against the confidence threshold; the star marks each model's maximum. The curve starts at {umbral}, the threshold it was run with: below that the detections were never computed.",
+    '<p>Detecciones de cada modelo imagen por imagen. El total puede estar dominado por unas pocas fotos densas, así que conviene mirar el detalle antes de elegir modelo.</p>':
+        "<p>Each model's detections image by image. The total can be dominated by a few dense photographs, so it is worth looking at the detail before choosing a model.</p>",
+    'Solo se ejecutó un modelo, así que no hay comparación. Carga un segundo modelo en la pestaña Modelos para compararlos sobre las mismas imágenes.':
+        'Only one model was run, so there is no comparison. Load a second model in the Models tab to compare them over the same images.',
+
+    # -- Informe: calibracion, talla por carpeta y avisos --
+    '<p><strong>La escala no es común a todo el lote:</strong> varía {var}× entre la foto más cercana y la más lejana. Por eso cada imagen se convierte con su propio factor; usar uno solo para todas daría tamaños con hasta un {pct}% de error.</p>':
+        '<p><strong>The scale is not shared by the whole batch:</strong> it varies {var}× between the nearest and the farthest photograph. That is why each image is converted with its own factor; using a single one for all of them would give sizes off by as much as {pct}%.</p>',
+    'Incidencias durante la calibración:':
+        'Issues during calibration:',
+    '<p>Escala única para todo el lote, introducida a mano: <strong>{um} µm/píxel</strong>. No se midió ninguna placa, de modo que este factor no está trazado a un patrón de longitud y cualquier variación en la distancia de disparo entre fotos queda sin corregir.</p>':
+        '<p>A single scale for the whole batch, entered by hand: <strong>{um} µm/pixel</strong>. No dish was measured, so this factor is not traced to a length standard and any variation in shooting distance between photographs goes uncorrected.</p>',
+    '<strong>{n} de {total} partículas ({pct}&nbsp;%) tienen una talla que pide comprobación</strong>: miden bastante más que la diagonal de su caja, lo que casi siempre significa varias partículas en contacto medidas como una sola. La talla de esas queda <em>sobreestimada</em>. Van marcadas con ⚠ en sus fichas.':
+        "<strong>{n} of {total} particles ({pct}&nbsp;%) have a size that needs checking</strong>: they measure considerably more than their box's diagonal, which almost always means several touching particles measured as one. Those sizes are <em>overestimated</em>. They are marked with ⚠ on their cards.",
+    'carpeta de origen':
+        'source folder',
+    '<p>Compara la talla entre las carpetas del lote analizado: cada carpeta como un grupo distinto. Útil cuando cada carpeta es un sitio de muestreo, una estación o una condición.</p>':
+        '<p>Compares size across the folders of the analysed batch, each folder as a separate group. Useful when each folder is a sampling site, a station or a condition.</p>',
+    'Talla por foto — {carpeta}':
+        'Size per photograph — {carpeta}',
+    'foto':
+        'photograph',
+    '({n} fotos)':
+        '({n} photographs)',
+    ' Se muestran las {n} carpetas con más partículas de las {total} que tienen más de una foto.':
+        ' The {n} folders with the most particles are shown, out of the {total} that have more than one photograph.',
+    '<p>Compara la talla entre las fotos individuales de una misma carpeta: por ejemplo, si el tamaño cambia con la profundidad o el momento de muestreo dentro de un mismo sitio.{nota}</p>':
+        '<p>Compares size across the individual photographs of one folder: for instance, whether size changes with depth or with the sampling moment within the same site.{nota}</p>',
+
+    # -- Informe: galeria comparativa --
+    'Se muestran las primeras {n} imágenes, cada una con todos los modelos; {fuera} quedaron fuera de la galería para que el archivo siga siendo manejable. Las métricas de las secciones anteriores sí incluyen todas.':
+        'The first {n} images are shown, each with every model; {fuera} were left out of the gallery to keep the file manageable. The metrics in the earlier sections do cover all of them.',
+    '<p>Cada bloque muestra, a la izquierda, las detecciones del modelo (<em>bounding boxes</em> dibujadas por YOLO con su clase y confianza) y, a la derecha, las etiquetas reales de control (<em>Ground Truth</em>). Esta vista lado a lado permite evaluar visualmente dónde acertó o falló el modelo.</p>':
+        "<p>Each block shows, on the left, the model's detections (<em>bounding boxes</em> drawn by YOLO with their class and confidence) and, on the right, the real control labels (<em>ground truth</em>). This side-by-side view lets you judge visually where the model got it right or wrong.</p>",
+    'Frecuencia':
+        'Frequency',
+    'Feret máximo (cuerda)':
+        'Maximum Feret (chord)',
+    'Geodésico (sigue la curva)':
+        'Geodesic (follows the curve)',
+    'Sin datos suficientes para una prueba estadística (hace falta más de una observación por grupo).':
+        'Not enough data for a statistical test (more than one observation per group is required).',
+
+    # -- Informe: resumen, fichas y recuento por imagen --
+    'Localización':
+        'Localisation',
+    'Con clase':
+        'With class',
+    ' y de ahí sale todo lo demás.':
+        ' and everything else follows from it.',
+    '{n} detección(es) por YOLO':
+        '{n} detection(s) by YOLO',
+    'Figura. Distribución de detecciones por clase.':
+        'Figure. Distribution of detections per class.',
+    'Figura. Histograma de confianza.':
+        'Figure. Confidence histogram.',
+    'Figura. Distribución de tamaños (diámetro equivalente en μm).':
+        'Figure. Size distribution (equivalent diameter in μm).',
+    '(una sola foto calibrada, sin IC)':
+        '(a single calibrated photograph, no CI)',
+    'La detección automatizada se realizó con el modelo YOLO «{modelos}» (Ultralytics {ul}) a una resolución de entrada de {imgsz} px, umbral de confianza {conf} y supresión de no-máximos con IoU {iou}. ':
+        'Automated detection was carried out with the YOLO model «{modelos}» (Ultralytics {ul}) at an input resolution of {imgsz} px, confidence threshold {conf} and non-maximum suppression at IoU {iou}. ',
+    'Resumen de la configuración empleada:':
+        'Summary of the settings used:',
+    'Las métricas de error se calcularon contra anotación manual independiente, emparejando predicciones y etiquetas con IoU ≥ {iou}. ':
+        'Error metrics were computed against independent manual annotation, matching predictions and labels at IoU ≥ {iou}. ',
+    'La calibración óptica fue de {um} μm/píxel. ':
+        'Optical calibration was {um} μm/pixel. ',
+    'Se procesaron {imgs} imágenes con un total de {dets} detecciones.':
+        '{imgs} images were processed with a total of {dets} detections.',
+    '<th>Imagen</th><th>Total</th><th>Fibras</th><th>Partículas</th>':
+        '<th>Image</th><th>Total</th><th>Fibres</th><th>Particles</th>',
+    '<th>Largo mediano<br>(µm)</th><th>Mayor<br>(µm)</th>':
+        '<th>Median length<br>(µm)</th><th>Largest<br>(µm)</th>',
+    '<strong>{n} de {total} imágenes no tienen escala</strong> ({cuales})':
+        '<strong>{n} of {total} images have no scale</strong> ({cuales})',
+    '<strong>Ninguna imagen tiene escala</strong>':
+        '<strong>No image has a scale</strong>',
+    ', y por eso su largo aparece como «—». Las partículas <em>sí</em> se midieron —el conteo y la forma de la tabla son correctos—, pero una medida en píxeles no se puede pasar a micrómetros sin saber cuántos µm mide cada píxel.</p>':
+        ', which is why their length shows as «—». The particles <em>were</em> measured —the counts and the shape columns are correct— but a measurement in pixels cannot be turned into micrometres without knowing how many µm each pixel is.</p>',
+    '<p>Para obtenerlo, en <em>Parámetros</em>: activa <strong>«Medir la placa Petri»</strong> —cada foto obtiene su propia escala del anillo de la placa, que es lo más fiable— o escribe un valor de <strong>µm/píxel</strong>':
+        "<p>To get one, in <em>Parameters</em>: tick <strong>«Measure the Petri dish»</strong> —each photograph then gets its own scale from the dish's rim, which is the most reliable route— or type a <strong>µm/pixel</strong> value",
+    '. Si ya está activo, en esas fotos concretas no se encontró el anillo de la placa: revisa que se vea entero en el encuadre.':
+        ". If it is already on, then in those particular photographs the dish's rim was not found: check that it is fully inside the frame.",
+    '<p>En {n} partículas no se pudo separar la partícula del fondo; su talla proviene de la caja y no es comparable con el resto.</p>':
+        '<p>In {n} particles the particle could not be separated from the background; their size comes from the box and is not comparable with the rest.</p>',
+    'medido por {metodo}':
+        'measured by {metodo}',
+    'Se muestran las <strong>{fibras} fibra(s) y las {otras} partículas más grandes</strong>':
+        'The <strong>{fibras} fibre(s) and the {otras} largest particles</strong> are shown',
+    'Se muestran las <strong>{otras} partículas más grandes</strong>. En este lote no se detectó ninguna fibra, así que la muestra no incluye ninguna':
+        'The <strong>{otras} largest particles</strong> are shown. No fibre was detected in this batch, so the sample includes none',
+    '<p>Cada partícula con el número que lleva en la imagen anotada, su recorte y la medida dibujada <strong>sobre ella</strong>: en amarillo la recta de Feret, en magenta el camino geodésico, según cuál de las dos haya decidido su talla. El contorno verde es la máscara que se midió. A la izquierda va la partícula sin marcas, para poder juzgar si el contorno la sigue.</p>':
+        '<p>Each particle with the number it carries in the annotated image, its crop and the measurement drawn <strong>on it</strong>: in yellow the Feret line, in magenta the geodesic path, whichever of the two decided its size. The green outline is the mask that was measured. On the left the particle without marks, so you can judge whether the outline follows it.</p>',
+    '. El reparto es deliberado: las fibras son el caso donde actúa el método geodésico —y son minoría, de modo que una muestra tomada al azar podría no enseñar ninguna—, y la mayor de cada tipo es la que sostiene cualquier afirmación sobre talla máxima. <strong>No es una muestra representativa del lote</strong>, sino la selección que permite comprobar el método donde más puede fallar.</p>':
+        '. The split is deliberate: fibres are the case where the geodesic method comes into play —and they are a minority, so a sample taken at random might show none— and the largest of each type is what any claim about maximum size rests on. <strong>It is not a representative sample of the batch</strong>, but the selection that lets the method be checked where it can fail most.</p>',
+    'Se incluyó análisis de errores con Ground Truth (Verdaderos Positivos, Falsos Positivos, Falsos Negativos y Mal Clasificados).':
+        'Error analysis against ground truth was included (true positives, false positives, false negatives and misclassified).',
+    'No se aportó Ground Truth, por lo que no se reportan métricas de error.':
+        'No ground truth was supplied, so no error metrics are reported.',
+    'Conf. media':
+        'Mean conf.',
+    'Se analizaron <strong>{imgs} imágenes</strong> con <strong>{n} {modelos}</strong> YOLO entrenado para detectar microplásticos de PET, PP y LDPE bajo fluorescencia Nile Red (254 nm). El total de detecciones fue <strong>{dets}</strong> con una confianza media de <strong>{conf}</strong>.':
+        '<strong>{imgs} images</strong> were analysed with <strong>{n} YOLO {modelos}</strong> trained to detect PET, PP and LDPE microplastics under Nile Red fluorescence (254 nm). Detections totalled <strong>{dets}</strong> with a mean confidence of <strong>{conf}</strong>.',
+    'modelo':
+        'model',
+    'modelos':
+        'models',
+    '<th>Modelo</th><th>Imágenes</th><th>Detecciones</th><th>Conf. media</th>':
+        '<th>Model</th><th>Images</th><th>Detections</th><th>Mean conf.</th>',
+    'localización':
+        'localisation',
+    'con clase':
+        'with class',
+
+    # -- Informe: morfotipos --
+    'Fibra':
+        'Fibre',
+
+    # -- Informe: dos rotulos que quedaban --
+    'Precisión':
+        'Precision',
+    'Predicción del modelo':
+        'Model prediction',
+
+    # -- Informe: nombre del metodo de medida y puntos del borde --
+    '{n} puntos de borde':
+        '{n} edge points',
+    'Feret maximo':
+        'maximum Feret',
+    'geodesico':
+        'geodesic',
 }

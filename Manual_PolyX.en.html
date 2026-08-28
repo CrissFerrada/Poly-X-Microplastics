@@ -177,12 +177,23 @@
       <h3>2.1 Requirements</h3>
       <table class="data">
         <tr><th>Component</th><th>Minimum</th><th>Recommended</th></tr>
-        <tr><td>Operating system</td><td>Windows 10</td><td>Windows 11</td></tr>
+        <tr><td>Operating system</td><td>Windows 10 · macOS 12 Monterey</td><td>Windows 11 · macOS 14 Sonoma</td></tr>
         <tr><td>Python</td><td>3.11.x (NOT 3.12+)</td><td>3.11.9</td></tr>
         <tr><td>RAM</td><td>8 GB</td><td>16 GB</td></tr>
-        <tr><td>GPU</td><td>—</td><td>NVIDIA RTX (the installer picks the CUDA build)</td></tr>
+        <tr><td>GPU</td><td>—</td><td>Windows: NVIDIA RTX (the installer picks the CUDA build) · macOS Apple Silicon: MPS, used automatically</td></tr>
         <tr><td>Disk space</td><td>5 GB</td><td>10 GB</td></tr>
       </table>
+
+      <div class="callout">
+        <strong>macOS.</strong> Poly-X runs on a Mac just the same. What changes is
+        the installer (<code>construir_app_macOS.command</code> instead of
+        <code>SETUP.bat</code>) and the launcher
+        (<code>Lanzar_macOS.command</code>). On <strong>Apple Silicon</strong> the
+        computation runs on <strong>MPS</strong>, the integrated GPU, with nothing
+        to configure. On an <strong>Intel</strong> Mac it runs on the CPU: it
+        works, but training is slow — for that a machine with an NVIDIA card is
+        the right tool. The details are in <code>LEEME_macOS.md</code>.
+      </div>
 
       <div class="callout warn">
         <strong>Important about Python:</strong> it must be <strong>3.11.x</strong>
@@ -214,6 +225,25 @@
         <li>To start using the program, double-click
             <strong><code>iniciar_polyx.bat</code></strong>.</li>
       </ol>
+
+      <p><strong>On macOS</strong> there are three steps:</p>
+      <ol class="steps">
+        <li>Install <strong>Python 3.11</strong> from python.org (the one shipped
+            with the system will not do: it has no Tk).</li>
+        <li>Open the folder in Finder and double-click
+            <strong><code>construir_app_macOS.command</code></strong>. It creates
+            the <code>.venv</code>, installs the dependencies and picks the right
+            PyTorch wheel: on Intel it pins <code>torch 2.2.2</code>, the last one
+            with an x86_64 wheel.</li>
+        <li>To use it, double-click
+            <strong><code>Lanzar_macOS.command</code></strong>.</li>
+      </ol>
+      <div class="callout warn">
+        The first time, macOS may say the file "cannot be opened because it is
+        from an unidentified developer". That is Gatekeeper, not a fault:
+        right-click the <code>.command</code> → <strong>Open</strong> →
+        <strong>Open</strong>. Once per file is enough.
+      </div>
 
       <div class="callout warn">
         <strong>RTX 50xx cards (Blackwell).</strong> These GPUs use the
@@ -260,7 +290,9 @@
       while preserving <code>.venv</code>, models, results and data.</p>
       <p>The check does not delay start-up and stays quiet on any failure: with
       no internet, or with GitHub down, the notice simply does not appear. You
-      can also force it with <code>actualizar.bat</code>.</p>
+      can also force it with <code>actualizar.bat</code>, or with
+      <code>actualizar_macOS.command</code> on a Mac. The launcher's button
+      calls whichever matches your system.</p>
     </section>
 
     <section id="workflow">
@@ -456,10 +488,23 @@
       <code>reporte_paper.html</code> is created inside the run folder.
       <strong>It contains:</strong></p>
       <ol>
-        <li>Abstract with detections, mean confidence and mean size.</li>
-        <li>Methods: model, parameters, calibration, device, date.</li>
+        <li>Summary with detections, mean confidence and mean size.</li>
+        <li>Methods: model, parameters, device, machine and date.</li>
+        <li><strong>Scale calibration:</strong> where each photograph's μm/px came
+            from, their minimum / median / maximum and the mean with a 95 %
+            confidence interval, plus a figure over a real dish with the fitted
+            circle and its diameter drawn on it.</li>
+        <li><strong>Particle shape and size:</strong> how the length is measured,
+            the fibre / particle split, a size histogram and a per-image count.</li>
+        <li><strong>Size per folder and per photograph</strong> (optional):
+            compares the size distribution across folders — each folder as a
+            sampling site, a station or a condition — with box plots and a
+            Kruskal-Wallis test.</li>
+        <li><strong>Measured particle cards:</strong> the 6 fibres and the 6
+            largest particles, each with its crop and the measurement drawn on
+            top.</li>
         <li>General results: class distribution, confidence histogram, size
-            distribution (μm), per-class table with P/R/F1.</li>
+            distribution (μm).</li>
         <li>Per-model summary table.</li>
         <li>Error analysis: confusion matrix, P/R/F1 per class, gallery of the
             images with most errors.</li>
@@ -467,8 +512,29 @@
             model's detections and, when ground truth exists, their TP/FP/FN and
             the overall F1.</li>
         <li>Full gallery of annotated images.</li>
+        <li>Counts per sample and plastic type.</li>
         <li>References.</li>
       </ol>
+
+      <h4>Which sections go in</h4>
+      <p>Every section has its own tick box, and there are three presets:
+      <strong>Full</strong>, <strong>Short summary</strong> and
+      <strong>Methodological</strong>. Unticking one makes the rest
+      <strong>renumber themselves</strong> and adjusts the table of contents, so
+      there is never a gap like "4, 6, 7" that reads as a mistake. A section
+      ticked but with no data is left out anyway.</p>
+      <div class="callout tip">
+        <strong>Size per folder</strong> is unticked by default and only makes
+        sense if the photographs came from <strong>two folders or more</strong>:
+        it compares the groups against each other. If the whole batch sits in one
+        folder, the section does not appear even if you tick it.
+      </div>
+
+      <h4>The report's language</h4>
+      <p>The report comes out in whatever language the application is set to.
+      Change it in the launcher (<em>Language</em>, top right), restart and
+      generate it again: headings, tables, figure captions and the methods prose
+      all come out in the chosen language.</p>
 
       <h4>Scope: which photos go into the report</h4>
       <p>In the <strong>Report scope</strong> card you choose between three
@@ -827,13 +893,45 @@ worst case</b>. Those checks are pinned down as automated tests and are run with
 <h3>Where to see it particle by particle</h3>
 
 <p>In the <b>Viewer</b>, the table lists every particle with its number, its class
-and its type (fibre or fragment). Selecting a row shows <b>what it was measured
+and its type (fibre or particle). Selecting a row shows <b>what it was measured
 on</b>: the crop without marks on the left and, on the right, the mask outline in
 green with the measurement drawn over it — the Feret line in yellow, the geodesic
 path in magenta — plus the full pixels-to-micrometres arithmetic. From the
 Detector's <b>Results</b> tab, the "Review particle by particle" button opens the
 selected image there with those very detections.</p>
 
+
+<h3>From pixels to micrometres: the scale</h3>
+
+<p>Everything above is measured in <b>pixels</b>. Turning it into micrometres
+requires knowing how many μm each pixel is, and that number is <b>not the same in
+every photograph</b>: it depends on the shooting distance. In this study's
+material the real scale ranges from 31 to 50 μm/px, a factor of 1.6; using a
+single value for the whole batch would give sizes off by as much as 50 %.</p>
+
+<p>So each photograph is calibrated on its own. The reference is the <b>Petri
+dish's rim</b>, whose diameter is known. The approximate centre is found with the
+Hough transform, the edge is then sampled in <b>720 directions</b> and a circle is
+fitted by least squares with outlier rejection. Hough's radius is not used: it can
+be off by 12 %, and that error would go straight into every size in the report.</p>
+
+<div class="callout warn">
+<p><b>Which edge the 100 mm are, and which way it can be wrong.</b> The dish's rim
+has a wall about <b>2 mm</b> thick — measured on this study's photographs: the
+inner edge falls at 0.960 of the fitted radius and the outer edge at 1.000. The
+nominal diameter of a Petri dish is ambiguous at that level: it may refer to the
+<b>outer</b> diameter or to the <b>usable inner</b> one.</p>
+<p>Here the <b>outer</b> is taken, since that is the edge the circle is fitted to.
+If the nominal figure referred to the inner edge, the correct scale would be
+<b>4.2 % larger</b> and every size would be <b>underestimated</b> by that amount.
+The bias can only run in that direction, because the outer edge is the larger of
+the two. This is stated in the report, in the calibration section.</p>
+</div>
+
+<p>If a photograph has no scale, its length shows as "—" in the tables. That is
+not a measurement failure: the particle <i>was</i> measured, in pixels, but
+without μm/px there is no way to convert it. Fix it by ticking <b>"Measure the
+Petri dish"</b> in <em>Parameters</em>, or by typing a μm/pixel value by hand.</p>
 
 <h3>Particles in contact</h3>
 
