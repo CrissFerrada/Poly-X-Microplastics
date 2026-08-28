@@ -1939,9 +1939,30 @@ def generate_report(state, output_path: Path,
     # variables que la literatura de microplasticos reporta y que la caja del
     # detector no puede dar.
     forma_html = ""
+
+    # ── Lo que cae sobre el anillo de la placa no es muestra ──
+    # El aro es una banda brillante y continua, y el detector la confunde con
+    # material. Como ademas sale enorme, entraba entre las mayores: en un
+    # informe ocupo una ficha de ejemplo como "PET fibra" de 5978 um, que es
+    # mas que el limite de 5 mm con que se define un microplastico.
+    #
+    # El circulo ajustado ya se conocia -- de el sale la escala -- y solo hacia
+    # falta preguntarle. Se aparta de la TALLA y de las fichas, no del conteo:
+    # quitar detecciones del recuento es una decision del estudio y no del
+    # generador del informe. Lo que si se hace es declarar cuantas se apartaron.
+    from .calibracion import sobre_el_anillo, FRACCION_AREA_UTIL
+
+    _cals = getattr(state, "calibraciones", None) or {}
+
+    def _en_el_aro(det, ruta) -> bool:
+        return sobre_el_anillo(_cals.get(Path(ruta).name),
+                               det.x1, det.y1, det.x2, det.y2)
+
     # Cada particula con su imagen de origen, para poder ir a buscarla luego.
-    formas = [(p_, r.image_path) for r in all_results for p_ in r.predictions
-              if getattr(p_, "aspecto", None)]
+    _con_forma = [(p_, r.image_path) for r in all_results for p_ in r.predictions
+                  if getattr(p_, "aspecto", None)]
+    formas = [(d, ruta) for d, ruta in _con_forma if not _en_el_aro(d, ruta)]
+    n_en_el_aro = len(_con_forma) - len(formas)
     n_sin_forma = sum(1 for r in all_results for p_ in r.predictions
                       if getattr(p_, "aspecto", None) is None)
     ficha_mayor = None
@@ -1979,6 +2000,19 @@ def generate_report(state, output_path: Path,
                      "contacto medidas como una sola. La talla de esas queda "
                      "<em>sobreestimada</em>. Van marcadas con ⚠ en sus fichas.").format(
                          n=n_revisar, total=len(formas), pct=_pc_txt)
+                + "</p>")
+
+        # ── Lo apartado por caer sobre el aro ──
+        if n_en_el_aro:
+            aviso_revisar += (
+                f"<p style='border-left:3px solid {T.INK3};padding:6px 12px;"
+                f"background:var(--bg_soft)'>"
+                + tr("<strong>{n} detección(es) caen sobre el anillo de la placa</strong> "
+                     "—más allá del {pct} % del radio ajustado— y quedan fuera de esta "
+                     "sección: el aro es una banda brillante que el detector confunde "
+                     "con material, y como sale enorme desplazaría a las partículas de "
+                     "verdad del extremo grande. Siguen contadas en la sección de "
+                     "conteo.").format(n=n_en_el_aro, pct=f"{100 * FRACCION_AREA_UTIL:.0f}")
                 + "</p>")
 
         # ── Reparto por morfotipo ──
@@ -2288,6 +2322,12 @@ def generate_report(state, output_path: Path,
                 if d.aspecto:
                     detalle.append(f"aspecto {d.aspecto:.1f}")
                 detalle.append(tr("medido por {metodo}").format(metodo=tr(m.metodo)))
+                # Si una parte apreciable de la recta cae fuera, se dice con un
+                # numero. Por debajo del 5% es discretizacion del contorno y
+                # decirlo solo añadiria ruido a la ficha.
+                if getattr(m, "feret_fuera", 0) > 0.05:
+                    detalle.append(tr("{pct} % de la recta fuera del contorno").format(
+                        pct=f"{100 * m.feret_fuera:.0f}"))
                 color = "#1f6b5e" if d.morfotipo == "fibra" else "#656d76"
                 etiqueta_morfo = _morfotipo(d.morfotipo, minuscula=True)
                 # El aviso se ENSEÑA. Antes se calculaba y se tiraba: una talla
@@ -2334,6 +2374,13 @@ def generate_report(state, output_path: Path,
                    "cuál de las dos haya decidido su talla. El contorno verde es la "
                    "máscara que se midió. A la izquierda va la partícula sin marcas, "
                    "para poder juzgar si el contorno la sigue.</p>")
+                + tr("<p>En una partícula <strong>cóncava</strong> la recta amarilla "
+                     "cruza por fuera del contorno, y eso es correcto: Feret es la "
+                     "separación de dos mordazas de calibre, no un camino por dentro "
+                     "de la partícula. Para que se vea, el tramo que cae fuera va "
+                     "<strong>a trazos</strong>. El camino que sí va por dentro es el "
+                     "geodésico, en magenta, y se usa cuando la partícula es delgada "
+                     "y está doblada.</p>")
                 + "<p>" + criterio
                 + tr(". El reparto es deliberado: las fibras son el caso donde actúa el "
                      "método geodésico —y son minoría, de modo que una muestra tomada al "

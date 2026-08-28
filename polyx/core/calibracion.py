@@ -379,6 +379,42 @@ def resolver(ruta_imagen: str | Path,
     return Calibracion(diametro_mm=diametro_mm)
 
 
+# Hasta que fraccion del radio ajustado se considera area util de la placa.
+#
+# El circulo se ajusta al borde EXTERNO del anillo, y la pared mide unos 2 mm
+# sobre un radio de 50: el borde interno cae en 0.960. Se deja 0.95 para que la
+# banda del propio anillo quede fuera con holgura, sin comerse muestra: en las
+# placas de este estudio el sedimento se reparte por el fondo y no se apoya en
+# la pared.
+FRACCION_AREA_UTIL = 0.95
+
+
+def fraccion_del_radio(cal, x: float, y: float) -> Optional[float]:
+    """A que fraccion del radio de la placa cae el punto (x, y).
+
+    None si esa foto no tiene un circulo ajustado, que es lo que pasa cuando la
+    escala vino a mano o heredada del indice.
+    """
+    if cal is None or not getattr(cal, "radio_px", 0):
+        return None
+    return float(np.hypot(x - cal.cx, y - cal.cy)) / float(cal.radio_px)
+
+
+def sobre_el_anillo(cal, x1: float, y1: float, x2: float, y2: float) -> bool:
+    """Si la caja (x1,y1,x2,y2) cae sobre la pared de la placa o fuera de ella.
+
+    Se mira el CENTRO de la caja y no una esquina: una particula legitima
+    pegada al borde util tiene esquinas que asoman, y descartarla por eso seria
+    perder muestra de verdad. El anillo, en cambio, cae entero fuera.
+
+    Devuelve False cuando no hay circulo ajustado: sin saber donde esta la
+    placa no se puede afirmar que algo este fuera, y marcar por si acaso seria
+    inventar un descarte.
+    """
+    f = fraccion_del_radio(cal, (x1 + x2) / 2.0, (y1 + y2) / 2.0)
+    return f is not None and f > FRACCION_AREA_UTIL
+
+
 def resumen_lote(calibraciones) -> dict:
     """Estadistica de escala del lote, para la seccion de metodos del informe.
 

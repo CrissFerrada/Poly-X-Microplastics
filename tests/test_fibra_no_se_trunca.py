@@ -29,6 +29,11 @@ import pytest
 from polyx.core import morfologia as M
 
 
+# Cuanto se queda corta la caja del detector por cada extremo de una fibra.
+# 0.10 = (36 - 29) / 2 / 36, medido sobre una fibra real de la placa 10.3.
+RECORTE_REAL_DEL_DETECTOR = 0.10
+
+
 def _foto_fibra_con_bultos(largo=120, grosor=9, bulto=7):
     """Fibra recta con dos ensanchamientos, y la caja CORTA que le pondria el
     detector.
@@ -46,8 +51,12 @@ def _foto_fibra_con_bultos(largo=120, grosor=9, bulto=7):
     cv2.circle(img, (x0 + largo // 4, y), bulto, (60, 210, 240), -1)
     cv2.circle(img, (x0 + 3 * largo // 4, y), bulto, (60, 210, 240), -1)
 
-    # Caja del detector: se queda un 20% corta por cada extremo.
-    recorte = int(largo * 0.20)
+    # Caja del detector: corta por cada extremo en la proporcion que se
+    # MIDIO sobre el material real -- una fibra de 36 px encajonada en 29 --,
+    # no en la que me pareceria razonable. La diferencia importa: con un 20%
+    # inventado, la unica forma de pasar la prueba era no recortar nada, y de
+    # ahi salio la fuga que llego al informe.
+    recorte = int(round(largo * RECORTE_REAL_DEL_DETECTOR))
     caja = (x0 + recorte, y - grosor, x0 + largo - recorte, y + grosor)
     return img, caja, float(largo)
 
@@ -180,3 +189,57 @@ def test_una_particula_sana_no_se_marca():
                   x1=75, y1=75, x2=125, y2=125)
     assert M.aplicar_a_deteccion(d, img, 30.0)
     assert d.revisar is False
+
+
+def _trozo_del_medio_de_algo_largo():
+    """Una barra brillante larga, con la caja puesta en un trozo del medio.
+
+    Es la forma del fallo real, y la unica que llega al recorte: no hay dos
+    bultos, asi que el watershed no ve dos nucleos y no separa nada. La mascara
+    sigue la barra hasta donde alcance el recorte de trabajo -- que es la caja
+    mas medio lado mayor por banda --, y de ahi salia el tope de 2.1x que se vio
+    en el informe.
+    """
+    img = np.full((260, 480, 3), 18, np.uint8)
+    cv2.rectangle(img, (30, 114), (450, 126), (60, 210, 240), -1)
+    return img, (200, 105, 240, 135)
+
+
+def test_una_mascara_alargada_que_se_fuga_queda_acotada_por_la_caja():
+    """La otra mitad, y la que faltaba.
+
+    Una fuga -- la particula mas una cresta brillante que sale de la caja -- es
+    larga y delgada, igual que una fibra, asi que la elongacion no las
+    distingue. Cuando una mascara alargada dejaba de recortarse, la fuga no
+    tenia tope: en un informe salieron tres fichas de seis midiendo entre 1.9 y
+    2.1 veces la diagonal de su caja, una de ellas de 6.4 mm, por encima del
+    limite de 5 mm con que se define un microplastico.
+
+    Sobre 98 particulas anotadas a mano ninguna pasa de 1.41 veces la diagonal
+    de su caja, asi que 1.6 es holgado y sigue siendo un tope.
+    """
+    img, caja = _trozo_del_medio_de_algo_largo()
+    mascara = M.segmentar(img, *caja)
+    assert mascara is not None
+    m = M.medir(mascara)
+    assert m.ok
+    diagonal = float(np.hypot(caja[2] - caja[0], caja[3] - caja[1]))
+    assert m.largo_px < 1.6 * diagonal, (
+        f"la mascara mide {m.largo_px:.0f} px, {m.largo_px / diagonal:.1f}x la "
+        f"diagonal de su caja ({diagonal:.0f} px): se fugo a la vecina")
+
+
+def test_la_fuga_se_declara_aunque_se_haya_acotado():
+    """Recortar la fuga no la vuelve un dato bueno.
+
+    Lo que queda medido es el trozo de dentro de la caja, que puede quedarse
+    corto si la particula seguia de verdad. El informe tiene que poder decirlo,
+    asi que la Detection sale marcada."""
+    from polyx.core.yolo_wrap import Detection
+
+    img, caja = _trozo_del_medio_de_algo_largo()
+    d = Detection(class_id=0, class_name="PET", conf=0.9,
+                  x1=caja[0], y1=caja[1], x2=caja[2], y2=caja[3])
+    assert M.aplicar_a_deteccion(d, img, 30.0)
+    assert d.revisar is True, "una fuga acotada sigue siendo una fuga"
+    assert d.aviso_forma

@@ -170,6 +170,11 @@ class Morfologia:
     solidez: float = 1.0         # area / area de su envolvente convexa
     morfotipo: str = INDETERMINADO
     metodo: str = ""             # de donde salio el largo
+    # Que fraccion de la recta de Feret cae FUERA de la particula. Solo lo
+    # rellena dibujar_medicion(), que es quien la dibuja. En una particula
+    # concava es distinto de cero y no es un error: Feret mide la separacion de
+    # dos mordazas, no un camino por dentro.
+    feret_fuera: float = 0.0
     aviso: str = ""
     # La medida sale, pero pide un vistazo humano. Se marca en vez de descartar:
     # descartar en silencio pierde particulas reales del conteo, y dar el numero
@@ -234,6 +239,39 @@ def _recorte(bgr: np.ndarray, x1, y1, x2, y2, margen: int):
 # puente forman un conjunto de unos 90x40 px -> elongacion 2.25, por debajo del
 # umbral, asi que ese caso se sigue recortando y separando como antes.
 ELONGACION_ALARGADA = 3.0
+
+# Cuanto se le permite a la mascara salirse de la caja del detector, como
+# fraccion de un lado de la caja. Son dos numeros porque el error del detector
+# es distinto en cada caso.
+#
+#   COMPACTA: fraccion del lado MENOR. La caja de una particula rechoncha es
+#   buena, y la holgura solo cubre que el detector suele ajustar un pelo por
+#   dentro del borde real.
+#
+#   ALARGADA: fraccion del lado MAYOR. En una fibra el lado menor es su grosor,
+#   asi que una fraccion de el no alcanza nunca a lo largo por mucho que se
+#   amplie: sobre una fibra de 36 px encajonada en 29 px, el 10% del grosor da
+#   2 px y sigue cortandola. Con el lado mayor, el 25% da 7 px y la recupera.
+#
+# QUE EL SEGUNDO CASO EXISTA ES EL ARREGLO. Antes una mascara alargada NO se
+# recortaba en absoluto, y ese "en absoluto" era el fallo: una fuga -- la
+# particula mas una cresta brillante que sale de la caja -- tambien es larga y
+# delgada, de modo que puntuaba como alargada y desactivaba la unica proteccion
+# que la habria parado. En el informe salieron tres fichas de seis midiendo
+# entre 1.9 y 2.1 veces la diagonal de su caja, una de ellas 6.4 mm: mas que el
+# limite de 5 mm con que se define un microplastico.
+#
+# La elongacion no puede distinguir una fibra de una fuga -- las dos son largas
+# y delgadas --, asi que no se le pide que lo haga. Se le pide a la CAJA, que es
+# lo unico que sabe de que particula hablamos. El 0.25 sale de que las 98
+# particulas anotadas a mano no pasan de 1.41 veces la diagonal de su caja.
+HOLGURA_COMPACTA = 0.10
+HOLGURA_ALARGADA = 0.25
+
+# A partir de cuanto se considera que la mascara se fugo. Se compara el largo
+# de la mascara SIN RECORTAR contra la diagonal de la caja. 1.5 sale de los
+# datos: sobre 98 particulas anotadas a mano, ninguna pasa de 1.41.
+FUGA_X_DIAGONAL = 1.5
 
 
 def _elongacion(mascara: np.ndarray) -> float:
@@ -340,8 +378,13 @@ def separar_pegadas(mascara: np.ndarray, semilla) -> np.ndarray:
 
 
 def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
-              margen: Optional[int] = None) -> Optional[np.ndarray]:
+              margen: Optional[int] = None,
+              registro: Optional[dict] = None) -> Optional[np.ndarray]:
     """Mascara de la particula dentro de la caja. None si no se pudo aislar.
+
+    Si se pasa ``registro``, se anota en el cuanto se salia la mascara antes de
+    recortarla a la caja. Es lo unico que distingue una fuga de una particula
+    grande, y solo se sabe aqui: despues del recorte la evidencia ya no esta.
 
     Bajo Nile Red la particula emite y el fondo del filtro queda oscuro, asi que
     se umbraliza el canal de mayor contraste con Otsu. Se toma la componente
@@ -456,38 +499,54 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
     # Se deja una holgura: el detector suele ajustar la caja algo por dentro del
     # borde real, y cortar a ras amputaria la punta de la particula.
     #
-    # LA HOLGURA DEPENDE DE LO ALARGADA QUE SEA LA MASCARA, y eso no es un
-    # refinamiento: con la holgura fija del 10% las FIBRAS salian cortadas por
-    # un borde recto. Medido sobre dos fibras reales de la placa 10.3, el
-    # recorte se llevaba el 31% y el 34% del area, y con ella parte del largo.
+    # LA HOLGURA DEPENDE DE LO ALARGADA QUE SEA LA MASCARA, pero SIEMPRE SE
+    # RECORTA. Las dos mitades de esa frase costaron un fallo cada una:
     #
-    # La razon es que el detector encajona corto justamente las particulas
-    # alargadas: una fibra de 36 px entraba en una caja de 29x24. Recortar a esa
-    # caja no corrige el error del detector, lo copia.
+    #   * Con la holgura fija del 10% del lado menor, las FIBRAS salian cortadas
+    #     por un borde recto. En una fibra el lado menor es su grosor, asi que
+    #     esa fraccion no alcanza nunca a lo largo. Sobre dos fibras reales de
+    #     la placa 10.3 el recorte se llevaba el 31% y el 34% del area.
     #
-    # Lo que distingue una fibra que sigue de una VECINA que se colo es la
-    # forma, no el tamaño: la vecina es un bulto al lado y al unirse el conjunto
-    # queda rechoncho; la fibra sigue siendo delgada por larga que sea.
+    #   * El arreglo de entonces fue no recortar NADA si la mascara era
+    #     alargada, y eso abrio el fallo contrario. La elongacion no distingue
+    #     una fibra de una fuga: una particula con una cresta brillante pegada
+    #     tambien es larga y delgada, asi que puntuaba como alargada y apagaba
+    #     la unica proteccion que la habria parado. En un informe salieron tres
+    #     fichas de seis midiendo entre 1.9 y 2.1 veces la diagonal de su caja,
+    #     una de ellas de 6.4 mm -- por encima del limite de 5 mm con que se
+    #     define un microplastico.
     #
-    # Por eso una mascara alargada NO se recorta. Ampliar la holgura no bastaba:
-    # es una fraccion del lado MENOR de la caja, que en una fibra es su grosor,
-    # de modo que por mucho que se amplie nunca alcanza a lo largo. Sobre una
-    # fibra sintetica de 120 px la holgura ampliada al maximo dejaba 94.
+    # De ahi la forma actual: a una mascara alargada se le da MAS holgura, no
+    # holgura infinita, y medida sobre el lado MAYOR para que alcance a lo
+    # largo. La caja es lo unico que sabe de que particula estamos hablando; la
+    # forma de la mascara no puede decirlo, porque una fibra y una fuga tienen
+    # la misma forma.
     #
     # La proteccion sigue en pie donde importa: dos circulos de 20 px unidos por
-    # un puente dan elongacion 1.7 -- rechonchos -- y se recortan igual que
-    # antes. Es el caso que motivo este recorte y del que salian tallas de
-    # 8.9 mm.
+    # un puente dan elongacion 1.7 -- rechonchos -- y se recortan como siempre.
+    # Es el caso que motivo este recorte y del que salian tallas de 8.9 mm.
+    if registro is not None:
+        registro["largo_sin_recortar_px"] = feret_maximo(_contorno_mayor(mascara))
     if _elongacion(mascara) < ELONGACION_ALARGADA:
-        holgura = max(2, int(round(0.10 * min(ancho_caja, alto_caja))))
-        hx1 = max(0, int(x1) - ox - holgura)
-        hy1 = max(0, int(y1) - oy - holgura)
-        hx2 = min(mascara.shape[1], int(np.ceil(x2)) - ox + holgura)
-        hy2 = min(mascara.shape[0], int(np.ceil(y2)) - oy + holgura)
-        fuera = np.ones_like(mascara, dtype=bool)
-        fuera[hy1:hy2, hx1:hx2] = False
-        mascara[fuera] = 0
+        holgura = max(2, int(round(HOLGURA_COMPACTA * min(ancho_caja, alto_caja))))
+    else:
+        holgura = max(2, int(round(HOLGURA_ALARGADA * max(ancho_caja, alto_caja))))
+    hx1 = max(0, int(x1) - ox - holgura)
+    hy1 = max(0, int(y1) - oy - holgura)
+    hx2 = min(mascara.shape[1], int(np.ceil(x2)) - ox + holgura)
+    hy2 = min(mascara.shape[0], int(np.ceil(y2)) - oy + holgura)
+    fuera = np.ones_like(mascara, dtype=bool)
+    fuera[hy1:hy2, hx1:hx2] = False
+    mascara[fuera] = 0
     return mascara if mascara.any() else None
+
+
+def _contorno_mayor(mascara: np.ndarray) -> Optional[np.ndarray]:
+    """El contorno externo de mayor area, o None si la mascara esta vacia."""
+    if mascara is None or not mascara.any():
+        return None
+    cont, _ = cv2.findContours(mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    return max(cont, key=cv2.contourArea) if cont else None
 
 
 def feret_maximo(contorno: np.ndarray) -> float:
@@ -652,6 +711,36 @@ def extremos_feret(contorno: np.ndarray):
     return tuple(env[i].astype(int)), tuple(env[j].astype(int))
 
 
+def _dibujar_feret(vis: np.ndarray, mascara: np.ndarray, p, q, color) -> float:
+    """Dibuja la recta de Feret: continua dentro de la particula, a trazos fuera.
+
+    Devuelve que fraccion del segmento cae FUERA de la mascara, para poder
+    decirlo con un numero en vez de dejarlo al ojo.
+
+    Se dibuja asi porque Feret es la separacion de dos mordazas, no un camino:
+    en una particula concava el segmento pasa por fuera y eso es correcto. Con
+    la linea continua parecia un error de medida.
+    """
+    p = np.asarray(p, dtype=float)
+    q = np.asarray(q, dtype=float)
+    largo = float(np.hypot(*(q - p)))
+    if largo < 1:
+        return 0.0
+    n = int(largo) + 1
+    ts = np.linspace(0.0, 1.0, n)
+    pts = p[None, :] + ts[:, None] * (q - p)[None, :]
+    xs = np.clip(pts[:, 0].round().astype(int), 0, mascara.shape[1] - 1)
+    ys = np.clip(pts[:, 1].round().astype(int), 0, mascara.shape[0] - 1)
+    dentro = mascara[ys, xs] > 0
+    for k in range(n - 1):
+        # Fuera de la particula, un pixel de cada tres: el trazo discontinuo es
+        # lo que distingue "aqui la mordaza no toca" de "aqui se midio".
+        if not dentro[k] and (k % 3):
+            continue
+        cv2.line(vis, (xs[k], ys[k]), (xs[k + 1], ys[k + 1]), color, 1)
+    return float((~dentro).mean())
+
+
 def dibujar_medicion(bgr: np.ndarray, det, zoom: int = 4):
     """Recorte de la particula con la medida que se le aplico, dibujada encima.
 
@@ -690,9 +779,11 @@ def dibujar_medicion(bgr: np.ndarray, det, zoom: int = 4):
             elif cont:
                 ext = extremos_feret(max(cont, key=cv2.contourArea))
                 if ext:
-                    cv2.line(vis, ext[0], ext[1], (0, 210, 255), 1)
+                    fuera = _dibujar_feret(vis, mascara, ext[0], ext[1],
+                                           (0, 210, 255))
                     for q in ext:
                         cv2.circle(vis, q, 2, (0, 210, 255), -1)
+                    m.feret_fuera = fuera
         par = np.hstack([sub, vis])
         if zoom > 1:
             par = cv2.resize(par, None, fx=zoom, fy=zoom,
@@ -827,23 +918,30 @@ def medir_deteccion(bgr: np.ndarray, det, um_por_px: Optional[float] = None,
     tamano de la caja.
     """
     try:
-        mascara = segmentar(bgr, det.x1, det.y1, det.x2, det.y2, margen)
+        registro: dict = {}
+        mascara = segmentar(bgr, det.x1, det.y1, det.x2, det.y2, margen,
+                            registro=registro)
         if mascara is None:
             m = Morfologia()
             m.aviso = "no se pudo separar la particula del fondo"
             return m
         m = medir(mascara, um_por_px)
-        # Una particula solo puede ser mas larga que la diagonal de su caja si
-        # esta muy enrollada. Pasado 1.5x, lo mas frecuente en este material no
-        # es una fibra enrollada sino DOS particulas que se tocan y que la
-        # componente conexa unio en una: se comprobo a ojo sobre las mayores del
-        # lote. La medida se entrega marcada para revisar, no se descarta.
         diagonal = float(np.hypot(det.x2 - det.x1, det.y2 - det.y1))
-        if m.ok and diagonal > 0 and m.largo_px > 1.5 * diagonal:
+        # El aviso mira la mascara ANTES del recorte, no despues.
+        #
+        # Despues del recorte la medida ya esta acotada por construccion, asi
+        # que comprobarla ahi no puede delatar nada: seria un aviso que no se
+        # dispara nunca. Lo que dice si esta particula es de fiar es cuanto se
+        # SALIA -- si la mascara se iba al doble de su caja, el umbral engancho
+        # algo que no era esta particula, y lo que se reporta es el trozo que
+        # quedo dentro de la caja, no la particula entera.
+        previo = float(registro.get("largo_sin_recortar_px", 0.0) or 0.0)
+        if m.ok and diagonal > 0 and previo > FUGA_X_DIAGONAL * diagonal:
             m.revisar = True
             m.aviso = (m.aviso + " | " if m.aviso else "") + (
-                f"largo {m.largo_px / diagonal:.1f}x la diagonal de su caja: "
-                f"comprobar que no sean dos particulas pegadas")
+                f"la mascara se salia {previo / diagonal:.1f}x la diagonal de su "
+                f"caja y se recorto a ella: puede ser una vecina pegada, y la "
+                f"talla se queda corta si la particula seguia de verdad")
         return m
     except cv2.error as e:
         m = Morfologia()

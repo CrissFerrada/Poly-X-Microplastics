@@ -1093,4 +1093,14 @@ EN: dict[str, str] = {
         'maximum Feret',
     'geodesico':
         'geodesic',
+
+    # -- Informe: detecciones sobre el anillo de la placa --
+    '<strong>{n} detección(es) caen sobre el anillo de la placa</strong> —más allá del {pct} % del radio ajustado— y quedan fuera de esta sección: el aro es una banda brillante que el detector confunde con material, y como sale enorme desplazaría a las partículas de verdad del extremo grande. Siguen contadas en la sección de conteo.':
+        "<strong>{n} detection(s) fall on the dish's rim</strong> —beyond {pct} % of the fitted radius— and are left out of this section: the rim is a bright band the detector mistakes for material, and being huge it would displace the real particles at the large end. They are still counted in the counting section.",
+
+    # -- Informe: la recta de Feret en particulas concavas --
+    '{pct} % de la recta fuera del contorno':
+        '{pct} % of the line outside the outline',
+    '<p>En una partícula <strong>cóncava</strong> la recta amarilla cruza por fuera del contorno, y eso es correcto: Feret es la separación de dos mordazas de calibre, no un camino por dentro de la partícula. Para que se vea, el tramo que cae fuera va <strong>a trazos</strong>. El camino que sí va por dentro es el geodésico, en magenta, y se usa cuando la partícula es delgada y está doblada.</p>':
+        '<p>On a <strong>concave</strong> particle the yellow line crosses outside the outline, and that is correct: Feret is the separation of two caliper jaws, not a path through the particle. So that this is visible, the stretch that falls outside is <strong>dashed</strong>. The path that does stay inside is the geodesic, in magenta, used when the particle is thin and bent.</p>',
 }
