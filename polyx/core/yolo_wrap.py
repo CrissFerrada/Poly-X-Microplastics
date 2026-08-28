@@ -344,11 +344,24 @@ def politica_troceado(ancho: int, alto: int, imgsz: int, umbral_px: int = 2000,
 
     Con ``tile=0`` el lado del tile sale de ``min(umbral_px, imgsz)``: asi el
     recorte entra a la red sin reducirse, que es justamente el objetivo.
+
+    CUANDO trocear y DE QUE TAMAÑO son dos preguntas distintas, y mezclarlas
+    costo un fallo: para forzar el troceo, ``predict_auto`` pasa
+    ``umbral_px=0`` -- su manera de decir "no decidas, trocea" --, y de ahi
+    salia ``min(0, imgsz) = 0``, que el clamp subia a 256. Sobre una foto de
+    4096x3072 eso son 336 teselas de 256 px: lentisimo y con CERO detecciones,
+    porque cada tesela se reescala 8x hasta imgsz y el modelo no ve nada
+    parecido a lo que entreno. Con umbral_px en 0 el tamaño lo manda imgsz, que
+    es lo unico que de verdad lo determina.
     """
     lado = max(int(ancho), int(alto))
     if lado <= int(umbral_px):
         return None
-    t = int(tile) if int(tile) > 0 else min(int(umbral_px), int(imgsz) or int(umbral_px))
+    if int(tile) > 0:
+        t = int(tile)
+    else:
+        candidatos = [v for v in (int(umbral_px), int(imgsz)) if v > 0]
+        t = min(candidatos) if candidatos else 1280
     t = max(256, min(t, lado))
     overlap = min(max(float(overlap), 0.0), 0.9)
     step = max(1, int(round(t * (1.0 - overlap))))
