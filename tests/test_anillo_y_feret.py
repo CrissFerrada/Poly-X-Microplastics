@@ -129,3 +129,20 @@ def test_el_tramo_de_fuera_se_dibuja_a_trazos():
     amarillo = ((vis[:, :, 0] < 80) & (vis[:, :, 1] > 150) & (vis[:, :, 2] > 200))
     assert amarillo.any(), "no se dibujo la recta"
     assert m.feret_fuera > 0.05
+
+
+def test_el_corte_del_area_util_no_se_lleva_particulas_reales():
+    """El riesgo del otro lado: pasarse de estricto y perder muestra.
+
+    Medido sobre las 100 particulas anotadas a mano del estudio, la mas
+    periferica cae en 0.828 del radio de la placa. El corte va en 0.95, o sea
+    con 0.12 de radio de margen. Si alguien lo bajara para "asegurar" que no
+    entra el aro, empezaria a descartar particulas de verdad -- que es un fallo
+    peor que el que se estaba arreglando, porque no deja rastro.
+    """
+    cal = _placa()
+    mas_periferica = 0.828
+    x = cal.cx + cal.radio_px * mas_periferica
+    assert not C.sobre_el_anillo(cal, x - 30, cal.cy - 30, x + 30, cal.cy + 30)
+    assert C.FRACCION_AREA_UTIL > mas_periferica + 0.10, (
+        "el corte se acerco demasiado a la particula real mas periferica")

@@ -382,10 +382,15 @@ def resolver(ruta_imagen: str | Path,
 # Hasta que fraccion del radio ajustado se considera area util de la placa.
 #
 # El circulo se ajusta al borde EXTERNO del anillo, y la pared mide unos 2 mm
-# sobre un radio de 50: el borde interno cae en 0.960. Se deja 0.95 para que la
-# banda del propio anillo quede fuera con holgura, sin comerse muestra: en las
-# placas de este estudio el sedimento se reparte por el fondo y no se apoya en
-# la pared.
+# sobre un radio de 50: el borde interno cae en 0.960. El corte va en 0.95, por
+# dentro de esa pared.
+#
+# QUE NO SE LLEVA POR DELANTE NINGUNA PARTICULA ESTA MEDIDO, no supuesto: sobre
+# las 100 particulas anotadas a mano de este estudio, la mas periferica esta en
+# 0.828 del radio y ninguna pasa de ahi. Entre 0.83 y 0.95 hay margen de sobra,
+# asi que el corte aparta el aro sin costar muestra. Si en otro material el
+# sedimento llegara a apoyarse en la pared, este numero habria que revisarlo
+# con la misma medicion.
 FRACCION_AREA_UTIL = 0.95
 
 
