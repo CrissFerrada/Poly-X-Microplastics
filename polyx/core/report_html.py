@@ -1008,11 +1008,16 @@ def _ficha_particula(det, ruta_imagen, um_por_px: Optional[float],
         # funciones para no cargar OpenCV cuando solo se pide texto.
         import cv2
         from .calibracion import leer_imagen
-        from .morfologia import segmentar
+        from .morfologia import margen_de_caja, segmentar
         bgr = leer_imagen(ruta_imagen)
         if bgr is None:
             return ""
-        mg = int(max(12, 0.35 * min(det.x2 - det.x1, det.y2 - det.y1)))
+        # EL MISMO MARGEN QUE USA segmentar(), no uno parecido. La mascara viene
+        # recortada con margen_de_caja(); si aqui se recorta con otro numero, el
+        # contorno se dibuja desde un origen distinto y sale desplazado sobre la
+        # foto. Ya paso con un 0.35 copiado a mano frente al 0.50 real, y se vio
+        # a ojo en el informe: "la mascara quedo corrida".
+        mg = margen_de_caja(det.x2 - det.x1, det.y2 - det.y1)
         x1 = max(0, int(det.x1) - mg); y1 = max(0, int(det.y1) - mg)
         x2 = min(bgr.shape[1], int(det.x2) + mg); y2 = min(bgr.shape[0], int(det.y2) + mg)
         sub = bgr[y1:y2, x1:x2].copy()
