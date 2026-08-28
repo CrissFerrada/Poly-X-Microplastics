@@ -250,3 +250,40 @@ def test_sin_calibracion_no_hay_micrometros():
     m = M.medir(recta()[0])
     assert m.largo_um is None and m.area_um2 is None
     assert m.largo_px > 0, "en píxeles sí debe medir"
+
+
+# ── Cajas sin particula ───────────────────────────────────────────────
+
+def test_una_caja_sin_contraste_no_devuelve_mascara():
+    """Sin particula que aislar no se inventa una talla.
+
+    Aqui se caia a Otsu, que parte el histograma del RUIDO y devuelve una
+    mascara fragmentada con una talla de aspecto normal -- indistinguible de un
+    dato bueno salvo mirando la imagen. Se veia en la hoja de contacto: fondo
+    oscuro y un contorno en zigzag con los extremos de Feret en esquinas
+    opuestas.
+
+    Medido sobre 100 cajas anotadas a mano, 7 caian por ahi, y las 7 eran de
+    las dos placas anotadas en el marco de pixeles equivocado: la caja señalaba
+    un sitio sin particula.
+    """
+    import numpy as np
+    rng = np.random.default_rng(0)
+    # Ruido uniforme: ni particula ni fondo, solo grano.
+    img = (18 + rng.normal(0, 2.0, (200, 200, 3))).clip(0, 255).astype(np.uint8)
+    assert M.segmentar(img, 80, 80, 120, 120) is None
+
+
+def test_una_particula_tenue_pero_visible_si_se_mide():
+    """El otro lado: el corte no puede llevarse particulas de verdad.
+
+    En los datos reales hay un salto claro -- las cajas vacias dan contraste
+    2-7 y la particula real mas tenue da 34 --, asi que un contraste de 40 tiene
+    que medirse sin problema.
+    """
+    import numpy as np
+    img = np.full((200, 200, 3), 18, np.uint8)
+    cv2.circle(img, (100, 100), 15, (18, 58, 58), -1)   # +40 sobre el fondo
+    mascara = M.segmentar(img, 80, 80, 120, 120)
+    assert mascara is not None
+    assert M.medir(mascara).ok

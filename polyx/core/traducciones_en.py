@@ -1103,4 +1103,42 @@ EN: dict[str, str] = {
         '{pct} % of the line outside the outline',
     '<p>En una partícula <strong>cóncava</strong> la recta amarilla cruza por fuera del contorno, y eso es correcto: Feret es la separación de dos mordazas de calibre, no un camino por dentro de la partícula. Para que se vea, el tramo que cae fuera va <strong>a trazos</strong>. El camino que sí va por dentro es el geodésico, en magenta, y se usa cuando la partícula es delgada y está doblada.</p>':
         '<p>On a <strong>concave</strong> particle the yellow line crosses outside the outline, and that is correct: Feret is the separation of two caliper jaws, not a path through the particle. So that this is visible, the stretch that falls outside is <strong>dashed</strong>. The path that does stay inside is the geodesic, in magenta, used when the particle is thin and bent.</p>',
+
+    # -- Informe: perfil en profundidad del testigo --
+    'Perfil en profundidad del testigo':
+        'Depth profile of the core',
+    'crece':
+        'increases',
+    'decrece':
+        'decreases',
+    'el número de partículas':
+        'the number of particles',
+    'la talla mediana':
+        'the median size',
+    '<strong>{que} {sentido} con la profundidad</strong>':
+        '<strong>{que} {sentido} with depth</strong>',
+    'No se detecta tendencia en {que} con la profundidad':
+        'No trend in {que} with depth is detected',
+    '{veredicto} (Spearman ρ = {rho}, p {p}, n = {n} tramos).':
+        '{veredicto} (Spearman ρ = {rho}, p = {p}, n = {n} intervals).',
+    'partículas por tramo':
+        'particles per interval',
+    'talla mediana (µm)  ·  banda = rango intercuartílico':
+        'median size (µm)  ·  band = interquartile range',
+    'tramo (mayor = más profundo)':
+        'interval (higher = deeper)',
+    '<p>El tramo es la <strong>profundidad</strong> a la que se tomó el sedimento, y a diferencia de una carpeta cualquiera está <em>ordenado</em>. Eso permite preguntar por una tendencia —si hay más partículas abajo que arriba, o si las de abajo son más grandes— y no solo si los grupos difieren entre sí.</p>':
+        '<p>The interval is the <strong>depth</strong> the sediment was taken from and, unlike an arbitrary folder, it is <em>ordered</em>. That makes it possible to ask about a trend —whether there are more particles deeper down, or whether the deeper ones are larger— and not merely whether the groups differ.</p>',
+    "<p class='caption' style='text-align:left'>La correlación se calcula sobre los <strong>tramos</strong>, no sobre las partículas: dos partículas de la misma placa no son observaciones independientes de la profundidad, y contarlas como tales inflaría cualquier significación. El valor de p sale de barajar la serie 20 000 veces, no de una aproximación que con tan pocos tramos no valdría.</p>":
+        "<p class='caption' style='text-align:left'>The correlation is computed over the <strong>intervals</strong>, not over the particles: two particles from the same dish are not independent observations of depth, and counting them as such would inflate any significance. The p value comes from shuffling the series 20,000 times, not from an approximation that would not hold with so few intervals.</p>",
+    '<th>Estación</th><th>Tramo</th><th>Placas</th><th>Partículas</th><th>Con talla</th><th>Mediana (µm)</th><th>Mayor (µm)</th>':
+        '<th>Station</th><th>Interval</th><th>Dishes</th><th>Particles</th><th>With size</th><th>Median (µm)</th><th>Largest (µm)</th>',
+
+    # -- Informe: aviso de mascara recortada --
+    '<strong>{n} de {total} partículas ({pct}&nbsp;%) tienen una talla que pide comprobación</strong>: al segmentarlas, la máscara se salía bastante más allá de la caja del detector, casi siempre porque el umbral enganchó una partícula vecina o una zona brillante del fondo. En esos casos la máscara se <em>recorta a la caja</em>, de modo que la talla reportada no está inflada; lo que puede es quedarse <em>corta</em>, si la partícula seguía de verdad más allá de la caja. Van marcadas con ⚠ en sus fichas.':
+        "<strong>{n} of {total} particles ({pct}&nbsp;%) have a size that needs checking</strong>: when segmenting them, the mask ran well beyond the detector's box, almost always because the threshold caught a neighbouring particle or a bright patch of background. In those cases the mask is <em>clipped to the box</em>, so the reported size is not inflated; what it may be is <em>short</em>, if the particle really did continue beyond the box. They are marked with ⚠ on their cards.",
+
+    # -- Informe: aviso corto de la ficha --
+    'la máscara se salía de la caja y se recortó a ella':
+        'the mask ran outside the box and was clipped to it',
 }

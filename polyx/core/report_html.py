@@ -825,6 +825,114 @@ def _fig_boxplot_grupos(grupos: Dict[str, List[float]], titulo: str, xlabel: str
     return _fig_to_b64(fig)
 
 
+def _spearman(x, y) -> Optional[float]:
+    """Correlacion de rangos entre dos series. None si no se puede calcular.
+
+    De rangos y no de Pearson porque aqui no hay motivo para esperar una
+    relacion LINEAL: lo que se pregunta es si la talla (o el conteo) crece o
+    decrece con la profundidad, no a que ritmo. Ademas el conteo de particulas
+    tiene una cola larga -- unas pocas placas con cientos -- que dominaria una
+    correlacion de Pearson.
+    """
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    if len(x) < 3 or len(x) != len(y):
+        return None
+    rx, ry = _rankdata(x), _rankdata(y)
+    sx, sy = rx.std(), ry.std()
+    if sx == 0 or sy == 0:
+        return None
+    return float(((rx - rx.mean()) * (ry - ry.mean())).mean() / (sx * sy))
+
+
+def _p_permutacion(x, y, n_perm: int = 20000, semilla: int = 0) -> Optional[float]:
+    """p bilateral de la correlacion, barajando una de las dos series.
+
+    Por permutacion y no por la aproximacion t habitual: con 7 u 8 tramos esa
+    aproximacion no vale, y aqui n es el numero de TRAMOS, no de particulas.
+    Barajar no supone nada sobre la distribucion y responde exactamente la
+    pregunta que toca -- con que frecuencia el azar da una correlacion asi de
+    grande.
+
+    La semilla es fija para que el informe sea reproducible: el mismo lote
+    tiene que dar el mismo numero cada vez que se genere.
+    """
+    rho = _spearman(x, y)
+    if rho is None:
+        return None
+    rng = np.random.default_rng(semilla)
+    y = np.asarray(y, dtype=float)
+    extremos = 0
+    for _ in range(n_perm):
+        r = _spearman(x, rng.permutation(y))
+        if r is not None and abs(r) >= abs(rho) - 1e-12:
+            extremos += 1
+    # +1 en numerador y denominador: sin eso, p podria salir 0, que no existe
+    # en una prueba por permutacion.
+    return (extremos + 1) / (n_perm + 1)
+
+
+def _texto_tendencia(x, y, que: str) -> str:
+    """Frase con la correlacion, su p y el n. Vacia si no se puede calcular."""
+    rho = _spearman(x, y)
+    if rho is None:
+        return ""
+    p = _p_permutacion(x, y)
+    sentido = tr("crece") if rho > 0 else tr("decrece")
+    if p is not None and p < 0.05:
+        # Mayuscula inicial: la frase va detras del punto que cierra el nombre
+        # de la estacion, y en minuscula se lee como una linea cortada.
+        veredicto = tr("<strong>{que} {sentido} con la profundidad</strong>").format(
+            que=que[0].upper() + que[1:], sentido=sentido)
+    else:
+        veredicto = tr("No se detecta tendencia en {que} con la profundidad").format(
+            que=que)
+    # El operador viaja con el valor: con "p = {p}" y un p pequeño salia
+    # "p = < 0.001", con dos signos seguidos.
+    #
+    # Punto decimal y no coma: el resto de las cifras del informe salen de
+    # formatos de Python y llevan punto; mezclarlos se lee como una errata.
+    p_txt = "< 0.001" if p is not None and p < 0.001 else f"= {p:.3f}"
+    return tr("{veredicto} (Spearman ρ = {rho}, p {p}, n = {n} tramos).").format(
+        veredicto=veredicto, rho=f"{rho:+.2f}", p=p_txt, n=len(x))
+
+
+def _fig_perfil_profundidad(perfiles: dict) -> str:
+    """Perfil del testigo: profundidad en el eje vertical, hacia abajo.
+
+    Es la convencion de cualquier perfil de sedimento, y no es cosmetica: con
+    la profundidad en el eje X hay que girar la cabeza para leer un testigo.
+    """
+    if not perfiles:
+        return ""
+    # Una linea por estacion, con los colores del informe.
+    colores = [T.ACCENT, T.OK, T.VIO, T.WARN, T.ERR]
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.2, 4.6), dpi=140, sharey=True)
+    for i, (estacion, filas) in enumerate(sorted(perfiles.items())):
+        tramos = [f[0] for f in filas]
+        color = colores[i % len(colores)]
+        ax1.plot([f[1] for f in filas], tramos, marker="o", markersize=4,
+                 linewidth=1.4, label=estacion, color=color)
+        medianas = [f[2] for f in filas]
+        ax2.plot(medianas, tramos, marker="o", markersize=4, linewidth=1.4,
+                 label=estacion, color=color)
+        # Rango intercuartilico como banda: la mediana sola esconde si el
+        # reparto de tallas se ensancha o se estrecha con la profundidad.
+        ax2.fill_betweenx(tramos, [f[3] for f in filas], [f[4] for f in filas],
+                          alpha=0.15, color=color, linewidth=0)
+    ax1.set_xlabel(tr("partículas por tramo"))
+    ax2.set_xlabel(tr("talla mediana (µm)  ·  banda = rango intercuartílico"))
+    ax1.set_ylabel(tr("tramo (mayor = más profundo)"))
+    ax1.invert_yaxis()
+    for ax in (ax1, ax2):
+        ax.grid(alpha=0.25)
+        ax.spines[["top", "right"]].set_visible(False)
+    if len(perfiles) > 1:
+        ax1.legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    return _fig_to_b64(fig)
+
+
 # ── Como se llama cada morfotipo de cara al usuario ──
 # El codigo distingue "fibra" y "fragmento" (morfologia.FIBRA / FRAGMENTO) y
 # eso NO cambia: es la clasificacion con la que se mide y se decide si el largo
@@ -899,6 +1007,118 @@ def elegir_fichas(formas: List[tuple], max_fichas: int) -> List[tuple]:
         sobrantes = [t for t in fibras + otras if id(t[0]) not in ya]
         elegidas += sobrantes[:max_fichas - len(elegidas)]
     return elegidas
+
+
+def seccion_profundidad(formas, resultados) -> str:
+    """Cuantas particulas y de que talla hay a cada profundidad del testigo.
+
+    El tramo no es una carpeta cualquiera: es una variable ORDENADA. Eso
+    permite preguntar por TENDENCIA -- si hay mas particulas abajo que arriba,
+    o si las de abajo son mas grandes -- y no solo si los grupos difieren, que
+    es todo lo que puede contestar la comparacion generica por carpeta.
+
+    ``formas`` es [(Detection, ruta)] con talla medida; ``resultados`` son los
+    ImageResult, que hacen falta para contar TODAS las particulas y no solo las
+    que se pudieron medir en micrometros.
+
+    Devuelve "" si los nombres no siguen la pauta ``tramo.testigo``: sin tramo
+    no hay profundidad, y el informe no puede exigir esa nomenclatura.
+    """
+    # -- Conteo por tramo, sumando las placas del mismo tramo --
+    # Se suman porque son submuestras de la misma masa de sedimento, no
+    # repeticiones fotograficas. Es la misma regla que la seccion de conteo.
+    conteo: Dict[tuple, int] = {}
+    placas: Dict[tuple, set] = {}
+    for r in resultados:
+        m = _muestra_de(r.image_path)
+        if m is None:
+            continue
+        estacion, tramo, placa = m
+        conteo[(estacion, tramo)] = conteo.get((estacion, tramo), 0) + len(r.predictions)
+        placas.setdefault((estacion, tramo), set()).add(placa)
+
+    # -- Tallas por tramo --
+    tallas: Dict[tuple, List[float]] = {}
+    for d, ruta in formas:
+        m = _muestra_de(ruta)
+        if m is None or not d.largo_um:
+            continue
+        tallas.setdefault((m[0], m[1]), []).append(float(d.largo_um))
+
+    if len(conteo) < 3:
+        # Con uno o dos tramos no hay perfil que dibujar ni tendencia que
+        # medir; decirlo es mas util que una figura de dos puntos.
+        return ""
+
+    perfiles: Dict[str, list] = {}
+    for (estacion, tramo), n in sorted(conteo.items()):
+        vals = np.asarray(tallas.get((estacion, tramo), []), dtype=float)
+        if len(vals):
+            mediana = float(np.median(vals))
+            q1, q3 = (float(np.percentile(vals, 25)), float(np.percentile(vals, 75)))
+        else:
+            mediana = q1 = q3 = float("nan")
+        perfiles.setdefault(estacion, []).append((tramo, n, mediana, q1, q3))
+
+    fig = _fig_perfil_profundidad(perfiles)
+
+    # -- Tendencia, por estacion --
+    # n es el numero de TRAMOS, no de particulas: dos particulas de la misma
+    # placa no son observaciones independientes de la profundidad, y contarlas
+    # como tales inflaria cualquier significacion. Con pocos tramos la
+    # correlacion es debil por construccion, y por eso se declara el n.
+    parrafos = []
+    for estacion, filas in sorted(perfiles.items()):
+        filas = sorted(filas)
+        x = [f[0] for f in filas]
+        n_part = [f[1] for f in filas]
+        med = [f[2] for f in filas]
+        con_talla = [(a, b) for a, b in zip(x, med) if b == b]   # descarta NaN
+        piezas = [_texto_tendencia(x, n_part, tr("el número de partículas"))]
+        if len(con_talla) >= 3:
+            piezas.append(_texto_tendencia([a for a, _ in con_talla],
+                                           [b for _, b in con_talla],
+                                           tr("la talla mediana")))
+        piezas = [p for p in piezas if p]
+        if piezas:
+            parrafos.append(f"<p><strong>{estacion}.</strong> " + " ".join(piezas) + "</p>")
+
+    # -- Tabla --
+    filas_tabla = ""
+    for estacion, filas in sorted(perfiles.items()):
+        for tramo, n, mediana, _q1, _q3 in sorted(filas):
+            vals = tallas.get((estacion, tramo), [])
+            # Un tramo puede tener particulas contadas y ninguna con talla, si
+            # esa foto no llego a calibrarse. Se enseña el conteo y una raya en
+            # las columnas de talla, que es lo que de verdad ocurrio.
+            celdas = [
+                estacion,
+                str(tramo),
+                str(len(placas.get((estacion, tramo), ()))),
+                str(n),
+                str(len(vals)),
+                f"{mediana:.0f}" if vals else "—",
+                f"{max(vals):.0f}" if vals else "—",
+            ]
+            filas_tabla += ("<tr><td>" + celdas[0] + "</td>"
+                            + "".join(f"<td class='r'>{c}</td>" for c in celdas[1:])
+                            + "</tr>")
+
+    return (
+        tr("<p>El tramo es la <strong>profundidad</strong> a la que se tomó el "
+           "sedimento, y a diferencia de una carpeta cualquiera está "
+           "<em>ordenado</em>. Eso permite preguntar por una tendencia —si hay "
+           "más partículas abajo que arriba, o si las de abajo son más "
+           "grandes— y no solo si los grupos difieren entre sí.</p>")
+        + (f"<img src='data:image/png;base64,{fig}' style='max-width:100%'>" if fig else "")
+        + "".join(parrafos)
+        + tr("<p class='caption' style='text-align:left'>La correlación se calcula "
+             "sobre los <strong>tramos</strong>, no sobre las partículas: dos "
+             "partículas de la misma placa no son observaciones independientes de la "
+             "profundidad, y contarlas como tales inflaría cualquier significación. "
+             "El valor de p sale de barajar la serie 20 000 veces, no de una "
+             "aproximación que con tan pocos tramos no valdría.</p>")
+        + f"<table class='data'><tr>{tr('<th>Estación</th><th>Tramo</th><th>Placas</th><th>Partículas</th><th>Con talla</th><th>Mediana (µm)</th><th>Mayor (µm)</th>')}</tr>{filas_tabla}</table>")
 
 
 def _figura_calibracion(state) -> str:
@@ -1272,6 +1492,7 @@ SECCIONES = [
     ("calibracion", "Calibración de escala"),
     ("forma",       "Forma y talla de las partículas"),
     ("talla_carpetas", "Talla por carpeta y por foto (comparación entre sitios)"),
+    ("profundidad", "Perfil en profundidad del testigo"),
     ("fichas",      "Ficha de partículas medidas (muestra)"),
     ("resultados",  "Resultados generales"),
     ("modelos",     "Resumen por modelo"),
@@ -1976,6 +2197,8 @@ def generate_report(state, output_path: Path,
     # Independiente de "forma": es su propia seccion opcional en el informe
     # (ver SECCIONES mas abajo), asi que no entra en forma_html.
     por_carpeta_html = ""
+    # El perfil por profundidad solo existe si los nombres llevan el tramo.
+    profundidad_html = seccion_profundidad(formas, all_results) if formas else ""
     if formas:
         con_talla = [(d, ruta) for d, ruta in formas if d.largo_um]
         fibras = sum(1 for d, _ in formas if d.morfotipo == "fibra")
@@ -1984,10 +2207,15 @@ def generate_report(state, output_path: Path,
 
         # ── Particulas cuya talla pide un vistazo ──
         # Se declara en la seccion, no solo en cada ficha: quien lee las cifras
-        # de talla tiene que saber cuantas de ellas pueden estar infladas por
-        # varias particulas medidas como una. El sesgo va hacia ARRIBA, y afecta
-        # sobre todo al extremo grande de la distribucion, que es justo el que
-        # se reporta como "la particula mayor".
+        # de talla tiene que saber cuantas de ellas se apoyaron en una mascara
+        # que hubo que recortar. Afecta sobre todo al extremo grande de la
+        # distribucion, que es justo el que se reporta como "la particula
+        # mayor".
+        #
+        # OJO CON EL SENTIDO DEL SESGO: mientras la mascara no se recortaba, la
+        # fuga inflaba la talla y el sesgo iba hacia ARRIBA. Ahora el recorte la
+        # acota, asi que lo reportado es el trozo de dentro de la caja y el
+        # sesgo va hacia ABAJO. El texto de abajo lo dice en ese sentido.
         n_revisar = sum(1 for d, _ in formas if getattr(d, "revisar", False))
         aviso_revisar = ""
         if n_revisar:
@@ -2000,10 +2228,13 @@ def generate_report(state, output_path: Path,
                 f"<p style='border-left:3px solid {T.WARN};padding:6px 12px;"
                 f"background:#fff8e6'>"
                 + tr("<strong>{n} de {total} partículas ({pct}&nbsp;%) tienen una talla "
-                     "que pide comprobación</strong>: miden bastante más que la diagonal "
-                     "de su caja, lo que casi siempre significa varias partículas en "
-                     "contacto medidas como una sola. La talla de esas queda "
-                     "<em>sobreestimada</em>. Van marcadas con ⚠ en sus fichas.").format(
+                     "que pide comprobación</strong>: al segmentarlas, la máscara se "
+                     "salía bastante más allá de la caja del detector, casi siempre "
+                     "porque el umbral enganchó una partícula vecina o una zona "
+                     "brillante del fondo. En esos casos la máscara se <em>recorta a la "
+                     "caja</em>, de modo que la talla reportada no está inflada; lo que "
+                     "puede es quedarse <em>corta</em>, si la partícula seguía de verdad "
+                     "más allá de la caja. Van marcadas con ⚠ en sus fichas.").format(
                          n=n_revisar, total=len(formas), pct=_pc_txt)
                 + "</p>")
 
@@ -2347,7 +2578,7 @@ def generate_report(state, output_path: Path,
                 if getattr(d, "revisar", False):
                     alerta = (
                         f"<div style='font-size:8.5pt;color:{T.WARN};margin-top:3px'>"
-                        f"⚠ {d.aviso_forma or tr('la talla puede estar inflada')}</div>")
+                        f"⚠ {d.aviso_forma or tr('la máscara se salía de la caja y se recortó a ella')}</div>")
                 tarjetas += (
                     f"<div style='display:inline-block;vertical-align:top;margin:0 14px 18px 0;"
                     f"max-width:290px'>"
@@ -2428,6 +2659,7 @@ def generate_report(state, output_path: Path,
         "calibracion": calib_html,
         "forma": forma_html,
         "talla_carpetas": por_carpeta_html,
+        "profundidad": profundidad_html,
         "fichas": fichas_html,
         "resultados": figures_html,
         "modelos": f"""
@@ -2445,11 +2677,17 @@ def generate_report(state, output_path: Path,
 
     # Un id en ``pedidas`` con cuerpo vacio se cae aqui: se marco la casilla pero
     # no habia con que llenarla (errores sin ground truth, conteo sin muestras).
-    ancla = {"resumen": "abstract", "metodos": "methods", "calibracion": "calib",
-             "forma": "forma", "talla_carpetas": "talla_carpetas", "fichas": "fichas",
-             "resultados": "results", "modelos": "models", "errores": "errors",
-             "comparacion": "compare", "galeria": "gallery", "conteo": "conteo",
-             "referencias": "refs"}
+    # Nombres de ancla heredados, para no romper enlaces a informes ya
+    # repartidos. Una seccion nueva NO tiene que aparecer aqui: su propio id ya
+    # sirve de ancla. Este diccionario era una segunda lista que mantener en
+    # sincronia con SECCIONES, y al añadir "profundidad" reventaba con
+    # KeyError -- justo lo que SECCIONES evita al ser lista unica.
+    _ANCLAS = {"resumen": "abstract", "metodos": "methods", "calibracion": "calib",
+               "resultados": "results", "modelos": "models", "errores": "errors",
+               "comparacion": "compare", "galeria": "gallery", "referencias": "refs"}
+
+    def ancla_de(sid: str) -> str:
+        return _ANCLAS.get(sid, sid)
     # tr() sobre el titulo: SECCIONES guarda la version en espanol, que es la
     # clave del diccionario. La interfaz ya lo traducia para sus casillas; el
     # documento no, y salia con los titulos en espanol aunque el resto no.
@@ -2458,9 +2696,9 @@ def generate_report(state, output_path: Path,
              if sid in pedidas and (cuerpos.get(sid) or "").strip()]
 
     toc_html = "".join(
-        f"<li><a href='#{ancla[sid]}'>{titulo}</a></li>" for sid, titulo, _ in vivas)
+        f"<li><a href='#{ancla_de(sid)}'>{titulo}</a></li>" for sid, titulo, _ in vivas)
     secciones_html = "".join(
-        f"<h2 id='{ancla[sid]}'>{i}. {titulo}</h2>\n{cuerpo.replace(NUM, str(i))}\n"
+        f"<h2 id='{ancla_de(sid)}'>{i}. {titulo}</h2>\n{cuerpo.replace(NUM, str(i))}\n"
         for i, (sid, titulo, cuerpo) in enumerate(vivas, start=1))
 
     html = f"""<!doctype html>

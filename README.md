@@ -58,6 +58,14 @@
 - **Talla por carpeta y por foto** (opcional): compara la distribución de tallas
   entre carpetas —cada carpeta como sitio de muestreo, estación o condición— con
   diagramas de caja y una prueba de **Kruskal-Wallis**
+- **Perfil en profundidad del testigo** (opcional): cuando las fotos se llaman
+  `tramo.testigo`, el tramo deja de ser una carpeta cualquiera y pasa a ser una
+  variable **ordenada**. El informe dibuja el perfil con la profundidad en el eje
+  vertical —la convención de cualquier testigo de sedimento— y responde si el
+  **número de partículas** y la **talla mediana** crecen o decrecen con la
+  profundidad, con **Spearman** y un valor de *p* por **permutación**. La
+  correlación va sobre los tramos y no sobre las partículas: dos partículas de la
+  misma placa no son observaciones independientes de la profundidad
 - **Ficha de partículas medidas**: las **6 fibras y las 6 partículas mayores**,
   cada una con su recorte al lado y la medida dibujada encima (Feret en amarillo,
   geodésico en magenta, máscara en verde). El reparto es deliberado: las fibras

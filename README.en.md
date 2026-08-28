@@ -61,6 +61,14 @@
 - **Size per folder and per photograph** (optional): compares the size
   distribution across folders — each folder as a sampling site, a station or a
   condition — with box plots and a **Kruskal-Wallis** test
+- **Depth profile of the core** (optional): when photographs are named
+  `interval.core`, the interval stops being an arbitrary folder and becomes an
+  **ordered** variable. The report draws the profile with depth on the vertical
+  axis — the convention for any sediment core — and answers whether the **number
+  of particles** and the **median size** rise or fall with depth, using
+  **Spearman** with a **permutation** p value. The correlation runs over the
+  intervals, not the particles: two particles from the same dish are not
+  independent observations of depth
 - **Measured particle cards**: the **6 fibres and the 6 largest particles**, each
   with its crop beside it and the measurement drawn on top (Feret in yellow,
   geodesic in magenta, mask in green). The split is deliberate: fibres are a

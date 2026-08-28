@@ -265,6 +265,12 @@ ELONGACION_ALARGADA = 3.0
 # y delgadas --, asi que no se le pide que lo haga. Se le pide a la CAJA, que es
 # lo unico que sabe de que particula hablamos. El 0.25 sale de que las 98
 # particulas anotadas a mano no pasan de 1.41 veces la diagonal de su caja.
+# Diferencia minima de brillo entre la caja y el anillo que la rodea para
+# admitir que ahi hay una particula. Por debajo se devuelve None en vez de
+# medir: el percentil 90 de la caja contra la mediana del anillo, en niveles
+# de 0-255.
+CONTRASTE_MINIMO = 12
+
 HOLGURA_COMPACTA = 0.10
 HOLGURA_ALARGADA = 0.25
 
@@ -437,10 +443,23 @@ def segmentar(bgr: np.ndarray, x1: float, y1: float, x2: float, y2: float,
     if anillo.sum() >= 20 and dentro_caja.size >= 9:
         fondo = float(np.median(canal[anillo]))
         pico = float(np.percentile(dentro_caja, 90))
-        # Sin contraste suficiente el punto medio no significa nada y se vuelve
-        # a Otsu, que al menos parte por donde el histograma se separa.
-        if pico - fondo >= 12:
+        if pico - fondo >= CONTRASTE_MINIMO:
             umbral = fondo + 0.5 * (pico - fondo)
+        else:
+            # SIN CONTRASTE NO SE INVENTA UNA TALLA. Aqui se caia a Otsu, que
+            # sin particula que separar parte el histograma del RUIDO y
+            # devuelve una mascara fragmentada -- con una talla de aspecto
+            # normal, indistinguible de un dato bueno salvo mirando la imagen.
+            #
+            # Medido sobre 100 cajas anotadas a mano: 7 caen por aqui, y las 7
+            # son de las dos placas anotadas en el marco de pixeles equivocado,
+            # donde la caja señala un sitio sin particula. El corte es nitido:
+            # esas 7 tienen contraste 2-7 y la siguiente tiene 34.
+            #
+            # Devolver None hace que el informe diga "no se pudo separar la
+            # particula del fondo" y la cuente aparte, que es lo que de verdad
+            # paso.
+            return None
 
     if umbral is None:
         _, mascara = cv2.threshold(canal, 0, 255,
