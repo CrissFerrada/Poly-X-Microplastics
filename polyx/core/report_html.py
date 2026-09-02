@@ -35,6 +35,7 @@ from .metrics import (
     LABEL_TP, LABEL_FP, LABEL_FN, LABEL_MISCLS,
 )
 from .yolo_wrap import Detection
+from .asignacion import NO_ASIGNABLE, clase_reportada, resumir
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -155,9 +156,16 @@ _PLACA = {"": "a", "x": "b", "xx": "c"}
 
 
 def _conteo_por_clase(detecciones) -> Counter:
+    """Partículas por polímero reportado.
+
+    Usa la clase *reportada* y no ``class_name`` a secas: con la abstención
+    activa, una partícula cuya confianza no sostiene el polímero cuenta bajo
+    «no asignable». Sigue siendo una partícula detectada — solo no se le
+    atribuye un polímero.
+    """
     c = Counter()
     for d in detecciones:
-        c[d.class_name] += 1
+        c[clase_reportada(d)] += 1
     return c
 
 
@@ -168,10 +176,13 @@ def _clases_vistas(resultados_planos) -> List[str]:
     modelo nunca detecta seguiría siendo una fila de la tabla, con cero, que es
     justo el dato que interesa mirar.
     """
-    vistas = {d.class_name for r in resultados_planos
+    vistas = {clase_reportada(d) for r in resultados_planos
               for d in list(r.predictions) + list(r.gt)}
     orden = [c for c in _ORDEN_CLASES if c in vistas]
-    return orden + sorted(vistas - set(orden))
+    # «no asignable» va al final y no alfabéticamente entre los polímeros: no es
+    # un polímero, es la ausencia de uno.
+    resto = sorted(vistas - set(orden) - {NO_ASIGNABLE})
+    return orden + resto + ([NO_ASIGNABLE] if NO_ASIGNABLE in vistas else [])
 
 
 def _muestra_de(ruta) -> Optional[tuple]:
@@ -216,10 +227,10 @@ def _tabla_conteo(manual: Optional[Counter], detectado: Counter,
             man = manual.get(c, 0)
             dif = det - man
             css = "dif-pos" if dif > 0 else ("dif-neg" if dif < 0 else "")
-            filas += (f"<tr><td>{c}</td><td>{man}</td><td>{det}</td>"
+            filas += (f"<tr><td>{tr(c)}</td><td>{man}</td><td>{det}</td>"
                       f"<td class='{css}'>{dif:+d}</td></tr>")
         else:
-            filas += f"<tr><td>{c}</td><td>{det}</td></tr>"
+            filas += f"<tr><td>{tr(c)}</td><td>{det}</td></tr>"
 
     tot_det = sum(detectado.get(c, 0) for c in clases)
     if hay_manual:
@@ -1319,14 +1330,14 @@ def _tabla_ancha(filas: List[tuple], clases: List[str], titulo_col: str,
     """
     if hay_manual:
         cab = (f"<tr><th rowspan='2'>{titulo_col}</th>"
-               + "".join(f"<th colspan='2' style='text-align:center'>{c}</th>"
+               + "".join(f"<th colspan='2' style='text-align:center'>{tr(c)}</th>"
                          for c in clases)
                + "<th colspan='2' style='text-align:center'>Total</th></tr><tr>"
                + "".join("<th class='r'>manual</th><th class='r'>modelo</th>"
                          for _ in clases + ["total"]) + "</tr>")
     else:
         cab = (f"<tr><th>{titulo_col}</th>"
-               + "".join(f"<th class='r'>{c}</th>" for c in clases)
+               + "".join(f"<th class='r'>{tr(c)}</th>" for c in clases)
                + "<th class='r'>Total</th></tr>")
 
     cuerpo = ""
@@ -2047,6 +2058,19 @@ def generate_report(state, output_path: Path,
         (tr("Imágenes procesadas"), str(total_imgs)),
         (tr("Total de detecciones"), str(total_dets)),
     ]
+    # Abstención: cuántas partículas se contaron sin atribuirles polímero. Va en
+    # Métodos y no enterrado en una tabla de resultados porque es una decisión
+    # del análisis, y quien lea el informe necesita saber que se tomó.
+    _res_asig = resumir([d for r in all_results for d in r.predictions],
+                        getattr(p, "conf_asignacion", 0.0))
+    if _res_asig.activa:
+        methods_rows.append((
+            tr("Confianza mínima para asignar polímero"),
+            f"{p.conf_asignacion:g}"))
+        methods_rows.append((
+            tr("Partículas sin polímero asignable"),
+            f"{_res_asig.no_asignables} / {_res_asig.total} "
+            f"({_res_asig.porcentaje_no_asignable:.1f} %)"))
     methods_html = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in methods_rows)
     equipo_html = _seccion_equipo(active)
 

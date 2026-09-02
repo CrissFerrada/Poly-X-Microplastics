@@ -326,6 +326,28 @@ class ParametrosPage(DetectorPage):
         l4.addLayout(g4)
         self.body.addWidget(c4)
 
+        # ── Hasta dónde se sostiene el polímero ──
+        c5, l5 = self.card(tr("Asignación de polímero (opcional)"), "🧪")
+        g5 = QGridLayout()
+        g5.setHorizontalSpacing(24); g5.setVerticalSpacing(10)
+        g5.addWidget(QLabel(tr("Confianza mínima para asignar:")), 0, 0)
+        self.sb_asignacion = QDoubleSpinBox(); self.sb_asignacion.setRange(0.0, 1.0)
+        self.sb_asignacion.setDecimals(2); self.sb_asignacion.setSingleStep(0.05)
+        self.sb_asignacion.setValue(state.params.conf_asignacion)
+        self.sb_asignacion.valueChanged.connect(self._on_change)
+        g5.addWidget(self.sb_asignacion, 0, 1)
+        g5.addWidget(_hint(tr(
+            "0 = desactivado. Por debajo de este valor la partícula se cuenta igual, "
+            "pero se reporta como «no asignable» en vez de atribuirle un polímero. "
+            "El Nile Red responde a la polaridad del entorno, no a la identidad "
+            "química: separa bien el PET —poliéster— del resto, mientras que PP y "
+            "LDPE son las dos poliolefinas y se distinguen solo por brillo, que "
+            "depende de la exposición y del foco. Abstenerse es más honesto que "
+            "inventar la clase, y el informe declara qué porcentaje quedó sin asignar.")),
+            1, 0, 1, 4)
+        l5.addLayout(g5)
+        self.body.addWidget(c5)
+
     def _apply_preset(self, name: str):
         """Aplica el perfil elegido (conf + imgsz) a los controles."""
         cfg = PRESETS.get(name)
@@ -402,6 +424,7 @@ class ParametrosPage(DetectorPage):
         p.distancia_camara_mm = float(self.sb_distancia.value())
         p.size_min_um = float(self.sb_min.value())
         p.size_max_um = float(self.sb_max.value())
+        p.conf_asignacion = float(self.sb_asignacion.value())
         p.troceo = self.combo_troceo.currentData() or "auto"
         p.troceo_umbral_px = int(self.sb_umbral.value())
         p.troceo_tile = int(self.sb_tile.value())

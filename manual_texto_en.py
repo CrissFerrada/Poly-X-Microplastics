@@ -804,6 +804,24 @@ inference resolution.]]
 <p>There is also a button that <b>measures how much resolution your GPU can take</b>
 before running out of memory, so you do not find out halfway through a batch.</p>
 
+<div class="aviso vio">
+  <span class="et">How far the polymer call holds</span>
+  <p>Detecting a particle and saying which polymer it is are two different
+  questions, and the second is far more fragile. Nile Red is
+  <b>solvatochromic</b>: its emission responds to the <b>polarity</b> of its
+  environment, not to chemical identity. That is why PET —a polar polyester—
+  separates cleanly, while PP and LDPE, both non-polar polyolefins, share a hue
+  and differ only in <i>brightness</i>; and brightness depends on exposure,
+  focus, particle thickness and how much the stain took.</p>
+  <p>The <b>Minimum confidence to assign</b> field lets the report say so rather
+  than hide it: below that value the particle <b>still counts</b> as a detected
+  particle, but is reported as <b>"unassignable"</b> instead of being given a
+  polymer. At 0 it is off. The report states in Methods what percentage of the
+  batch was left unassigned — exactly the figure a reviewer will ask for.</p>
+  <p>Confirming the polymer itself requires spectroscopy —FTIR or Raman—. No
+  fluorescent stain replaces that.</p>
+</div>
+
 <h3 id="d-ejecutar">Run</h3>
 [[fig:ui/06_det_ejecutar|The <b>Run</b> tab. Before starting it warns whether the batch will be
 tiled and how long it will take.]]

@@ -1141,4 +1141,23 @@ EN: dict[str, str] = {
     # -- Informe: aviso corto de la ficha --
     'la máscara se salía de la caja y se recortó a ella':
         'the mask ran outside the box and was clipped to it',
+    # -- Abstencion: hasta donde se sostiene el polimero --
+    'no asignable':
+        'unassignable',
+    'Asignación de polímero (opcional)':
+        'Polymer assignment (optional)',
+    'Confianza mínima para asignar:':
+        'Minimum confidence to assign:',
+    'Confianza mínima para asignar polímero':
+        'Minimum confidence to assign a polymer',
+    'Partículas sin polímero asignable':
+        'Particles with no assignable polymer',
+    '0 = desactivado. Por debajo de este valor la partícula se cuenta igual, pero se reporta como «no asignable» en vez de atribuirle un polímero. El Nile Red responde a la polaridad del entorno, no a la identidad química: separa bien el PET —poliéster— del resto, mientras que PP y LDPE son las dos poliolefinas y se distinguen solo por brillo, que depende de la exposición y del foco. Abstenerse es más honesto que inventar la clase, y el informe declara qué porcentaje quedó sin asignar.':
+        '0 = off. Below this value the particle is still counted, but reported as '
+        '"unassignable" instead of being given a polymer. Nile Red responds to the '
+        'polarity of its environment, not to chemical identity: it separates PET '
+        '—a polyester— cleanly from the rest, while PP and LDPE are both polyolefins '
+        'and differ only in brightness, which depends on exposure and focus. '
+        'Abstaining is more honest than inventing the class, and the report states '
+        'what percentage was left unassigned.',
 }

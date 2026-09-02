@@ -47,6 +47,12 @@ class Detection:
     # permite ir de una fila de la tabla a la partícula concreta en la foto: sin
     # él, «la mayor mide 5878 µm» no se puede ir a comprobar.
     numero: Optional[int] = None
+    # ¿Se sostiene el polímero de esta partícula, o solo su detección?
+    # Lo decide core.asignacion tras la inferencia, comparando conf contra el
+    # umbral de asignación. En False la partícula sigue contando, pero se
+    # reporta como «no asignable» en vez de atribuirle un polímero.
+    # De fábrica True: sin umbral configurado, todo se asigna como siempre.
+    asignable: bool = True
 
     @property
     def w(self) -> float: return self.x2 - self.x1

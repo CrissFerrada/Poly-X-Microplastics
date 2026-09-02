@@ -817,6 +817,25 @@ píxel y resolución de inferencia.]]
 <p>Hay además un botón que <b>mide cuanta resolución aguanta tu GPU</b> antes de
 quedarse sin memoria, para no descubrirlo a mitad de un lote.</p>
 
+<div class="aviso vio">
+  <span class="et">Hasta dónde se sostiene el polímero</span>
+  <p>Detectar una partícula y decir de qué polímero es son dos preguntas
+  distintas, y la segunda es mucho más frágil. El Nile Red es
+  <b>solvatocrómico</b>: su emisión responde a la <b>polaridad</b> del entorno,
+  no a la identidad química. Por eso el PET —poliéster, polar— se separa limpio,
+  mientras que el PP y el LDPE, las dos poliolefinas apolares, comparten tono y
+  solo difieren en <i>brillo</i>; y el brillo depende de la exposición, del foco,
+  del espesor de la partícula y de cuánto tiñó el colorante.</p>
+  <p>El campo <b>Confianza mínima para asignar</b> permite decirlo en el informe
+  en vez de esconderlo: por debajo de ese valor la partícula <b>sigue contando</b>
+  como partícula detectada, pero se reporta como <b>«no asignable»</b> en lugar de
+  atribuirle un polímero. En 0 queda desactivado. El informe declara en Métodos
+  qué porcentaje del lote quedó sin asignar, que es exactamente el dato que un
+  revisor va a pedir.</p>
+  <p>Para confirmar el polímero de verdad hace falta espectroscopía —FTIR o
+  Raman—. Ninguna tinción fluorescente sustituye eso.</p>
+</div>
+
 <h3 id="d-ejecutar">Ejecutar</h3>
 [[fig:ui/06_det_ejecutar|Pestaña <b>Ejecutar</b>. Antes de empezar avisa de si el lote se va a
 trocear y de cuánto va a tardar.]]

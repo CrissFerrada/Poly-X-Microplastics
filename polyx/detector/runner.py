@@ -13,6 +13,7 @@ from ..core.yolo_wrap import (
     YoloModel, Detection, find_gt_for_image, read_yolo_txt, compute_box_size_um,
 )
 from ..core.metrics import match_image
+from ..core.asignacion import marcar_asignables
 from ..core.procedencia import procedencia, sha256_archivo
 from ..core.calibracion import (resolver, cargar_indice, buscar_indice,
                                 resumen_lote)
@@ -249,6 +250,12 @@ class DetectorRunner(QThread):
                             if params.size_max_um > 0 and d.diam_um > params.size_max_um: continue
                             keep.append(d)
                         preds = keep
+
+                    # Abstencion: marcar cuales sostienen su polimero. Va DESPUES
+                    # del filtro de tamano y ANTES del match con el GT, porque no
+                    # descarta particulas -- solo decide si se les atribuye un
+                    # polimero o se reportan como «no asignable».
+                    marcar_asignables(preds, params.conf_asignacion)
 
                     # Numerar de arriba a abajo y de izquierda a derecha, no en
                     # el orden en que el modelo las devolvio: asi el numero 1

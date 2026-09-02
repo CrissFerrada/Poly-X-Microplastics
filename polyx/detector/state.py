@@ -40,6 +40,13 @@ class InferenceParams:
     um_per_px: float = 0.0          # 0 = no hay calibración; respaldo manual
     size_min_um: float = 0.0        # 0 = sin filtro inferior
     size_max_um: float = 0.0        # 0 = sin filtro superior
+    # ── Abstención: hasta dónde se sostiene el polímero ──
+    # Confianza mínima para atribuir un polímero a la partícula. Por debajo, la
+    # partícula se cuenta igual pero se reporta como «no asignable», en vez de
+    # inventarle una clase. 0 = desactivado, que es el comportamiento de
+    # siempre. El porqué —el Nile Red mide polaridad, no identidad química, y
+    # PP y LDPE son las dos poliolefinas— está en core/asignacion.py.
+    conf_asignacion: float = 0.0
     # ── Calibración automática contra la placa Petri ──
     # Con esto activo cada foto obtiene SU escala midiendo el anillo de la placa,
     # sin marcar nada a mano. Importa porque la distancia de disparo varía entre

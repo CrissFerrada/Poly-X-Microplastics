@@ -502,7 +502,31 @@ device: str = "0"           # "0" (GPU), "cpu"
 um_per_px: float = 0.0      # Calibración (0 = sin calibrar)
 size_min_um: float = 0.0    # Filtro inferior (0 = sin filtro)
 size_max_um: float = 0.0    # Filtro superior
+conf_asignacion: float = 0.0  # Confianza mínima para atribuir polímero (0 = off)
 ```
+
+### Abstención: detectar ≠ identificar
+
+`core/asignacion.py`. Por debajo de `conf_asignacion` la partícula **sigue
+contando** como partícula detectada, pero se reporta como **«no asignable»** en
+vez de atribuirle un polímero. El informe declara en Métodos qué porcentaje del
+lote quedó sin asignar.
+
+El motivo es químico, no de ingeniería: el Nile Red es **solvatocrómico** y su
+emisión responde a la **polaridad** del entorno, no a la identidad del polímero.
+El PET —poliéster— se separa limpio (recall 0.98); el PP y el LDPE son las dos
+poliolefinas apolares, comparten tono y solo difieren en brillo, que depende de
+exposición, foco y espesor. De ahí que su recall se hunda a 0.70 y 0.54.
+
+**No es una clase del modelo, y no debe serlo.** Una clase `desconocido`
+entrenada se define por la duda de quien anota y no por lo que se ve: la misma
+partícula acabaría LDPE un día y desconocido otro, y ese ruido caería justo
+sobre las dos clases ya más débiles.
+
+**Tampoco usa el margen entre las dos clases más probables**, que sería mejor
+criterio: tras el NMS, YOLO devuelve una sola confianza y una sola clase por
+caja, y las puntuaciones del resto se pierden ahí. Recuperarlas obliga a
+interceptar el tensor crudo de la cabeza, frágil entre versiones de ultralytics.
 
 ### Entrenamiento
 ```python
