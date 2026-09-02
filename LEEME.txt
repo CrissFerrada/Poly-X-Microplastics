@@ -115,13 +115,25 @@ ESTRUCTURA DE CARPETAS
   iniciar_polyx.bat         [Win] Lanzador
   actualizar.bat            [Win] Actualizador
   Lanzar_macOS.command      [Mac] Instalación + lanzador
+  crear_icono_macOS.command [Mac] Icono que abre sin ventana de Terminal
   actualizar_macOS.command  [Mac] Actualizador
 
 REGENERAR EL MANUAL CON LA UI ACTUAL
 ------------------------------------
-.venv\Scripts\python.exe generar_manual.py --solo launcher
-.venv\Scripts\python.exe generar_manual.py --solo detector
-.venv\Scripts\python.exe generar_manual.py            (todos)
+Son dos pasos: primero las capturas de la interfaz, despues el manual.
+
+  1) capturas (una tanda por idioma)
+     .venv\Scripts\python.exe capturar_manual.py --salida manual_screenshots/es
+     set POLYX_IDIOMA=en && .venv\Scripts\python.exe capturar_manual.py --salida manual_screenshots/en
+
+  2) manual completo, en los dos idiomas, mas los PDF
+     .venv\Scripts\python.exe generar_manual.py --pdf
+
+El texto vive en manual_texto_es.py y manual_texto_en.py; el motor (plantilla,
+hoja de estilo, numeracion de figuras) en generar_manual.py.
+
+  generar_manual.py quedo OBSOLETO: reemplazaba figuras por posicion y sobre
+  el manual actual las descolocaria. Ya no hace nada, solo avisa.
 
 PROBLEMAS COMUNES
 -----------------

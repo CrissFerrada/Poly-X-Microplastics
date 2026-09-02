@@ -64,11 +64,25 @@ polyx/                    # Código fuente
 │       ├── comparar.py   # Comparar múltiples runs
 │       ├── exportar.py   # Export PT→ONNX/TensorRT/CoreML
 │       └── informe.py    # Reporte entrenamiento
-└── legacy/               # Versiones anteriores (referencia)
-    ├── Detector_Microplastico.py
-    ├── trainer_microplastico.py
-    ├── polyx_viewer.py
-    └── ...
+
+legacy/                   # Versiones anteriores, en la RAIZ (no dentro de polyx/)
+├── Detector_Microplastico.py
+├── trainer_microplastico.py
+├── polyx_viewer.py
+└── ...
+
+_diagnostico/             # Scripts sueltos de diagnostico. No son del programa:
+                          # se usan a mano para mirar un dataset o un modelo.
+
+manual_screenshots/       # Capturas que empotra el manual
+├── es/  en/                 interfaz, un idioma por carpeta
+└── web/ win/                figuras de apoyo
+
+# Cadena del manual (archivos sueltos en la raiz):
+#   capturar_manual.py   capturas de la interfaz → manual_screenshots/
+#   manual_texto_es.py   texto del manual, ES
+#   manual_texto_en.py   texto del manual, EN
+#   generar_manual.py    motor: arma Manual_PolyX[.en].html y los PDF
 
 models/                   # Pesos YOLO .pt entrenados
 ├── bestdetectormedium.pt # Modelo por defecto (producción)
@@ -197,6 +211,7 @@ actualizar.bat       :: traer lo nuevo de GitHub
 
 ```bash
 Lanzar_macOS.command       # instala la 1ª vez, arranca las siguientes
+crear_icono_macOS.command  # crea Poly-X.app: abre sin ventana de Terminal
 actualizar_macOS.command   # traer lo nuevo de GitHub
 construir_app_macOS.command  # empaquetar Poly-X.app (opcional)
 ```
@@ -515,14 +530,23 @@ lr0: float = 0.01
 
 ## 📚 Archivos generados automáticamente
 
-- **Manual_PolyX.html** — Generado por `generar_manual.py` (screenshots + especificación)
-- **manual_screenshots/** — Capturas de cada tab (actualizadas al regenerar manual)
+- **Manual_PolyX.html / Manual_PolyX.en.html** (+ sus PDF) — los arma
+  `generar_manual.py` desde cero: texto, figuras, índice y hoja de estilo.
+- **manual_texto_es.py / manual_texto_en.py** — el texto del manual. Solo
+  contenido; el motor está en `generar_manual.py`.
+- **manual_screenshots/** — capturas que empotra el manual, una carpeta por
+  origen: `es/` y `en/` (interfaz, un idioma cada una), más `web/` y `win/`.
 
-Para regenerar:
+Para regenerar (capturas primero, manual después):
 ```bash
-.venv\Scripts\python.exe generar_manual.py --solo detector
-.venv\Scripts\python.exe generar_manual.py              # todos
+.venv\Scripts\python.exe capturar_manual.py --salida manual_screenshots/es
+set POLYX_IDIOMA=en && .venv\Scripts\python.exe capturar_manual.py --salida manual_screenshots/en
+.venv\Scripts\python.exe generar_manual.py --pdf
 ```
+
+> El generador anterior reemplazaba figuras *por posición* dentro de un HTML ya
+> escrito. Se retiró en septiembre de 2026 —queda en el historial de git— porque
+> con el manual actual descolocaría las imágenes sin avisar.
 
 ---
 

@@ -75,7 +75,8 @@ venv.txt
 
 # Datos de active learning (imagenes pesadas, no van al repo)
 dataset_correcciones/
-# Scripts temporales de diagnostico
+# Scripts temporales de diagnostico (agrupados en _diagnostico/ desde sep-2026)
+_diagnostico/
 _diag_*.py
 _diag_overlays/
 _diag_train_vis/
@@ -95,10 +96,23 @@ paper/
 Wheigts/
 poly-x-repo/
 
-# MATLAB: instalador de 220 MB (GitHub rechaza >100 MB) y producto licenciado
-matlab_R2024b_Windows.exe
-_temp_matlab_R2024b_Windows/
+# MATLAB: instalador de 220 MB (GitHub rechaza >100 MB) y producto licenciado.
+# El instalador y su carpeta temporal viven dentro de 'Microplasticos con MATLAB/'.
 Microplasticos con MATLAB/
+matlab_R2024b_Windows.exe
+
+# ── Fuera del repo publicado: no lo necesita el programa ────────────
+# El repositorio contiene SOLO lo que hace falta para instalar, ejecutar y
+# documentar Poly-X. Lo de abajo se queda en el disco de trabajo.
+# Los PDF del manual se regeneran con: generar_manual.py --pdf
+# El HTML si va versionado y se abre sin conexion, asi que el PDF sobra (10 MB).
+Manual_PolyX*.pdf
+
+# Hoja de ruta personal, no es material del programa.
+SUGERENCIAS_Y_PROXIMOS_PASOS.md
+# Guias y manuales de terceros (Claude Code, etc.): no son de este proyecto.
+Guia_*.html
+Guia_*.pdf
 
 # Herramientas locales de agentes
 .agents/

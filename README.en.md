@@ -380,6 +380,7 @@ SETUP.bat                # 🪟 Installer
 iniciar_polyx.bat        # 🪟 Launcher
 actualizar.bat           # 🪟 Updater
 Lanzar_macOS.command     # 🍎 Installer + launcher (both in one)
+crear_icono_macOS.command    # 🍎 Icon that opens with no Terminal window
 actualizar_macOS.command # 🍎 Updater
 construir_app_macOS.command  # 🍎 Build Poly-X.app (optional)
 ```
@@ -441,12 +442,26 @@ installation meant for use does not need it.
 
 ## User manual
 
-`Manual_PolyX.en.html` ships with the repository: every tab documented with
-screenshots. Regenerate it with:
+`Manual_PolyX.en.html` (English) and `Manual_PolyX.html` (Spanish) are the full
+manual: step-by-step installation from GitHub with real photographs of every
+step — on Windows and macOS — all four modules screen by screen, how size is
+measured, the report, the shortcuts and troubleshooting. They open on a
+double-click and work offline: every image is embedded. Alongside them,
+`Manual_PolyX.en.pdf` and `Manual_PolyX.pdf` for printing or emailing.
+
+To regenerate it against the current interface:
 
 ```bash
-POLYX_IDIOMA=en .venv\Scripts\python.exe generar_manual.py --manual Manual_PolyX.en.html
+# 1. interface screenshots, one pass per language
+.venv\Scripts\python.exe capturar_manual.py --salida manual_screenshots/es
+POLYX_IDIOMA=en .venv\Scripts\python.exe capturar_manual.py --salida manual_screenshots/en
+
+# 2. the manual, both languages and their PDFs
+.venv\Scripts\python.exe generar_manual.py --pdf
 ```
+
+The text lives in `manual_texto_es.py` and `manual_texto_en.py`; the engine —
+template, stylesheet and figure numbering — in `generar_manual.py`.
 
 ---
 

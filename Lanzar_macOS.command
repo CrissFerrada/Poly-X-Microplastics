@@ -6,6 +6,11 @@
 #  Doble clic en Finder para ejecutar.
 #  La primera vez instala todo solo (10-15 min); después arranca directo.
 #
+#  La ventana de Terminal que queda detrás es inevitable aquí — un .command
+#  es, por definición, un script que Finder le entrega a la Terminal — y de
+#  hecho conviene: es donde se lee el error si algo falla. Para el uso diario
+#  sin esa ventana está crear_icono_macOS.command, que deja un Poly-X.app.
+#
 #  ⚠️  Si macOS dice «no se puede abrir porque es de un desarrollador no
 #      identificado»: clic DERECHO sobre este archivo → Abrir → Abrir.
 #      Solo hace falta la primera vez.
@@ -149,22 +154,19 @@ fi
 # olvida. Se pregunta en vez de imponerlo: no todo el mundo quiere cosas
 # nuevas en su Escritorio.
 ESCRITORIO="$HOME/Desktop"
-if [ -d "$ESCRITORIO" ] && [ ! -e "$ESCRITORIO/Poly-X" ]; then
+if [ -d "$ESCRITORIO" ] && [ ! -e "$ESCRITORIO/Poly-X.app" ]; then
     echo ""
-    read -r -p "  ¿Crear un acceso directo a Poly-X en el Escritorio? [S/n] " crear
+    read -r -p "  ¿Crear un icono de Poly-X en el Escritorio? [S/n] " crear
     case "$crear" in
-        n|N) echo "  De acuerdo, sin acceso directo." ;;
+        n|N) echo "  De acuerdo, sin icono. Puedes crearlo luego con crear_icono_macOS.command." ;;
         *)
-            # Enlace simbolico y no alias de Finder: un alias hay que crearlo
-            # con AppleScript y se rompe si la carpeta se mueve, mientras que
-            # el enlace se arregla recreandolo. Ademas conserva el permiso de
-            # ejecucion, asi que el doble clic funciona igual.
-            if ln -sf "$INSTALL_DIR_ABS/Lanzar_macOS.command" "$ESCRITORIO/Poly-X" 2>/dev/null; then
-                echo "  [OK] Acceso directo creado: Escritorio → Poly-X"
-            else
-                echo "  [AVISO] No se pudo crear el acceso directo. No es grave:"
+            # Un .app y no un enlace a este mismo .command: el .command arrastra
+            # siempre una ventana de Terminal detras, que se queda abierta todo
+            # el rato que dure el programa. El .app arranca sin ella.
+            bash "$INSTALL_DIR_ABS/crear_icono_macOS.command" --escritorio --silencioso || {
+                echo "  [AVISO] No se pudo crear el icono. No es grave:"
                 echo "          abre Poly-X desde esta misma carpeta."
-            fi
+            }
             ;;
     esac
 fi

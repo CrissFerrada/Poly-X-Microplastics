@@ -472,6 +472,7 @@ SETUP.bat                # 🪟 Instalador
 iniciar_polyx.bat        # 🪟 Lanzador
 actualizar.bat           # 🪟 Actualizador
 Lanzar_macOS.command     # 🍎 Instalador + lanzador (los dos en uno)
+crear_icono_macOS.command    # 🍎 Icono que abre sin ventana de Terminal
 actualizar_macOS.command # 🍎 Actualizador
 construir_app_macOS.command  # 🍎 Empaquetar Poly-X.app (opcional)
 ```
@@ -537,7 +538,26 @@ contrasta con el diccionario. Debe decir **0 sin traducir**.
 
 ## Manual de usuario
 
-El archivo `Manual_PolyX.html` contiene la documentación completa con capturas de cada módulo, atajos de teclado, flujos de trabajo recomendados y referencias bibliográficas.
+`Manual_PolyX.html` (español) y `Manual_PolyX.en.html` (inglés) son el manual
+completo: instalación paso a paso desde GitHub con fotografías reales de cada
+paso —en Windows y macOS—, las cuatro módulos pantalla por pantalla, cómo se
+mide la talla, el informe, los atajos y la solución de problemas. Se abren con
+doble clic y sin conexión: las imágenes van incrustadas. Junto a ellos,
+`Manual_PolyX.pdf` y `Manual_PolyX.en.pdf` para imprimir o enviar.
+
+Para regenerarlo contra la interfaz actual:
+
+```bat
+REM 1. capturas de la interfaz, una tanda por idioma
+.venv\Scripts\python.exe capturar_manual.py --salida manual_screenshots/es
+set POLYX_IDIOMA=en && .venv\Scripts\python.exe capturar_manual.py --salida manual_screenshots/en
+
+REM 2. el manual, los dos idiomas y sus PDF
+.venv\Scripts\python.exe generar_manual.py --pdf
+```
+
+El texto está en `manual_texto_es.py` y `manual_texto_en.py`; el motor —plantilla,
+hoja de estilo y numeración de figuras— en `generar_manual.py`.
 
 ---
 
