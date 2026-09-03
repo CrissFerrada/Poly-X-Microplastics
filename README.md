@@ -5,7 +5,7 @@
 > **Detección automatizada y clasificación de microplásticos (PET, PP, LDPE)  
 > por fluorescencia Nile Red bajo luz UV (254 nm) con modelos YOLO v8/v11.**
 
-**Autor:** Cristofher Ferrada · Doctorado en Ciencias mención Química · PUCV · 2026  
+**Autor:** Cristofher Ferrada · Dr (c) en Ciencias mención Química · PUCV · 2026  
 **Versión:** 2.0.0 · **Windows 10/11 y macOS** · Python 3.9+
 
 ---
@@ -285,6 +285,40 @@ Para ver qué falta por traducir:
 ```bat
 .venv\Scripts\python.exe auditar_traduccion.py
 ```
+
+## Temas
+
+Cuatro temas, en **Preferencias** (botón de la barra superior, o `Ctrl+,`):
+
+| Tema | Para qué |
+|---|---|
+| **Claro** | El de siempre. Por defecto |
+| **Oscuro** | Trabajar de noche, y junto a fotografías de UV |
+| **Azul nocturno** | Azul profundo, con el acento más frío |
+| **Alto contraste** | Cumple AAA. Para proyector y para vista cansada |
+
+El tema se aplica **al instante en el launcher**, que se reconstruye solo. Los
+módulos ya abiertos conservan el suyo —son procesos aparte, con los colores
+incrustados en su hoja de estilo— y los que abras después ya salen con el nuevo.
+Es el mismo contrato que el idioma.
+
+`POLYX_TEMA=oscuro` lo fuerza sin tocar la interfaz.
+
+> **Los informes HTML no siguen el tema, a propósito.** Un informe se imprime,
+> se adjunta a un correo y se archiva: que saliera oscuro porque quien lo generó
+> prefiere trabajar de noche gastaría tinta y haría que dos informes del mismo
+> análisis no se parecieran.
+
+Todos los pares de texto y fondo de los cuatro temas pasan el **4.5:1** que pide
+la WCAG para texto normal.
+
+### Movimiento
+
+El panel del microscopio del launcher se anima: las partículas derivan y un
+barrido las va marcando con sus cajas de detección, que es lo que hace el
+programa. En **Preferencias → Movimiento** se puede apagar —el panel queda en un
+fotograma fijo— si el movimiento molesta o si el equipo va justo.
+`POLYX_SIN_ANIMACION=1` hace lo mismo desde el entorno.
 
 ---
 

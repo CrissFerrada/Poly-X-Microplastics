@@ -29,7 +29,7 @@ from typing import Callable
 
 from .traducciones_en import EN as _EN, NO_TRADUCIR
 
-IDIOMAS = {"es": "Espanol", "en": "English"}
+IDIOMAS = {"es": "Español", "en": "English"}
 _ARCHIVO = Path.home() / ".polyx_idioma.json"
 
 _idioma = "es"
@@ -54,8 +54,6 @@ TRADUCCIONES: dict[str, str] = {
     "Idioma": "Language",
     "MÓDULOS": "MODULES",
     "● Listo": "● Ready",
-    "📄 LÉAME": "📄 READ ME",
-    "📖 Manual de usuario": "📖 User manual",
     "Polímeros": "Polymers",
     "fluorescencia Nile Red": "Nile Red fluorescence",
     "medición": "measurement",
@@ -64,8 +62,8 @@ TRADUCCIONES: dict[str, str] = {
     "e inteligencia artificial. Entrenamiento, etiquetado, detección y reporte en un mismo flujo.":
         "Automated detection of PET, PP and LDPE by Nile Red fluorescence (254 nm) "
         "and machine learning. Training, labeling, detection and reporting in a single workflow.",
-    "✍  Diseñado y desarrollado por <b>Cristofher Ferrada</b> · Doctorado en Química, 2026":
-        "✍  Designed and developed by <b>Cristofher Ferrada</b> · PhD in Chemistry, 2026",
+    "Diseñado y desarrollado por <b>Cristofher Ferrada</b> · Dr (c) en Química, 2026":
+        "Designed and developed by <b>Cristofher Ferrada</b> · PhD (c) in Chemistry, 2026",
     "Analiza imágenes con un modelo .pt entrenado. Genera salidas anotadas, "
     "CSV con centroides y diámetros, métricas globales y reporte HTML paper-quality.":
         "Analyzes images with a trained .pt model. Produces annotated output, a CSV "
@@ -131,12 +129,12 @@ TRADUCCIONES: dict[str, str] = {
         "afterwards.",
 
     # ── Entrenador › GPU y prioridades ──
-    "🚀  Maximizar imgsz para mi GPU": "🚀  Maximize imgsz for my GPU",
-    "🔄  Detectar GPU / VRAM": "🔄  Detect GPU / VRAM",
-    "⚡  Sugerir imgsz MÁXIMO": "⚡  Suggest MAXIMUM imgsz",
+    "Maximizar imgsz para mi GPU": "Maximize imgsz for my GPU",
+    "Detectar GPU / VRAM": "Detect GPU / VRAM",
+    "Sugerir imgsz MÁXIMO": "Suggest MAXIMUM imgsz",
     "Sugerir batch para mi GPU": "Suggest batch for my GPU",
-    "🎯  Optimizar todo (imgsz → batch → velocidad)":
-        "🎯  Optimize everything (imgsz → batch → speed)",
+    "Optimizar todo (imgsz → batch → velocidad)":
+        "Optimize everything (imgsz → batch → speed)",
     "Detectando GPU…": "Detecting GPU…",
     "Sin GPU utilizable": "No usable GPU",
     "Configuración optimizada": "Optimized configuration",

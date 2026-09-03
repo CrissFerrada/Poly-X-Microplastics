@@ -5,7 +5,7 @@
 > **Automated detection and classification of microplastics (PET, PP, LDPE)
 > by Nile Red fluorescence under UV light (254 nm), using YOLO v8/v11 models.**
 
-**Author:** Cristofher Ferrada · PhD in Chemistry · PUCV · 2026
+**Author:** Cristofher Ferrada · PhD (c) in Chemistry · PUCV · 2026
 **Version:** 2.0.0 · **Windows 10/11 and macOS** · Python 3.9+
 
 ---
@@ -251,6 +251,40 @@ To see what is still untranslated:
 .venv\Scripts\python.exe auditar_traduccion.py
 ```
 
+## Themes
+
+Four themes, under **Preferences** (top-bar button, or `Ctrl+,`):
+
+| Theme | What for |
+|---|---|
+| **Light** | The original one. Default |
+| **Dark** | Working at night, and next to UV photographs |
+| **Midnight blue** | Deep blue, with a cooler accent |
+| **High contrast** | Meets AAA. For projectors and for tired eyes |
+
+The theme applies **immediately in the launcher**, which rebuilds itself.
+Modules already open keep theirs — they are separate processes, with the colours
+baked into their stylesheet — and any you open afterwards come up with the new
+one. Same contract as the language.
+
+`POLYX_TEMA=oscuro` forces it without touching the interface.
+
+> **HTML reports deliberately do not follow the theme.** A report gets printed,
+> emailed and filed: turning it dark because whoever produced it prefers working
+> at night would waste ink and make two reports of the same analysis look
+> unalike.
+
+Every text/background pair in all four themes clears the **4.5:1** WCAG asks for
+normal text.
+
+### Motion
+
+The launcher's microscope panel is animated: particles drift and a sweep marks
+them with detection boxes — which is what the program does. Under
+**Preferences → Motion** it can be turned off, leaving the panel on a still
+frame, if the motion bothers you or the machine is struggling.
+`POLYX_SIN_ANIMACION=1` does the same from the environment.
+
 ---
 
 ## Requirements
@@ -476,7 +510,7 @@ are not out yet.
 
 ## Licence and contact
 
-**Cristofher Ferrada** — PhD in Chemistry, Pontificia Universidad Católica de
+**Cristofher Ferrada** — PhD (c) in Chemistry, Pontificia Universidad Católica de
 Valparaíso, 2026.
 
 Repository: https://github.com/CrissFerrada/Poly-X-Microplastics

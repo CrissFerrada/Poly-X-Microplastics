@@ -4,13 +4,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 
 from ...core import theme as T
+from ...core import iconos
 from ..state import TrainerState
 
 
 class TrainerPage(QWidget):
     """Página con header tipo manual: icono grande + título + subtítulo."""
 
-    PAGE_ICON: str = "🎯"
+    PAGE_ICON: str = "diana"
     PAGE_TITLE: str = ""
     PAGE_DESCRIPTION: str = ""
 
@@ -26,9 +27,11 @@ class TrainerPage(QWidget):
         # Header del paso (igual al manual: icono + título grande)
         head = QHBoxLayout()
         head.setSpacing(14)
-        icon_lbl = QLabel(self.PAGE_ICON)
-        icon_lbl.setStyleSheet("font-size: 28pt; border: none;")
-        head.addWidget(icon_lbl)
+        # PAGE_ICON es el nombre de un dibujo de core/iconos.py, no un emoji.
+        icon_lbl = QLabel()
+        icon_lbl.setPixmap(iconos.pixmap(self.PAGE_ICON, 30, T.ACCENT_TX, 1.9))
+        icon_lbl.setStyleSheet("border: none;")
+        head.addWidget(icon_lbl, 0, Qt.AlignVCenter)
         title_lbl = QLabel(self.PAGE_TITLE)
         title_lbl.setStyleSheet(f"color: {T.INK}; font-size: 22pt; font-weight: 600; border: none;")
         head.addWidget(title_lbl, 1)
@@ -45,7 +48,7 @@ class TrainerPage(QWidget):
         outer.addLayout(self.body)
         outer.addStretch(1)
 
-    def card(self, title: str, icon: str = "") -> tuple[QFrame, QVBoxLayout]:
+    def card(self, title: str, icono: str = "") -> tuple[QFrame, QVBoxLayout]:
         frame = QFrame()
         frame.setStyleSheet(
             f"QFrame {{ background: {T.BG}; border: 1px solid {T.RULE}; border-radius: 8px; }}"
@@ -56,9 +59,13 @@ class TrainerPage(QWidget):
         if title:
             row = QHBoxLayout()
             row.setSpacing(8)
-            if icon:
-                ic = QLabel(icon)
-                ic.setStyleSheet("font-size: 14pt; border: none;")
+            if icono:
+                # `icon` es el nombre de un dibujo de core/iconos.py, no un
+                # emoji: asi la cabecera se ve igual en Windows y en macOS y
+                # toma el color del tema en vez de venir con el suyo.
+                ic = QLabel()
+                ic.setPixmap(iconos.pixmap(icono, 17, T.INK2, 1.85))
+                ic.setStyleSheet("border: none;")
                 row.addWidget(ic)
             t = QLabel(title)
             t.setStyleSheet(f"color: {T.INK}; font-size: 13pt; font-weight: 600; border: none;")

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import theme as T
+from ..core import iconos
 from ..core.widgets import LogoBadge, HLine
 from .state import LabelerState
 from .canvas import BboxCanvas
@@ -81,7 +82,8 @@ class LabelerWindow(QMainWindow):
         lv.addWidget(LogoBadge("POLY-X", "Etiquetador"))
         lv.addSpacing(6)
 
-        btn_open = QPushButton(tr("📂  Abrir carpeta…"))
+        btn_open = QPushButton(tr("Abrir carpeta…"))
+        btn_open.setIcon(iconos.icono("dataset", 15, T.INK2))
         btn_open.setObjectName("primary")
         btn_open.setCursor(Qt.PointingHandCursor)
         btn_open.clicked.connect(self._open_folder)
@@ -99,7 +101,7 @@ class LabelerWindow(QMainWindow):
             }}
             QListWidget::item {{ padding: 4px 6px; font-size: 9pt; }}
             QListWidget::item:selected {{
-                background: #dde7f4; color: {T.ACCENT_D};
+                background: #dde7f4; color: {T.ACCENT_D_TX};
             }}
         """)
         self.img_list.currentRowChanged.connect(self._on_list_select)
@@ -176,7 +178,7 @@ class LabelerWindow(QMainWindow):
 
         btn_add = QPushButton(tr("+ Agregar clase"))
         btn_add.setStyleSheet(
-            f"QPushButton {{ background: transparent; color: {T.ACCENT}; "
+            f"QPushButton {{ background: transparent; color: {T.ACCENT_TX}; "
             f"border: 1px dashed {T.ACCENT}; border-radius: 4px; padding: 4px; }}"
             f"QPushButton:hover {{ background: {T.BG_SOFT}; }}"
         )
@@ -210,7 +212,8 @@ class LabelerWindow(QMainWindow):
         )
         rv.addWidget(self.lbl_model)
 
-        btn_load_model = QPushButton(tr("📂  Cargar modelo…"))
+        btn_load_model = QPushButton(tr("Cargar modelo…"))
+        btn_load_model.setIcon(iconos.icono("dataset", 15, T.INK2))
         btn_load_model.clicked.connect(self._load_model)
         rv.addWidget(btn_load_model)
 
@@ -235,11 +238,11 @@ class LabelerWindow(QMainWindow):
         fila_pre.addWidget(self.sb_pre_imgsz)
         rv.addLayout(fila_pre)
 
-        btn_pre_one = QPushButton(tr("🤖  Pre-anotar imagen actual"))
+        btn_pre_one = QPushButton(tr("Pre-anotar imagen actual"))
         btn_pre_one.clicked.connect(self._preannotar_current)
         rv.addWidget(btn_pre_one)
 
-        btn_pre_all = QPushButton(tr("🤖  Pre-anotar TODAS"))
+        btn_pre_all = QPushButton(tr("Pre-anotar TODAS"))
         btn_pre_all.setObjectName("primary")
         btn_pre_all.clicked.connect(self._preannotar_all)
         rv.addWidget(btn_pre_all)
@@ -267,14 +270,15 @@ class LabelerWindow(QMainWindow):
         btn_rev.clicked.connect(self._marcar_revisada)
         rv.addWidget(btn_rev)
 
-        btn_save = QPushButton(tr("💾  Guardar (.txt)"))
+        btn_save = QPushButton(tr("Guardar (.txt)"))
+        btn_save.setIcon(iconos.icono("guardar", 15, T.INK2))
         btn_save.setObjectName("primary")
         btn_save.clicked.connect(self._save)
         rv.addWidget(btn_save)
 
         self.lbl_status = QLabel(tr("● Listo"))
         self.lbl_status.setAlignment(Qt.AlignCenter)
-        self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt;")
+        self.lbl_status.setStyleSheet(f"color: {T.OK_TX}; font-size: 9pt;")
         rv.addWidget(self.lbl_status)
 
         return panel

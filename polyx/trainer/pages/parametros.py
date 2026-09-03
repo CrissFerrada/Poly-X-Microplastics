@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from ._base import TrainerPage
 from ...core import theme as T
+from ...core import iconos
 from ..hw import detect_gpu, recommend_max_imgsz, recommend_batch, estimate_vram_gb, humanize_gb
 from ...core.i18n import tr
 
@@ -40,7 +41,7 @@ def _hint(text: str) -> QLabel:
 
 
 class ParametrosPage(TrainerPage):
-    PAGE_ICON = "⚙️"
+    PAGE_ICON = "ajustes"
     PAGE_TITLE = tr("Parámetros de entrenamiento")
     PAGE_DESCRIPTION = (
         tr("Cada parámetro tiene un hint con su explicación. Los valores por defecto son "
@@ -51,7 +52,7 @@ class ParametrosPage(TrainerPage):
         super().__init__(state, parent)
 
         # ── Configuración básica (incluye Maximizar imgsz) ──
-        c1, l1 = self.card(tr("Configuración básica"), "🧱")
+        c1, l1 = self.card(tr("Configuración básica"), "piezas")
         g = QGridLayout(); g.setHorizontalSpacing(20); g.setVerticalSpacing(10)
 
         # Imgsz: combobox con tamaños altos como valores principales
@@ -92,7 +93,7 @@ class ParametrosPage(TrainerPage):
         )
         gf = QVBoxLayout(gpu_frame); gf.setContentsMargins(14, 10, 14, 12); gf.setSpacing(8)
 
-        title = QLabel(tr("🚀  Maximizar imgsz para mi GPU"))
+        title = QLabel(tr("Maximizar imgsz para mi GPU"))
         title.setStyleSheet(f"color: {T.INK}; font-size: 11pt; font-weight: 600; border: none;")
         gf.addWidget(title)
         self.lbl_gpu = QLabel(tr("Detectando GPU…"))
@@ -100,11 +101,13 @@ class ParametrosPage(TrainerPage):
         gf.addWidget(self.lbl_gpu)
 
         btn_row = QHBoxLayout(); btn_row.setSpacing(8)
-        self.btn_detect = QPushButton(tr("🔄  Detectar GPU / VRAM"))
+        self.btn_detect = QPushButton(tr("Detectar GPU / VRAM"))
+        self.btn_detect.setIcon(iconos.icono("recargar", 15, T.ON_ACCENT))
         self.btn_detect.clicked.connect(self._detect_gpu)
         btn_row.addWidget(self.btn_detect)
 
-        self.btn_maximize = QPushButton(tr("⚡  Sugerir imgsz MÁXIMO"))
+        self.btn_maximize = QPushButton(tr("Sugerir imgsz MÁXIMO"))
+        self.btn_maximize.setIcon(iconos.icono("rayo", 15, T.ON_ACCENT))
         self.btn_maximize.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 7px 14px; font-weight: 600;"
@@ -121,7 +124,8 @@ class ParametrosPage(TrainerPage):
 
         # Un solo botón que aplica el orden de prioridades completo, en vez de
         # dejar que el usuario adivine si primero sube imgsz o primero batch.
-        self.btn_optimizar = QPushButton(tr("🎯  Optimizar todo (imgsz → batch → velocidad)"))
+        self.btn_optimizar = QPushButton(tr("Optimizar todo (imgsz → batch → velocidad)"))
+        self.btn_optimizar.setIcon(iconos.icono("diana", 15, T.ON_ACCENT))
         self.btn_optimizar.setStyleSheet(
             f"background: {T.OK}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 14px; font-weight: 600;"
@@ -143,7 +147,7 @@ class ParametrosPage(TrainerPage):
         self.body.addWidget(c1)
 
         # ── Optimizador y LR ──
-        c2, l2 = self.card(tr("Optimizador y learning rate"), "📈")
+        c2, l2 = self.card(tr("Optimizador y learning rate"), "curva")
         g2 = QGridLayout(); g2.setHorizontalSpacing(20); g2.setVerticalSpacing(10)
         g2.addWidget(QLabel(tr("Learning rate (lr0):")), 0, 0)
         self.sb_lr0 = QDoubleSpinBox(); self.sb_lr0.setRange(0.0001, 0.1)
@@ -180,7 +184,7 @@ class ParametrosPage(TrainerPage):
         self.body.addWidget(c2)
 
         # ── Early stopping ──
-        c3, l3 = self.card(tr("Early stopping y checkpoints"), "💾")
+        c3, l3 = self.card(tr("Early stopping y checkpoints"), "guardar")
         g3 = QGridLayout(); g3.setHorizontalSpacing(20); g3.setVerticalSpacing(10)
         g3.addWidget(QLabel(tr("Patience:")), 0, 0)
         self.sb_pat = QSpinBox(); self.sb_pat.setRange(0, 500); self.sb_pat.setValue(state.params.patience)
@@ -194,7 +198,7 @@ class ParametrosPage(TrainerPage):
         self.body.addWidget(c3)
 
         # ── Hardware / IO ──
-        c4, l4 = self.card(tr("Hardware e I/O"), "🖥")
+        c4, l4 = self.card(tr("Hardware e I/O"), "equipo")
         g4 = QGridLayout(); g4.setHorizontalSpacing(20); g4.setVerticalSpacing(10)
         g4.addWidget(QLabel(tr("Device:")), 0, 0)
         self.ed_device = QLineEdit(state.params.device); self.ed_device.editingFinished.connect(self._on_change)
@@ -300,7 +304,7 @@ class ParametrosPage(TrainerPage):
                 + (f"<br><span style='font-size:9pt'>{' · '.join(extra)}</span>"
                    if extra else "")
             )
-            self.lbl_gpu.setStyleSheet(f"color: {T.OK}; font-size: 10pt; border: none;")
+            self.lbl_gpu.setStyleSheet(f"color: {T.OK_TX}; font-size: 10pt; border: none;")
         elif info.gpu_sin_torch:
             # La distinción importa: la tarjeta sirve, lo que está mal es la
             # instalación. Decir "no hay GPU" aquí mandaría a comprar hardware.
@@ -312,14 +316,14 @@ class ParametrosPage(TrainerPage):
                 f"Reinstala PyTorch con CUDA (SETUP.bat) — hasta entonces se "
                 f"entrena por CPU.</span>"
             )
-            self.lbl_gpu.setStyleSheet(f"color: {T.ERR}; font-size: 10pt; border: none;")
+            self.lbl_gpu.setStyleSheet(f"color: {T.ERR_TX}; font-size: 10pt; border: none;")
         else:
             self.lbl_gpu.setText(
                 "✗ No se detectó GPU NVIDIA. Entrenarás en CPU (será MUY lento)."
                 + (f"<br><span style='font-size:9pt'>{info.detalle}</span>"
                    if info.detalle else "")
             )
-            self.lbl_gpu.setStyleSheet(f"color: {T.WARN}; font-size: 10pt; border: none;")
+            self.lbl_gpu.setStyleSheet(f"color: {T.WARN_TX}; font-size: 10pt; border: none;")
         self._update_estimate()
 
     def _maximize_imgsz(self):

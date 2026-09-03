@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import theme as T
+from ..core import iconos
 from ..core.widgets import LogoBadge
 from .state import DetectorState
 from ..core.i18n import tr
@@ -17,28 +18,36 @@ from ..core.i18n import tr
 
 # ────────────────────────────────────────────────────────────────────
 SIDEBAR_ITEMS = [
-    # (icono, etiqueta)
-    ("🎯", tr("Modelos")),
-    ("🖼", tr("Imágenes")),
-    ("✏️", tr("GT manual")),
-    ("⚙️", tr("Parámetros")),
-    ("▶", tr("Ejecutar")),
-    ("📊", tr("Resultados")),
-    ("⚠", tr("Errores")),
-    ("🧪", tr("Comparar")),
-    ("📄", tr("Reporte")),
+    # (nombre del icono en core/iconos.py, etiqueta)
+    ("modelo", tr("Modelos")),
+    ("imagenes", tr("Imágenes")),
+    ("editar", tr("GT manual")),
+    ("ajustes", tr("Parámetros")),
+    ("ejecutar", tr("Ejecutar")),
+    ("resultados", tr("Resultados")),
+    ("errores", tr("Errores")),
+    ("comparar", tr("Comparar")),
+    ("reporte", tr("Reporte")),
 ]
 
 
 # ────────────────────────────────────────────────────────────────────
 class SidebarButton(QPushButton):
-    """Item del sidebar (icono + texto). Look pill cuando seleccionado."""
+    """Item del sidebar: icono vectorial + texto. Pastilla al estar activo.
 
-    def __init__(self, icon: str, text: str):
-        super().__init__(f"  {icon}    {text}")
+    El icono se pasa como nombre y no como emoji: un emoji lo dibuja la fuente
+    del sistema, cambia de forma entre Windows y macOS y llega en color fijo,
+    de modo que no puede tenirse de acento cuando la pagina esta activa.
+    """
+
+    def __init__(self, icono_nombre: str, text: str):
+        super().__init__(f"   {text}")
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
         self.setMinimumHeight(38)
+        self.setIcon(iconos.icono_conmutable(
+            icono_nombre, 17, T.INK3, T.ACCENT_D_TX))
+        self.setIconSize(QSize(17, 17))
         self.setStyleSheet(
             f"""
             QPushButton {{
@@ -56,13 +65,12 @@ class SidebarButton(QPushButton):
                 color: {T.INK};
             }}
             QPushButton:checked {{
-                background: #dde7f4;
-                color: {T.ACCENT_D};
+                background: {T.sobre_fondo(T.ACCENT, 0.16)};
+                color: {T.ACCENT_D_TX};
                 font-weight: 600;
             }}
             """
         )
-
 
 # ────────────────────────────────────────────────────────────────────
 class DetectorWindow(QMainWindow):
@@ -111,7 +119,7 @@ class DetectorWindow(QMainWindow):
 
         # Pie del sidebar: estado del run
         self.lbl_status = QLabel(tr("● Listo"))
-        self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt; padding: 4px 8px;")
+        self.lbl_status.setStyleSheet(f"color: {T.OK_TX}; font-size: 9pt; padding: 4px 8px;")
         sb.addWidget(self.lbl_status)
 
         # Crédito de autoría

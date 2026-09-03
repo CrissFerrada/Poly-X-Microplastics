@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 
 from ._base import TrainerPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.i18n import tr
 from ...core.plataforma import abrir_en_el_sistema
 
@@ -47,7 +48,7 @@ def _read_results_csv(run_dir: Path) -> dict | None:
 
 
 class CompararPage(TrainerPage):
-    PAGE_ICON = "📊"
+    PAGE_ICON = "resultados"
     PAGE_TITLE = tr("Comparar runs")
     PAGE_DESCRIPTION = (
         tr("Tabla con todos los entrenamientos anteriores en runs_train/. Útil para comparar "
@@ -57,12 +58,14 @@ class CompararPage(TrainerPage):
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
-        c1, l1 = self.card(tr("Runs disponibles"), "📂")
+        c1, l1 = self.card(tr("Runs disponibles"), "dataset")
         row = QHBoxLayout()
-        btn = QPushButton(tr("🔄  Refrescar lista"))
+        btn = QPushButton(tr("Refrescar lista"))
+        btn.setIcon(iconos.icono("recargar", 15, T.INK2))
         btn.clicked.connect(self.refresh)
         row.addWidget(btn)
-        btn2 = QPushButton(tr("📂  Abrir carpeta runs_train/"))
+        btn2 = QPushButton(tr("Abrir carpeta runs_train/"))
+        btn2.setIcon(iconos.icono("dataset", 15, T.INK2))
         btn2.clicked.connect(self._open_root)
         row.addWidget(btn2)
         row.addStretch(1)

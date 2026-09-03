@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 
 from ._base import TrainerPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.widgets import KPICard
 from ..runner import TrainerRunner
 from ...core.i18n import tr
@@ -102,7 +103,7 @@ class _LiveCurves(QFrame):
 
 
 class EntrenarPage(TrainerPage):
-    PAGE_ICON = "▶"
+    PAGE_ICON = "ejecutar"
     PAGE_TITLE = tr("Entrenar")
     PAGE_DESCRIPTION = (
         tr("Inicia el entrenamiento del modelo con los parámetros configurados. Verás "
@@ -124,7 +125,8 @@ class EntrenarPage(TrainerPage):
         self.lbl_hw.setStyleSheet(f"color: {T.INK2}; font-size: 10pt; border: none;")
         self.lbl_hw.setTextFormat(Qt.RichText)
         hwl.addWidget(self.lbl_hw, 1)
-        btn_recheck = QPushButton("🔄")
+        btn_recheck = QPushButton()
+        btn_recheck.setIcon(iconos.icono("recargar", 15, T.INK2))
         btn_recheck.setFixedWidth(36); btn_recheck.setToolTip(tr("Re-detectar"))
         btn_recheck.clicked.connect(self._refresh_hw)
         hwl.addWidget(btn_recheck)
@@ -134,9 +136,10 @@ class EntrenarPage(TrainerPage):
         QTimer.singleShot(150, self._refresh_hw)
 
         # ── Control ──
-        c1, l1 = self.card(tr("Control"), "🎮")
+        c1, l1 = self.card(tr("Control"), "ajustes")
         row = QHBoxLayout(); row.setSpacing(8)
-        self.btn_start = QPushButton(tr("▶  Iniciar entrenamiento"))
+        self.btn_start = QPushButton(tr("Iniciar entrenamiento"))
+        self.btn_start.setIcon(iconos.icono("ejecutar", 15, T.ON_ACCENT))
         self.btn_start.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 9px 18px; font-weight: 600;"
@@ -145,7 +148,8 @@ class EntrenarPage(TrainerPage):
         self.btn_start.clicked.connect(self._start)
         row.addWidget(self.btn_start)
 
-        self.btn_stop = QPushButton(tr("■  Detener"))
+        self.btn_stop = QPushButton(tr("Detener"))
+        self.btn_stop.setIcon(iconos.icono("detener", 15, T.ON_ACCENT))
         self.btn_stop.setStyleSheet(
             f"background: {T.ERR}; color: white; border: none; "
             f"border-radius: 6px; padding: 9px 18px; font-weight: 600;"
@@ -154,7 +158,8 @@ class EntrenarPage(TrainerPage):
         self.btn_stop.clicked.connect(self._stop)
         row.addWidget(self.btn_stop)
 
-        self.btn_open = QPushButton(tr("📂  Abrir carpeta de resultados"))
+        self.btn_open = QPushButton(tr("Abrir carpeta de resultados"))
+        self.btn_open.setIcon(iconos.icono("dataset", 15, T.INK2))
         self.btn_open.clicked.connect(self._open_results)
         row.addWidget(self.btn_open)
         row.addStretch(1)
@@ -176,7 +181,7 @@ class EntrenarPage(TrainerPage):
                 border-top-left-radius: 6px; border-top-right-radius: 6px;
                 font-weight: 500;
             }}
-            QTabBar::tab:selected {{ background: {T.BG}; color: {T.ACCENT_D}; font-weight: 600; }}
+            QTabBar::tab:selected {{ background: {T.BG}; color: {T.ACCENT_D_TX}; font-weight: 600; }}
             QTabWidget::pane {{ border: 1px solid {T.RULE}; border-radius: 6px; background: {T.BG}; }}
         """)
 
@@ -198,7 +203,7 @@ class EntrenarPage(TrainerPage):
         watch = QFrame()
         watch.setStyleSheet(f"QFrame {{ background: {T.BG_SOFT}; border: 1px solid {T.RULE}; border-radius: 8px; }}")
         wl = QVBoxLayout(watch); wl.setContentsMargins(16, 12, 16, 14)
-        title = QLabel(tr("🎯  ¿Qué mirar?"))
+        title = QLabel(tr("¿Qué mirar?"))
         title.setStyleSheet(f"color: {T.INK}; font-weight: 600; font-size: 11pt; border: none;")
         wl.addWidget(title)
         tips = QLabel(
@@ -210,11 +215,11 @@ class EntrenarPage(TrainerPage):
         tips.setTextFormat(Qt.RichText); tips.setWordWrap(True)
         wl.addWidget(tips)
         ml.addWidget(watch, 2, 0, 1, 4)
-        self.tabs.addTab(metr, "📊  Métricas en vivo")
+        self.tabs.addTab(metr, tr("Métricas en vivo"))
 
         # Tab 2: Curvas
         self.curves = _LiveCurves()
-        self.tabs.addTab(self.curves, "📈  Curvas")
+        self.tabs.addTab(self.curves, tr("Curvas"))
 
         # Tab 3: Log
         self.log = QPlainTextEdit()
@@ -224,7 +229,7 @@ class EntrenarPage(TrainerPage):
             f"font-size: 9.5pt; border: 1px solid {T.RULE}; border-radius: 6px;"
         )
         self.log.setMinimumHeight(420)
-        self.tabs.addTab(self.log, "📜  Log")
+        self.tabs.addTab(self.log, "Log")
 
         self.body.addWidget(self.tabs)
 
@@ -248,14 +253,14 @@ class EntrenarPage(TrainerPage):
     def _on_hw_probe(self, d: dict):
         if d.get("ok"):
             self.lbl_hw.setText(
-                f"<b style='color:{T.OK};'>● ENTRENARÁ EN GPU</b> &nbsp; · &nbsp; "
+                f"<b style='color:{T.OK_TX};'>● ENTRENARÁ EN GPU</b> &nbsp; · &nbsp; "
                 f"<b>{d.get('device_name','?')}</b> &nbsp; · &nbsp; "
                 f"VRAM libre {d.get('vram_free_gb',0):.1f} / {d.get('vram_total_gb',0):.1f} GB "
                 f"&nbsp; · &nbsp; torch {d.get('torch_version','?')} (CUDA {d.get('cuda_build','?')})"
             )
         elif "error" in d:
             self.lbl_hw.setText(
-                f"<b style='color:{T.ERR};'>● ERROR</b> al sondear hardware: {d['error']}"
+                f"<b style='color:{T.ERR_TX};'>● ERROR</b> al sondear hardware: {d['error']}"
             )
         else:
             tv = d.get("torch_version", "?"); cb = d.get("cuda_build")
@@ -265,7 +270,7 @@ class EntrenarPage(TrainerPage):
             else:
                 msg = (f"PyTorch {tv} con CUDA {cb} pero <code>torch.cuda.is_available()</code> "
                        f"= False — revisa drivers NVIDIA / reinicia el equipo.")
-            self.lbl_hw.setText(f"<b style='color:{T.WARN};'>● ENTRENARÁ EN CPU</b> &nbsp; · &nbsp; {msg}")
+            self.lbl_hw.setText(f"<b style='color:{T.WARN_TX};'>● ENTRENARÁ EN CPU</b> &nbsp; · &nbsp; {msg}")
 
     # ──────────────────────────────────────────
     def _start(self):

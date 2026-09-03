@@ -26,7 +26,7 @@ class CompararPage(DetectorPage):
     def __init__(self, state, parent=None):
         super().__init__(state, parent)
 
-        c1, l1 = self.card(tr("Resumen por modelo"), "📊")
+        c1, l1 = self.card(tr("Resumen por modelo"), "resultados")
         self.tbl_summary = QTableWidget(0, 8)
         self.tbl_summary.setHorizontalHeaderLabels(
             ["Modelo", "Imágenes", "Detecciones", "Conf media",
@@ -40,7 +40,7 @@ class CompararPage(DetectorPage):
         l1.addWidget(self.tbl_summary)
         self.body.addWidget(c1)
 
-        c2, l2 = self.card(tr("Detecciones por imagen"), "🖼")
+        c2, l2 = self.card(tr("Detecciones por imagen"), "imagenes")
         self.tbl_per_image = QTableWidget(0, 1)
         self.tbl_per_image.setMinimumHeight(280)
         self.tbl_per_image.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)

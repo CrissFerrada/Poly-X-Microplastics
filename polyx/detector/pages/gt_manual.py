@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
 
 from ._base import DetectorPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.yolo_wrap import (
     Detection, read_yolo_txt, find_gt_for_image, tamano_imagen,
 )
@@ -565,7 +566,7 @@ class GTManualPage(DetectorPage):
         super().__init__(state, parent)
 
         # ── Tarjeta principal ──
-        c1, l1 = self.card(tr("Anotación"), "✏️")
+        c1, l1 = self.card(tr("Anotación"), "editar")
 
         # Barra superior: nombre + clase activa + zoom
         top = QHBoxLayout()
@@ -628,7 +629,8 @@ class GTManualPage(DetectorPage):
         # Botonera inferior
         btns = QHBoxLayout()
         btns.setSpacing(8)
-        b_save = QPushButton(tr("💾  Guardar GT (.txt YOLO)"))
+        b_save = QPushButton(tr("Guardar GT (.txt YOLO)"))
+        b_save.setIcon(iconos.icono("guardar", 15, T.ON_ACCENT))
         b_save.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -644,14 +646,17 @@ class GTManualPage(DetectorPage):
         b_next.clicked.connect(self._go_next)
         btns.addWidget(b_next)
 
-        b_undo = QPushButton(tr("↶  Deshacer"))
+        b_undo = QPushButton(tr("Deshacer"))
+        b_undo.setIcon(iconos.icono("deshacer", 15, T.INK2))
         b_undo.clicked.connect(lambda: self.canvas.undo())
         btns.addWidget(b_undo)
-        b_redo = QPushButton(tr("↷  Rehacer"))
+        b_redo = QPushButton(tr("Rehacer"))
+        b_redo.setIcon(iconos.icono("rehacer", 15, T.INK2))
         b_redo.clicked.connect(lambda: self.canvas.redo())
         btns.addWidget(b_redo)
 
-        b_del = QPushButton(tr("🗑  Borrar selección"))
+        b_del = QPushButton(tr("Borrar selección"))
+        b_del.setIcon(iconos.icono("papelera", 15, T.INK2))
         b_del.clicked.connect(lambda: self.canvas.delete_selected())
         btns.addWidget(b_del)
         b_clear = QPushButton(tr("Limpiar todo"))

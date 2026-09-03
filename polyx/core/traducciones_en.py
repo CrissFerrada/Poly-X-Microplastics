@@ -23,6 +23,43 @@ NO_TRADUCIR = {
 }
 
 EN: dict[str, str] = {
+    'Curvas': 'Curves',
+    'Métricas en vivo': 'Live metrics',
+    'Generar reporte HTML': 'Generate HTML report',
+    'Guardar como…': 'Save as…',
+    'Pre-anotar TODAS': 'Pre-annotate ALL',
+    'Pre-anotar imagen actual': 'Pre-annotate current image',
+    'Rápido': 'Fast',
+    'Equilibrado': 'Balanced',
+    'Máxima detección': 'Maximum detection',
+    # ══ Preferencias: tema, idioma y movimiento ════════════════════
+    'Preferencias': 'Preferences',
+    'Tema, idioma y movimiento': 'Theme, language and motion',
+    'Tema': 'Theme',
+    'Se aplica al instante aquí. Los módulos ya abiertos conservan el suyo.':
+        'Applied here straight away. Modules already open keep theirs.',
+    'Los módulos que abras a partir de ahora salen en el idioma nuevo.':
+        'Modules you open from now on come up in the new language.',
+    'Movimiento': 'Motion',
+    'Animar el panel del microscopio': 'Animate the microscope panel',
+    'Apágalo si el movimiento te molesta o si el equipo va justo. '
+    'El panel queda en un fotograma fijo.':
+        'Turn it off if the motion bothers you or the machine is struggling. '
+        'The panel settles on a still frame.',
+    'Cerrar': 'Close',
+    'El idioma se aplicará al reabrir Poly-X. Los módulos que '
+    'abras desde ahora ya salen en el idioma nuevo.':
+        'The language will be applied when you reopen Poly-X. Modules you open '
+        'from now on already use the new language.',
+    # Nombres de los temas, de theme.NOMBRES_TEMA
+    'Claro': 'Light',
+    'Oscuro': 'Dark',
+    'Azul nocturno': 'Midnight blue',
+    'Alto contraste': 'High contrast',
+    # ══ Launcher: textos que cambiaron al sustituir los emoji ══════
+    'LÉAME': 'READ ME',
+    'Manual de usuario': 'User manual',
+    'Abriendo…': 'Opening…',
     # ══ Barra lateral de los modulos ═══════════════════════════════
     'GT manual': 'Manual GT',
     'Ejecutar': 'Run',
@@ -143,29 +180,29 @@ EN: dict[str, str] = {
     "Última imagen procesada por cada modelo:": "Last image processed by each model:",
     "μm por píxel:": "µm per pixel:",
     "←  Anterior": "←  Previous",
-    "↶  Deshacer": "↶  Undo",
-    "↷  Rehacer": "↷  Redo",
-    "⏳ Probando…": "⏳ Testing…",
-    "■  Detener": "■  Stop",
-    "▶  Iniciar detección": "▶  Start detection",
+    "Deshacer": "Undo",
+    "Rehacer": "Redo",
+    "Probando…": "Testing…",
+    "Detener": "Stop",
+    "Iniciar detección": "Start detection",
     "✓  Buena": "✓  Good",
     "✕  Limpiar": "✕  Clear",
     "✗  Mala": "✗  Bad",
     "✗ Falló la generación de PDF.": "✗ PDF generation failed.",
     "✗ Falló la generación.": "✗ Generation failed.",
     "✗ No se pudo generar el PDF.": "✗ The PDF could not be generated.",
-    "👁  Revisar en pantalla grande": "👁  Review full screen",
-    "💾  Guardar GT (.txt YOLO)": "💾  Save ground truth (.txt YOLO)",
-    "💾  Guardar correcciones (.txt YOLO)": "💾  Save corrections (.txt YOLO)",
-    "📁  Seleccionar carpeta…": "📁  Select folder…",
-    "📂  Abrir carpeta de resultados": "📂  Open results folder",
-    "📄  Exportar CSV de detecciones": "📄  Export detections CSV",
-    "📄  Generar reporte HTML": "📄  Generate HTML report",
-    "📑  Exportar a PDF": "📑  Export to PDF",
-    "📤  Enviar al dataset de reentrenamiento": "📤  Send to the retraining dataset",
-    "📷  Seleccionar imágenes…": "📷  Select images…",
-    "🔍 Detectar máximo (GPU)": "🔍 Detect maximum (GPU)",
-    "🗑  Borrar selección": "🗑  Delete selection",
+    "Revisar en pantalla grande": "Review full screen",
+    "Guardar GT (.txt YOLO)": "Save ground truth (.txt YOLO)",
+    "Guardar correcciones (.txt YOLO)": "Save corrections (.txt YOLO)",
+    "Seleccionar carpeta…": "Select folder…",
+    "Abrir carpeta de resultados": "Open results folder",
+    "Exportar CSV de detecciones": "Export detections CSV",
+    "Generar reporte HTML": "Generate HTML report",
+    "Exportar a PDF": "Export to PDF",
+    "Enviar al dataset de reentrenamiento": "Send to the retraining dataset",
+    "Seleccionar imágenes…": "Select images…",
+    "Detectar máximo (GPU)": "Detect maximum (GPU)",
+    "Borrar selección": "Delete selection",
 
     # ══ Etiquetador ════════════════════════════════════════════════
     "+ Agregar clase": "+ Add class",
@@ -200,11 +237,11 @@ EN: dict[str, str] = {
     "← Anterior": "← Previous",
     "⏭  Siguiente sin revisar": "⏭  Next unreviewed",
     "✓  Revisada, siguiente   (Espacio)": "✓  Reviewed, next   (Space)",
-    "💾  Guardar (.txt)": "💾  Save (.txt)",
-    "📂  Abrir carpeta…": "📂  Open folder…",
-    "📂  Cargar modelo…": "📂  Load model…",
-    "🤖  Pre-anotar TODAS": "🤖  Pre-annotate ALL",
-    "🤖  Pre-anotar imagen actual": "🤖  Pre-annotate current image",
+    "Guardar (.txt)": "Save (.txt)",
+    "Abrir carpeta…": "Open folder…",
+    "Cargar modelo…": "Load model…",
+    "Pre-anotar TODAS": "Pre-annotate ALL",
+    "Pre-anotar imagen actual": "Pre-annotate current image",
 
     # ══ Entrenador ═════════════════════════════════════════════════
     "%v / %m épocas": "%v / %m epochs",
@@ -285,18 +322,18 @@ EN: dict[str, str] = {
         "• <b>Box loss</b> should FALL steadily. If it oscillates or rises, lower lr0.<br>"
         "• If <b>No improvement</b> reaches <b>Patience</b>, training stops on its own.",
     "⌛  Detectando hardware…": "⌛  Detecting hardware…",
-    "▶  Iniciar entrenamiento": "▶  Start training",
-    "▶  Iniciar validación": "▶  Start validation",
+    "Iniciar entrenamiento": "Start training",
+    "Iniciar validación": "Start validation",
     "✗ Archivo no encontrado.": "✗ File not found.",
     "✗ Error": "✗ Error",
-    "🎯  ¿Qué mirar?": "🎯  What to look at",
-    "💾  Guardar como…": "💾  Save as…",
-    "📂  Abrir carpeta runs_train/": "📂  Open the runs_train/ folder",
-    "📤  Exportar": "📤  Export",
-    "🔄  Otras 6": "🔄  6 more",
-    "🔄  Refrescar lista": "🔄  Refresh list",
-    "🔍  Validar ahora": "🔍  Validate now",
-    "🪚  Auto-split + generar data.yaml": "🪚  Auto-split + generate data.yaml",
+    "¿Qué mirar?": "What to look at",
+    "Guardar como…": "Save as…",
+    "Abrir carpeta runs_train/": "Open the runs_train/ folder",
+    "Exportar": "Export",
+    "Otras 6": "6 more",
+    "Refrescar lista": "Refresh list",
+    "Validar ahora": "Validate now",
+    "Auto-split + generar data.yaml": "Auto-split + generate data.yaml",
 
     # ══ Visor ══════════════════════════════════════════════════════
     "  Sin imagen  —  Sin calibración": "  No image  —  Not calibrated",
@@ -328,15 +365,15 @@ EN: dict[str, str] = {
     "Sin imagen": "No image",
     "Todas las clases": "All classes",
     "Usar GPU si está disponible": "Use the GPU if available",
-    "▶  Detectar": "▶  Detect",
+    "Detectar": "Detect",
     "✕  Cancelar calibración": "✕  Cancel calibration",
-    "⭕  Círculo": "⭕  Circle",
-    "💾  Guardar info actual": "💾  Save current info",
-    "📁  Carpeta": "📁  Folder",
-    "📄  Cargar etiquetas (.txt)": "📄  Load labels (.txt)",
-    "📏  Línea": "📏  Line",
-    "📐  Sin calibrar": "📐  Not calibrated",
-    "📷  Imagen": "📷  Image",
+    "Círculo": "Circle",
+    "Guardar info actual": "Save current info",
+    "Carpeta": "Folder",
+    "Cargar etiquetas (.txt)": "Load labels (.txt)",
+    "Línea": "Line",
+    "Sin calibrar": "Not calibrated",
+    "Imagen": "Image",
 
     # ── Añadidas con la comparación de arquitecturas, la selección
     # por dominio, el alcance del informe y el aviso de troceado ──
@@ -378,8 +415,8 @@ EN: dict[str, str] = {
     'MÓDULOS': 'MODULES',
     'MÓDULO': 'MODULE',
     'Abrir  →': 'Open  →',
-    '📄 LÉAME': '📄 README',
-    '📖 Manual de usuario': '📖 User manual',
+    'LÉAME': 'README',
+    'Manual de usuario': 'User manual',
     'Polímeros': 'Polymers',
     'fluorescencia Nile Red': 'Nile Red fluorescence',
     'medición': 'measurement',
@@ -389,7 +426,7 @@ EN: dict[str, str] = {
     'Etiquetador': 'Labeler',
     'Visor': 'Viewer',
     'Detección automatizada de PET, PP y LDPE por fluorescencia Nile Red (254 nm) e inteligencia artificial. Entrenamiento, etiquetado, detección y reporte en un mismo flujo.': 'Automated detection of PET, PP and LDPE by Nile Red fluorescence (254 nm) and machine learning. Training, labeling, detection and reporting in a single workflow.',
-    '✍  Diseñado y desarrollado por <b>Cristofher Ferrada</b> · Doctorado en Química, 2026': '✍  Designed and developed by <b>Cristofher Ferrada</b> · PhD in Chemistry, 2026',
+    'Diseñado y desarrollado por <b>Cristofher Ferrada</b> · Dr (c) en Química, 2026': 'Designed and developed by <b>Cristofher Ferrada</b> · PhD (c) in Chemistry, 2026',
     'Analiza imágenes con un modelo .pt entrenado. Genera salidas anotadas, CSV con centroides y diámetros, métricas globales e informe HTML de detección.': 'Analyzes images with a trained .pt model. Produces annotated output, a CSV of centroids and diameters, global metrics and an HTML detection report.',
     'Entrena modelos YOLO v8 / v11. Curvas en vivo, recomendaciones automáticas de calidad y comparación con runs anteriores.': 'Trains YOLO v8 / v11 models. Live curves, automatic quality recommendations and comparison against earlier runs.',
     'Anota imágenes en formato YOLO. Soporta pre-anotación con un modelo existente y atajos de teclado, ahorra ~80 % del tiempo manual.': 'Annotates images in YOLO format. Supports pre-annotation with an existing model plus keyboard shortcuts, saving ~80% of the manual time.',
@@ -476,12 +513,12 @@ EN: dict[str, str] = {
     'Early stopping y checkpoints': 'Early stopping and checkpoints',
     'Hardware e I/O': 'Hardware and I/O',
     'Configuración': 'Configuration',
-    '🚀  Maximizar imgsz para mi GPU': '🚀  Maximize imgsz for my GPU',
+    'Maximizar imgsz para mi GPU': 'Maximize imgsz for my GPU',
     'Detectando GPU…': 'Detecting GPU…',
-    '🔄  Detectar GPU / VRAM': '🔄  Detect GPU / VRAM',
-    '⚡  Sugerir imgsz MÁXIMO': '⚡  Suggest MAXIMUM imgsz',
+    'Detectar GPU / VRAM': 'Detect GPU / VRAM',
+    'Sugerir imgsz MÁXIMO': 'Suggest MAXIMUM imgsz',
     'Sugerir batch para mi GPU': 'Suggest batch for my GPU',
-    '🎯  Optimizar todo (imgsz → batch → velocidad)': '🎯  Optimize everything (imgsz → batch → speed)',
+    'Optimizar todo (imgsz → batch → velocidad)': 'Optimize everything (imgsz → batch → speed)',
     'Sin GPU': 'No GPU',
     'Sin GPU utilizable': 'No usable GPU',
     'Configuración optimizada': 'Optimized configuration',
@@ -549,8 +586,8 @@ EN: dict[str, str] = {
         'The dish rim sits closer to the camera than the base where the particles lie, so it projects larger and the resulting scale is too small: left uncorrected, ALL sizes are underestimated. With a 15 mm dish and the camera at 100 mm that is almost 16 percentage points; at 500 mm, about 3 %. Fill in both fields above to correct it.',
     'Genera un informe HTML autocontenido (todas las imágenes embebidas en base64, así no se rompen al enviarlo a otra persona) con métodos, métricas, gráficos, galería comparativa, conteo por muestra y análisis de errores. Puedes exportarlo directamente a PDF para enviarlo, o guardar aparte cada foto con sus etiquetas dibujadas.':
         'Generates a self-contained HTML report (every image embedded as base64, so nothing breaks when you send it to someone else) with methods, metrics, charts, a comparison gallery, per-sample counts and error analysis. You can export it straight to PDF to send it, or save each photo separately with its labels drawn on.',
-    '📄  Generar informe HTML':
-        '📄  Generate HTML report',
+    'Generar informe HTML':
+        'Generate HTML report',
     'Guardar las fotos con las etiquetas':
         'Save the photos with their labels',
     'Guarda cada foto analizada con sus cajas dibujadas, en su resolución original. Eliges una carpeta y dentro se crea una subcarpeta por cada opción que marques (<code>conteo_manual</code>, <code>deteccion_modelo</code>, <code>ambas_superpuestas</code>), así no se mezclan. Respeta el <b>alcance</b> elegido arriba: si marcaste fotos concretas, solo se guardan esas.':
@@ -561,8 +598,8 @@ EN: dict[str, str] = {
         'Model detections',
     'Las dos superpuestas en la misma foto':
         'Both overlaid on the same photo',
-    '🖼️  Guardar fotos etiquetadas':
-        '🖼️  Save labelled photos',
+    'Guardar fotos etiquetadas':
+        'Save labelled photos',
     'Carpeta donde guardar las fotos etiquetadas':
         'Folder to save the labelled photos in',
     'Qué incluir en el informe':
@@ -599,10 +636,10 @@ EN: dict[str, str] = {
         'Ground truth',
     'No pide ninguna carpeta: relee los .txt que están junto a cada foto, los mismos que ves en GT manual. Hace falta porque la corrida guarda el ground truth que leyó, así que corregir una anotación después no cambia por sí solo estas métricas ni el informe. Recalcula sin pasar el modelo otra vez y solo redibuja las imágenes cuyo .txt cambió.':
         'It asks for no folder: it re-reads the .txt files sitting next to each photo, the same ones you see under Manual GT. This is needed because a run freezes the ground truth it read, so fixing an annotation afterwards does not by itself change these metrics or the report. It recalculates without running the model again, and only redraws the images whose .txt actually changed.',
-    '🔄  Releer los .txt del disco y recalcular':
-        '🔄  Re-read the .txt files from disk and recalculate',
-    '🔍  Revisar partícula a partícula en el Visor':
-        '🔍  Review particle by particle in the Viewer',
+    'Releer los .txt del disco y recalcular':
+        'Re-read the .txt files from disk and recalculate',
+    'Revisar partícula a partícula en el Visor':
+        'Review particle by particle in the Viewer',
     'Abre la imagen seleccionada en el Visor con estas mismas detecciones, numeradas. Allí cada partícula muestra sobre qué se midió y si es fibra o fragmento — sin volver a pasar el modelo.':
         'Opens the selected image in the Viewer with these very detections, numbered. There each particle shows what it was measured on and whether it is a fibre or a fragment — without running the model again.',
     'Releyendo ground truth…':
@@ -621,8 +658,8 @@ EN: dict[str, str] = {
         'Also save the best weights for the real dataset',
     'Al terminar quedan tres pesos en la carpeta del run: <b>best_sintetico.pt</b>, <b>best_real.pt</b> y <b>last.pt</b> (este último sirve para reanudar el entrenamiento).':
         'When it finishes there are three sets of weights in the run folder: <b>best_sintetico.pt</b>, <b>best_real.pt</b> and <b>last.pt</b> (this last one is what you use to resume training).',
-    '📁  Cargar predicciones de una corrida':
-        '📁  Load predictions from a run',
+    'Cargar predicciones de una corrida':
+        'Load predictions from a run',
     'Lee las predicciones que el Detector dejó en runs/detect_.../ para esta misma foto. Sirve para revisar una corrida ya cerrada, sin volver a pasar el modelo.':
         'Reads the predictions the Detector left in runs/detect_.../ for this same photo. Use it to review a run you have already closed, without running the model again.',
     'Selecciona una partícula para ver su medición':

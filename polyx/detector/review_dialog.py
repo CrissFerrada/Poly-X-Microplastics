@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import theme as T
+from ..core import iconos
 from ..core.yolo_wrap import Detection
 from .pages.gt_manual import AnnotCanvas, DEFAULT_CLASSES
 from ..core.i18n import tr
@@ -126,14 +127,16 @@ class ReviewDialog(QDialog):
         btns.addWidget(self.btn_bad)
 
         btns.addStretch(1)
-        b_dataset = QPushButton(tr("📤  Enviar al dataset de reentrenamiento"))
+        b_dataset = QPushButton(tr("Enviar al dataset de reentrenamiento"))
+        b_dataset.setIcon(iconos.icono("exportar", 15, T.INK2))
         b_dataset.setToolTip(
             tr("Copia esta imagen y sus cajas corregidas a dataset_correcciones/ "
             "para mejorar el modelo con fine-tuning (active learning)."))
         b_dataset.setCursor(Qt.PointingHandCursor)
         b_dataset.clicked.connect(self._send_to_dataset)
         btns.addWidget(b_dataset)
-        b_save = QPushButton(tr("💾  Guardar correcciones (.txt YOLO)"))
+        b_save = QPushButton(tr("Guardar correcciones (.txt YOLO)"))
+        b_save.setIcon(iconos.icono("guardar", 15, T.ON_ACCENT))
         b_save.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;")
@@ -307,6 +310,6 @@ class ReviewDialog(QDialog):
             cls_path.write_text("\n".join(DEFAULT_CLASSES), encoding="utf-8")
         n = len(list((root / "labels").glob("*.txt")))
         self.lbl_status.setText(
-            f"📤 Enviada al dataset de reentrenamiento — {n} imagen(es) "
+            f"Enviada al dataset de reentrenamiento — {n} imagen(es) "
             f"acumuladas en dataset_correcciones/. Cuando juntes ~50, haz "
             f"fine-tuning en el Entrenador.")

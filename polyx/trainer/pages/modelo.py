@@ -24,7 +24,7 @@ SIZE_DESCRIPTIONS = [
 
 
 class ModeloPage(TrainerPage):
-    PAGE_ICON = "🎯"
+    PAGE_ICON = "modelo"
     PAGE_TITLE = tr("Seleccionar modelo")
     PAGE_DESCRIPTION = (
         tr("Elige el preset según el caso, o personaliza familia y tamaño. El preset "
@@ -35,7 +35,7 @@ class ModeloPage(TrainerPage):
         super().__init__(state, parent)
 
         # ── Preset rápido ──
-        c1, l1 = self.card(tr("Preset rápido"), "⚡")
+        c1, l1 = self.card(tr("Preset rápido"), "rayo")
         info = QLabel(
             tr("Aplica un conjunto de parámetros probados con un clic. Cambiarlo después "
             "en 'Parámetros' marca como Personalizado.")
@@ -58,7 +58,7 @@ class ModeloPage(TrainerPage):
         self.body.addWidget(c1)
 
         # ── Familia y tamaño ──
-        c2, l2 = self.card(tr("Familia y tamaño"), "🧠")
+        c2, l2 = self.card(tr("Familia y tamaño"), "modelo")
         row2 = QHBoxLayout()
         row2.setSpacing(20)
         row2.addWidget(QLabel(tr("Familia:")))
@@ -96,7 +96,7 @@ class ModeloPage(TrainerPage):
         self.chk_comparar.setChecked(self.state.model.comparar_familias)
         self.chk_comparar.stateChanged.connect(self._on_comparar)
         self.chk_comparar.setStyleSheet(
-            f"QCheckBox {{ font-weight: 600; color: {T.ACCENT}; border: none; }}")
+            f"QCheckBox {{ font-weight: 600; color: {T.ACCENT_TX}; border: none; }}")
         l2.addWidget(self.chk_comparar)
 
         self.lbl_comparar = QLabel()
@@ -112,7 +112,7 @@ class ModeloPage(TrainerPage):
         self.chk_dominio.setChecked(self.state.params.elegir_por_dominio_real)
         self.chk_dominio.stateChanged.connect(self._on_dominio)
         self.chk_dominio.setStyleSheet(
-            f"QCheckBox {{ font-weight: 600; color: {T.OK}; border: none; }}")
+            f"QCheckBox {{ font-weight: 600; color: {T.OK_TX}; border: none; }}")
         l2.addWidget(self.chk_dominio)
 
         aviso = QLabel(tr(
@@ -126,7 +126,7 @@ class ModeloPage(TrainerPage):
         self.body.addWidget(c2)
 
         # ── Pesos personalizados ──
-        c3, l3 = self.card(tr("Pesos personalizados (opcional)"), "📦")
+        c3, l3 = self.card(tr("Pesos personalizados (opcional)"), "paquete")
         info3 = QLabel(
             tr("Si tienes un .pt ya entrenado y quieres seguir desde ahí, selecciónalo. "
             "Deja vacío para usar el modelo base de la familia/tamaño elegidos.")

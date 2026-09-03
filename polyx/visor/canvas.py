@@ -129,7 +129,7 @@ class VisorCanvas(QWidget):
             p.setPen(QColor(T.INK3))
             p.setFont(QFont(T.APP_FONT_FAMILY, 12))
             p.drawText(self.rect(), Qt.AlignCenter,
-                       "Abre una imagen (📷) o carpeta (📁) para comenzar")
+                       "Abre una imagen o una carpeta para comenzar")
             return
 
         # Imagen

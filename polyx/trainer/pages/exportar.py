@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 
 from ._base import TrainerPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.i18n import tr
 
 
@@ -47,7 +48,7 @@ class _ExportWorker(QThread):
 
 
 class ExportarPage(TrainerPage):
-    PAGE_ICON = "📤"
+    PAGE_ICON = "exportar"
     PAGE_TITLE = tr("Exportar modelo")
     PAGE_DESCRIPTION = (
         tr("Convierte el modelo entrenado a otros formatos para producción: ONNX (portable), "
@@ -58,7 +59,7 @@ class ExportarPage(TrainerPage):
         super().__init__(state, parent)
         self.worker: _ExportWorker | None = None
 
-        c1, l1 = self.card(tr("Modelo a exportar"), "📦")
+        c1, l1 = self.card(tr("Modelo a exportar"), "paquete")
         row = QHBoxLayout()
         row.addWidget(QLabel(tr("Pesos .pt:")))
         self.ed_w = QLineEdit()
@@ -72,7 +73,7 @@ class ExportarPage(TrainerPage):
         l1.addLayout(row)
         self.body.addWidget(c1)
 
-        c2, l2 = self.card(tr("Formato y opciones"), "⚙️")
+        c2, l2 = self.card(tr("Formato y opciones"), "ajustes")
         g = QGridLayout(); g.setHorizontalSpacing(20); g.setVerticalSpacing(10)
         g.addWidget(QLabel(tr("Formato:")), 0, 0)
         self.combo = QComboBox()
@@ -93,7 +94,8 @@ class ExportarPage(TrainerPage):
         self.lbl_desc.setWordWrap(True)
         l2.addWidget(self.lbl_desc)
 
-        btn = QPushButton(tr("📤  Exportar"))
+        btn = QPushButton(tr("Exportar"))
+        btn.setIcon(iconos.icono("exportar", 15, T.ON_ACCENT))
         btn.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -103,7 +105,7 @@ class ExportarPage(TrainerPage):
         l2.addWidget(btn, 0, Qt.AlignLeft)
         self.body.addWidget(c2)
 
-        c3, l3 = self.card("Log", "📜")
+        c3, l3 = self.card("Log", "registro")
         self.log = QPlainTextEdit(); self.log.setReadOnly(True)
         self.log.setStyleSheet(
             f"background: #0d1117; color: #c9d1d9; font-family: Consolas, monospace; "

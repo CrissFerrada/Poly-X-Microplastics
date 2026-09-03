@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from ._base import TrainerPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.paths import IMAGE_EXTS
 from ...core.dataset_audit import (
     audit_dataset, LEVEL_OK, LEVEL_WARN, LEVEL_ERROR,
@@ -115,7 +116,7 @@ class _PreviewTile(QLabel):
 
 
 class DatasetPage(TrainerPage):
-    PAGE_ICON = "📂"
+    PAGE_ICON = "dataset"
     PAGE_TITLE = tr("Dataset")
     PAGE_DESCRIPTION = (
         tr("Carga tu data.yaml. Validamos la estructura, contamos imágenes y mostramos una "
@@ -126,7 +127,7 @@ class DatasetPage(TrainerPage):
         super().__init__(state, parent)
 
         # ── Origen ──
-        c1, l1 = self.card(tr("data.yaml"), "📑")
+        c1, l1 = self.card(tr("data.yaml"), "reporte")
         row = QHBoxLayout()
         row.setSpacing(8)
         self.ed_yaml = QLineEdit()
@@ -145,7 +146,7 @@ class DatasetPage(TrainerPage):
         self.body.addWidget(c1)
 
         # ── Conteos ──
-        c2, l2 = self.card(tr("Conteos por split"), "📊")
+        c2, l2 = self.card(tr("Conteos por split"), "resultados")
         grid = QGridLayout(); grid.setHorizontalSpacing(20); grid.setVerticalSpacing(8)
         self.lbl_train = QLabel(tr("Train: —")); grid.addWidget(self.lbl_train, 0, 0)
         self.lbl_val   = QLabel(tr("Val: —"));   grid.addWidget(self.lbl_val,   0, 1)
@@ -157,7 +158,7 @@ class DatasetPage(TrainerPage):
         self.body.addWidget(c2)
 
         # ── Vista previa ──
-        c3, l3 = self.card(tr("Vista previa (6 imágenes random con cajas)"), "👁")
+        c3, l3 = self.card(tr("Vista previa (6 imágenes random con cajas)"), "ver")
         prev_grid = QGridLayout(); prev_grid.setSpacing(10)
         self.tiles: list[_PreviewTile] = []
         for i in range(6):
@@ -165,13 +166,14 @@ class DatasetPage(TrainerPage):
             self.tiles.append(t)
             prev_grid.addWidget(t, i // 3, i % 3)
         l3.addLayout(prev_grid)
-        btn_refresh = QPushButton(tr("🔄  Otras 6"))
+        btn_refresh = QPushButton(tr("Otras 6"))
+        btn_refresh.setIcon(iconos.icono("recargar", 15, T.INK2))
         btn_refresh.clicked.connect(self._refresh_preview)
         l3.addWidget(btn_refresh, 0, Qt.AlignLeft)
         self.body.addWidget(c3)
 
         # ── Auto-split ──
-        c4, l4 = self.card(tr("Auto-split (si tu dataset no está dividido)"), "🪚")
+        c4, l4 = self.card(tr("Auto-split (si tu dataset no está dividido)"), "piezas")
         info = QLabel(
             tr("Toma una carpeta con images/ y labels/ y genera train/val/test automáticamente "
             "con un nuevo data.yaml. No mueve archivos: usa listas .txt.")
@@ -199,7 +201,8 @@ class DatasetPage(TrainerPage):
         self.sb_test = QSpinBox(); self.sb_test.setRange(0, 25); self.sb_test.setValue(5)
         prow.addWidget(self.sb_test)
         prow.addStretch(1)
-        btn_split = QPushButton(tr("🪚  Auto-split + generar data.yaml"))
+        btn_split = QPushButton(tr("Auto-split + generar data.yaml"))
+        btn_split.setIcon(iconos.icono("piezas", 15, T.ON_ACCENT))
         btn_split.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -211,7 +214,7 @@ class DatasetPage(TrainerPage):
         self.body.addWidget(c4)
 
         # ── Validación del dataset ──
-        c5, l5 = self.card(tr("Validación del dataset"), "🔍")
+        c5, l5 = self.card(tr("Validación del dataset"), "buscar")
         info_val = QLabel(
             tr("Verifica que el dataset sea correcto antes de entrenar. "
             "Se comprueba automáticamente al cargar data.yaml.")
@@ -241,7 +244,8 @@ class DatasetPage(TrainerPage):
             self._val_checks.append((icon, lbl))
         l5.addLayout(val_grid)
 
-        btn_val = QPushButton(tr("🔍  Validar ahora"))
+        btn_val = QPushButton(tr("Validar ahora"))
+        btn_val.setIcon(iconos.icono("buscar", 15, T.INK2))
         btn_val.clicked.connect(self._validate_dataset)
         l5.addWidget(btn_val, 0, Qt.AlignLeft)
 
@@ -285,13 +289,13 @@ class DatasetPage(TrainerPage):
         p = Path(t)
         if not p.exists():
             self.lbl_yaml_status.setText(tr("✗ Archivo no encontrado."))
-            self.lbl_yaml_status.setStyleSheet(f"color: {T.ERR}; font-size: 10pt; border: none;")
+            self.lbl_yaml_status.setStyleSheet(f"color: {T.ERR_TX}; font-size: 10pt; border: none;")
             return
         try:
             d = _load_yaml(p)
         except Exception as e:
             self.lbl_yaml_status.setText(f"✗ Error parseando YAML: {e}")
-            self.lbl_yaml_status.setStyleSheet(f"color: {T.ERR}; font-size: 10pt; border: none;")
+            self.lbl_yaml_status.setStyleSheet(f"color: {T.ERR_TX}; font-size: 10pt; border: none;")
             return
 
         yaml_dir = p.parent
@@ -312,7 +316,7 @@ class DatasetPage(TrainerPage):
         self.state.dataset_changed.emit()
 
         self.lbl_yaml_status.setText(f"✓ {p}")
-        self.lbl_yaml_status.setStyleSheet(f"color: {T.OK}; font-size: 10pt; border: none;")
+        self.lbl_yaml_status.setStyleSheet(f"color: {T.OK_TX}; font-size: 10pt; border: none;")
         self.lbl_train.setText(f"Train: {n_train}")
         self.lbl_val.setText(f"Val: {n_val}")
         self.lbl_test.setText(f"Test: {n_test}")
@@ -421,12 +425,12 @@ class DatasetPage(TrainerPage):
         icon_lbl, text_lbl = self._val_checks[idx]
         if ok is True:
             icon_lbl.setText("✓")
-            icon_lbl.setStyleSheet(f"color: {T.OK}; font-size: 11pt; border: none;")
-            text_lbl.setStyleSheet(f"color: {T.OK}; font-size: 10pt; border: none;")
+            icon_lbl.setStyleSheet(f"color: {T.OK_TX}; font-size: 11pt; border: none;")
+            text_lbl.setStyleSheet(f"color: {T.OK_TX}; font-size: 10pt; border: none;")
         elif ok is False:
             icon_lbl.setText("✗")
-            icon_lbl.setStyleSheet(f"color: {T.ERR}; font-size: 11pt; border: none;")
-            text_lbl.setStyleSheet(f"color: {T.ERR}; font-size: 10pt; border: none;")
+            icon_lbl.setStyleSheet(f"color: {T.ERR_TX}; font-size: 11pt; border: none;")
+            text_lbl.setStyleSheet(f"color: {T.ERR_TX}; font-size: 10pt; border: none;")
         else:
             icon_lbl.setText("○")
             icon_lbl.setStyleSheet(f"color: {T.INK3}; font-size: 11pt; border: none;")

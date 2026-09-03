@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 
 from ._base import TrainerPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.widgets import KPICard
 from ...core.i18n import tr
 
@@ -44,7 +45,7 @@ class _EvalWorker(QThread):
 
 
 class EvaluarPage(TrainerPage):
-    PAGE_ICON = "🧪"
+    PAGE_ICON = "evaluar"
     PAGE_TITLE = tr("Evaluar")
     PAGE_DESCRIPTION = (
         tr("Valida cualquier modelo .pt sobre un dataset YOLO (data.yaml). Útil para "
@@ -55,7 +56,7 @@ class EvaluarPage(TrainerPage):
         super().__init__(state, parent)
         self.worker: _EvalWorker | None = None
 
-        c1, l1 = self.card(tr("Configuración"), "🔧")
+        c1, l1 = self.card(tr("Configuración"), "ajustes")
         row1 = QHBoxLayout(); row1.setSpacing(8)
         row1.addWidget(QLabel(tr("Modelo .pt:")))
         self.ed_w = QLineEdit(); row1.addWidget(self.ed_w, 1)
@@ -83,7 +84,8 @@ class EvaluarPage(TrainerPage):
         row3.addStretch(1)
         l1.addLayout(row3)
 
-        btn = QPushButton(tr("▶  Iniciar validación"))
+        btn = QPushButton(tr("Iniciar validación"))
+        btn.setIcon(iconos.icono("ejecutar", 15, T.ON_ACCENT))
         btn.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -94,7 +96,7 @@ class EvaluarPage(TrainerPage):
         self.body.addWidget(c1)
 
         # Resultados
-        c2, l2 = self.card(tr("Resultados"), "📊")
+        c2, l2 = self.card(tr("Resultados"), "resultados")
         g = QGridLayout(); g.setSpacing(12)
         self.kpi_map50 = KPICard("mAP@50", T.ACCENT)
         self.kpi_map95 = KPICard("mAP@50-95", T.VIO)
@@ -105,7 +107,7 @@ class EvaluarPage(TrainerPage):
         l2.addLayout(g)
         self.body.addWidget(c2)
 
-        c3, l3 = self.card("Log", "📜")
+        c3, l3 = self.card("Log", "registro")
         self.log = QPlainTextEdit(); self.log.setReadOnly(True)
         self.log.setStyleSheet(
             f"background: #0d1117; color: #c9d1d9; font-family: Consolas, monospace; "

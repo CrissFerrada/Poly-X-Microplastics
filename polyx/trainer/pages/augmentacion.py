@@ -36,7 +36,7 @@ def _slider_row(label: str, value: float, max_val: float, on_change) -> tuple[QH
 
 
 class AugmentacionPage(TrainerPage):
-    PAGE_ICON = "🎨"
+    PAGE_ICON = "augmentacion"
     PAGE_TITLE = tr("Augmentación de datos")
     PAGE_DESCRIPTION = (
         tr("Aumenta artificialmente la variedad del dataset. Útil para datasets pequeños "
@@ -47,7 +47,7 @@ class AugmentacionPage(TrainerPage):
         super().__init__(state, parent)
 
         # ── Preset ──
-        c1, l1 = self.card(tr("Nivel de augmentación"), "🎚")
+        c1, l1 = self.card(tr("Nivel de augmentación"), "ajustes")
         row = QHBoxLayout(); row.setSpacing(8)
         row.addWidget(QLabel(tr("Nivel:")))
         self.combo = QComboBox()
@@ -70,7 +70,7 @@ class AugmentacionPage(TrainerPage):
         self.body.addWidget(c1)
 
         # ── Sliders manuales ──
-        c2, l2 = self.card(tr("Sliders manuales (avanzado)"), "🎛")
+        c2, l2 = self.card(tr("Sliders manuales (avanzado)"), "ajustes")
 
         sets = [
             ("HSV-H (hue):",      "hsv_h",      0.1),
@@ -92,7 +92,7 @@ class AugmentacionPage(TrainerPage):
         self.body.addWidget(c2)
 
         # Hints
-        c3, l3 = self.card(tr("Recomendaciones"), "💡")
+        c3, l3 = self.card(tr("Recomendaciones"), "idea")
         tips = QLabel(
             tr("• <b>Dataset pequeño (< 500 imgs)</b>: usa Fuerte. Más variedad sintética compensa pocos ejemplos.<br>"
             "• <b>Microplásticos PET/PP/LDPE</b>: <b>NO</b> uses HSV-H alto: los colores son la pista principal.<br>"

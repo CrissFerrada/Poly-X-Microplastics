@@ -1,7 +1,7 @@
 # Poly-X en macOS
 
 Suite de detección de microplásticos por fluorescencia Nile Red.
-Cristofher Ferrada · Doctorado en Ciencias mención Química · PUCV
+Cristofher Ferrada · Dr (c) en Ciencias mención Química · PUCV
 
 ---
 

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 from ._base import DetectorPage
 from ...core.i18n import tr
 from ...core import theme as T
+from ...core import iconos
 from ...core.plataforma import ES_MAC, arquitectura_mac, etiqueta_dispositivos
 
 
@@ -24,9 +25,9 @@ def _hint(text: str) -> QLabel:
 # "Máxima detección" apunta a partículas diminutas en fotos de alta resolución
 # (si la GPU no aguanta el imgsz, el auto-fallback baja de tamaño solo).
 PRESETS = {
-    "🚀 Rápido": {"conf": 0.25, "imgsz": 1280},
-    "⚖️ Equilibrado": {"conf": 0.15, "imgsz": 2560},
-    "🔬 Máxima detección": {"conf": 0.10, "imgsz": 4096},
+    "Rápido": {"conf": 0.25, "imgsz": 1280},
+    "Equilibrado": {"conf": 0.15, "imgsz": 2560},
+    "Máxima detección": {"conf": 0.10, "imgsz": 4096},
 }
 
 
@@ -65,7 +66,7 @@ class ParametrosPage(DetectorPage):
         super().__init__(state, parent)
 
         # ── Inferencia ──
-        c1, l1 = self.card(tr("Inferencia"), "⚙️")
+        c1, l1 = self.card(tr("Inferencia"), "ajustes")
 
         # Perfil de calidad (preset): aplica conf + imgsz de una vez
         self._applying_preset = False
@@ -115,7 +116,8 @@ class ParametrosPage(DetectorPage):
         self.sb_imgsz.setValue(state.params.imgsz)
         self.sb_imgsz.valueChanged.connect(self._on_change)
         imgsz_row.addWidget(self.sb_imgsz)
-        self.btn_probe = QPushButton(tr("🔍 Detectar máximo (GPU)"))
+        self.btn_probe = QPushButton(tr("Detectar máximo (GPU)"))
+        self.btn_probe.setIcon(iconos.icono("buscar", 15, T.INK2))
         self.btn_probe.setCursor(Qt.PointingHandCursor)
         self.btn_probe.clicked.connect(self._probe_max_imgsz)
         imgsz_row.addWidget(self.btn_probe)
@@ -146,7 +148,7 @@ class ParametrosPage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Troceado automático ──
-        c5, l5 = self.card(tr("Troceado automático (fotos grandes)"), "🧩")
+        c5, l5 = self.card(tr("Troceado automático (fotos grandes)"), "piezas")
         l5.addWidget(_hint(
             tr("Una foto de placa completa entra a la red reescalada a imgsz: a 4096 px "
             "reducidos a 2080, cada partícula encoge a la mitad y desaparece bajo el "
@@ -216,7 +218,7 @@ class ParametrosPage(DetectorPage):
         self._refrescar_plan()
 
         # ── Análisis de errores ──
-        c2, l2 = self.card(tr("Análisis de errores (si hay GT)"), "🎯")
+        c2, l2 = self.card(tr("Análisis de errores (si hay GT)"), "diana")
         g2 = QGridLayout()
         g2.setHorizontalSpacing(24); g2.setVerticalSpacing(10)
         g2.addWidget(QLabel(tr("IoU para emparejar Verdaderos Positivos:")), 0, 0)
@@ -236,7 +238,7 @@ class ParametrosPage(DetectorPage):
         self.body.addWidget(c2)
 
         # ── Calibración óptica ──
-        c3, l3 = self.card(tr("Calibración óptica (tamaño de partícula)"), "📐")
+        c3, l3 = self.card(tr("Calibración óptica (tamaño de partícula)"), "visor")
         g3 = QGridLayout()
         g3.setHorizontalSpacing(24); g3.setVerticalSpacing(10)
         g3.addWidget(QLabel(tr("μm por píxel:")), 0, 0)
@@ -308,7 +310,7 @@ class ParametrosPage(DetectorPage):
         self.body.addWidget(c3)
 
         # ── Filtro por tamaño ──
-        c4, l4 = self.card(tr("Filtro por tamaño (opcional)"), "📏")
+        c4, l4 = self.card(tr("Filtro por tamaño (opcional)"), "visor")
         g4 = QGridLayout()
         g4.setHorizontalSpacing(24); g4.setVerticalSpacing(10)
         g4.addWidget(QLabel(tr("Tamaño mín (μm):")), 0, 0)
@@ -327,7 +329,7 @@ class ParametrosPage(DetectorPage):
         self.body.addWidget(c4)
 
         # ── Hasta dónde se sostiene el polímero ──
-        c5, l5 = self.card(tr("Asignación de polímero (opcional)"), "🧪")
+        c5, l5 = self.card(tr("Asignación de polímero (opcional)"), "ensayo")
         g5 = QGridLayout()
         g5.setHorizontalSpacing(24); g5.setVerticalSpacing(10)
         g5.addWidget(QLabel(tr("Confianza mínima para asignar:")), 0, 0)
@@ -378,7 +380,7 @@ class ParametrosPage(DetectorPage):
             slot.loaded = YoloModel(str(slot.path), alias=slot.alias)
         device = self.state.params.device
         self.btn_probe.setEnabled(False)
-        self.btn_probe.setText(tr("⏳ Probando…"))
+        self.btn_probe.setText(tr("Probando…"))
         self._probe = _ProbeThread(slot.loaded, str(self.state.images[0]), device, self)
         self._probe.progress.connect(
             lambda sz: self.btn_probe.setText(f"⏳ Probando {sz}px…"))
@@ -388,7 +390,7 @@ class ParametrosPage(DetectorPage):
 
     def _on_probe_done(self, max_ok: int, detail: dict):
         self.btn_probe.setEnabled(True)
-        self.btn_probe.setText(tr("🔍 Detectar máximo (GPU)"))
+        self.btn_probe.setText(tr("Detectar máximo (GPU)"))
         self.sb_imgsz.setValue(max_ok)
         oom = [str(k) for k, v in detail.items() if v == "oom"]
         msg = (f"Máximo seguro para «{self.state.active_models()[0].alias}»: "
@@ -402,7 +404,7 @@ class ParametrosPage(DetectorPage):
 
     def _on_probe_failed(self, err: str):
         self.btn_probe.setEnabled(True)
-        self.btn_probe.setText(tr("🔍 Detectar máximo (GPU)"))
+        self.btn_probe.setText(tr("Detectar máximo (GPU)"))
         QMessageBox.warning(self, tr("No se pudo medir"), err)
 
     def _on_change(self, *_):

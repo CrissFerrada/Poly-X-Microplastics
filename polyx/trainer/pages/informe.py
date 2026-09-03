@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from ._base import TrainerPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.i18n import tr
 
 
@@ -50,27 +51,27 @@ def _read_results_csv_full(run_dir: Path) -> tuple[list[str], list[list[float]]]
 
 CSS = f"""
 *{{box-sizing:border-box;}}
-body{{font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:{T.INK};
-background:{T.BG};margin:0;padding:0;line-height:1.55;}}
+body{{font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:{T.DOC.INK};
+background:{T.DOC.BG};margin:0;padding:0;line-height:1.55;}}
 .container{{max-width:1100px;margin:0 auto;padding:36px 44px 80px;}}
-header.cover{{border-bottom:2px solid {T.INK};padding-bottom:22px;margin-bottom:28px;}}
+header.cover{{border-bottom:2px solid {T.DOC.INK};padding-bottom:22px;margin-bottom:28px;}}
 .kicker{{font-size:10pt;letter-spacing:.14em;text-transform:uppercase;
-color:{T.ACCENT_D};font-weight:600;margin-bottom:8px;}}
+color:{T.DOC.ACCENT_D};font-weight:600;margin-bottom:8px;}}
 h1{{font-size:26pt;margin:4px 0 8px;}}
-h2{{font-size:18pt;margin-top:34px;padding-bottom:6px;border-bottom:1px solid {T.RULE};}}
-h3{{font-size:13pt;margin-top:20px;color:{T.INK2};}}
-.meta{{font-size:10pt;color:{T.INK3};}}
+h2{{font-size:18pt;margin-top:34px;padding-bottom:6px;border-bottom:1px solid {T.DOC.RULE};}}
+h3{{font-size:13pt;margin-top:20px;color:{T.DOC.INK2};}}
+.meta{{font-size:10pt;color:{T.DOC.INK3};}}
 .kpis{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0;}}
-.kpi{{background:{T.BG};border:1px solid {T.RULE};border-radius:8px;padding:14px 16px;}}
-.kpi .l{{font-size:9pt;color:{T.INK3};font-weight:600;letter-spacing:1.4px;text-transform:uppercase;}}
-.kpi .v{{font-size:22pt;font-weight:700;color:{T.INK};}}
-.kpi .b{{height:3px;border-radius:2px;margin-top:8px;background:{T.ACCENT};}}
+.kpi{{background:{T.DOC.BG};border:1px solid {T.DOC.RULE};border-radius:8px;padding:14px 16px;}}
+.kpi .l{{font-size:9pt;color:{T.DOC.INK3};font-weight:600;letter-spacing:1.4px;text-transform:uppercase;}}
+.kpi .v{{font-size:22pt;font-weight:700;color:{T.DOC.INK};}}
+.kpi .b{{height:3px;border-radius:2px;margin-top:8px;background:{T.DOC.ACCENT};}}
 table.data{{width:100%;border-collapse:collapse;font-size:10pt;margin:12px 0;}}
-table.data th{{background:{T.BG_SOFT};text-align:left;padding:7px 9px;border-bottom:1px solid {T.RULE};}}
-table.data td{{padding:6px 9px;border-bottom:1px solid {T.RULE_SOFT};}}
+table.data th{{background:{T.DOC.BG_SOFT};text-align:left;padding:7px 9px;border-bottom:1px solid {T.DOC.RULE};}}
+table.data td{{padding:6px 9px;border-bottom:1px solid {T.DOC.RULE_SOFT};}}
 .fig{{margin:18px 0;text-align:center;}}
-.fig img{{max-width:100%;border:1px solid {T.RULE};border-radius:6px;}}
-.caption{{font-size:9pt;color:{T.INK3};margin-top:6px;}}
+.fig img{{max-width:100%;border:1px solid {T.DOC.RULE};border-radius:6px;}}
+.caption{{font-size:9pt;color:{T.DOC.INK3};margin-top:6px;}}
 """
 
 
@@ -97,9 +98,9 @@ def build_training_report(run_dir: Path, out_path: Path, include_refs: bool = Tr
         kpi_html = f"""
         <div class='kpis'>
           <div class='kpi'><div class='l'>Épocas</div><div class='v'>{last_epoch}</div><div class='b'></div></div>
-          <div class='kpi'><div class='l'>mAP@50</div><div class='v'>{f"{map50:.3f}" if map50 is not None else "—"}</div><div class='b' style='background:{T.OK}'></div></div>
-          <div class='kpi'><div class='l'>mAP@50-95</div><div class='v'>{f"{map95:.3f}" if map95 is not None else "—"}</div><div class='b' style='background:{T.VIO}'></div></div>
-          <div class='kpi'><div class='l'>P / R</div><div class='v'>{f"{prec:.2f}/{rec:.2f}" if prec is not None and rec is not None else "—"}</div><div class='b' style='background:{T.WARN}'></div></div>
+          <div class='kpi'><div class='l'>mAP@50</div><div class='v'>{f"{map50:.3f}" if map50 is not None else "—"}</div><div class='b' style='background:{T.DOC.OK}'></div></div>
+          <div class='kpi'><div class='l'>mAP@50-95</div><div class='v'>{f"{map95:.3f}" if map95 is not None else "—"}</div><div class='b' style='background:{T.DOC.VIO}'></div></div>
+          <div class='kpi'><div class='l'>P / R</div><div class='v'>{f"{prec:.2f}/{rec:.2f}" if prec is not None and rec is not None else "—"}</div><div class='b' style='background:{T.DOC.WARN}'></div></div>
         </div>
         """
         metrics_html = kpi_html
@@ -160,7 +161,7 @@ def build_training_report(run_dir: Path, out_path: Path, include_refs: bool = Tr
 
 {refs}
 
-<p style='margin-top:60px;color:{T.INK3};font-size:9.5pt;border-top:1px solid {T.RULE};padding-top:14px;'>
+<p style='margin-top:60px;color:{T.DOC.INK3};font-size:9.5pt;border-top:1px solid {T.DOC.RULE};padding-top:14px;'>
 © Cristofher Ferrada · Poly-X · Reporte autogenerado.</p>
 </div></body></html>
 """
@@ -185,7 +186,7 @@ class _ReportWorker(QThread):
 
 
 class InformePage(TrainerPage):
-    PAGE_ICON = "📄"
+    PAGE_ICON = "reporte"
     PAGE_TITLE = tr("Informe del entrenamiento")
     PAGE_DESCRIPTION = (
         tr("Genera un informe HTML autocontenido con las curvas y métricas del run "
@@ -196,7 +197,7 @@ class InformePage(TrainerPage):
         super().__init__(state, parent)
         self.worker: _ReportWorker | None = None
 
-        c1, l1 = self.card(tr("Selección de run"), "📂")
+        c1, l1 = self.card(tr("Selección de run"), "dataset")
         row = QHBoxLayout(); row.setSpacing(8)
         row.addWidget(QLabel(tr("Run:")))
         self.combo = QComboBox(); self.combo.setMinimumWidth(360)
@@ -209,23 +210,25 @@ class InformePage(TrainerPage):
         l1.addWidget(self.chk_refs)
         self.body.addWidget(c1)
 
-        c2, l2 = self.card(tr("Generar"), "📄")
+        c2, l2 = self.card(tr("Generar"), "texto")
         rr = QHBoxLayout(); rr.setSpacing(8)
-        b1 = QPushButton(tr("📄  Generar reporte HTML"))
+        b1 = QPushButton(tr("Generar reporte HTML"))
+        b1.setIcon(iconos.icono("reporte", 15, T.ON_ACCENT))
         b1.setStyleSheet(
-            f"background: {T.ACCENT}; color: white; border: none; "
+            f"background: {T.DOC.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
         )
         b1.setCursor(Qt.PointingHandCursor)
         b1.clicked.connect(self._generate)
         rr.addWidget(b1)
-        b2 = QPushButton(tr("💾  Guardar como…"))
+        b2 = QPushButton(tr("Guardar como…"))
+        b2.setIcon(iconos.icono("guardar", 15, T.INK2))
         b2.clicked.connect(self._save_as)
         rr.addWidget(b2)
         rr.addStretch(1)
         l2.addLayout(rr)
         self.lbl_status = QLabel("")
-        self.lbl_status.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
+        self.lbl_status.setStyleSheet(f"color: {T.DOC.INK3}; font-size: 9.5pt; border: none;")
         l2.addWidget(self.lbl_status)
         self.body.addWidget(c2)
 

@@ -1,49 +1,72 @@
 """Ventana principal del Entrenador. Sidebar 9 items + páginas a la derecha."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QPushButton,
     QButtonGroup, QStackedWidget, QLabel, QScrollArea,
 )
 
 from ..core import theme as T
+from ..core import iconos
 from ..core.widgets import LogoBadge
 from .state import TrainerState
 from ..core.i18n import tr
 
 
 SIDEBAR_ITEMS = [
-    ("🎯", tr("Modelo")),
-    ("📂", tr("Dataset")),
-    ("⚙️", tr("Parámetros")),
-    ("🎨", tr("Augmentación")),
-    ("▶", tr("Entrenar")),
-    ("🧪", tr("Evaluar")),
-    ("📊", tr("Comparar")),
-    ("📤", tr("Exportar")),
-    ("📄", tr("Informe")),
+    # (nombre del icono en core/iconos.py, etiqueta)
+    ("modelo", tr("Modelo")),
+    ("dataset", tr("Dataset")),
+    ("ajustes", tr("Parámetros")),
+    ("augmentacion", tr("Augmentación")),
+    ("ejecutar", tr("Entrenar")),
+    ("evaluar", tr("Evaluar")),
+    ("comparar", tr("Comparar")),
+    ("exportar", tr("Exportar")),
+    ("reporte", tr("Informe")),
 ]
 
 
 class SidebarButton(QPushButton):
-    def __init__(self, icon: str, text: str):
-        super().__init__(f"  {icon}    {text}")
+    """Item del sidebar: icono vectorial + texto. Pastilla al estar activo.
+
+    El icono se pasa como nombre y no como emoji: un emoji lo dibuja la fuente
+    del sistema, cambia de forma entre Windows y macOS y llega en color fijo,
+    de modo que no puede tenirse de acento cuando la pagina esta activa.
+    """
+
+    def __init__(self, icono_nombre: str, text: str):
+        super().__init__(f"   {text}")
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
         self.setMinimumHeight(38)
-        self.setStyleSheet(f"""
+        self.setIcon(iconos.icono_conmutable(
+            icono_nombre, 17, T.INK3, T.ACCENT_D_TX))
+        self.setIconSize(QSize(17, 17))
+        self.setStyleSheet(
+            f"""
             QPushButton {{
-                background: transparent; color: {T.INK2};
-                border: none; border-radius: 6px; padding: 8px 12px;
-                text-align: left; font-size: 10.5pt; font-weight: 500;
+                background: transparent;
+                color: {T.INK2};
+                border: none;
+                border-radius: 6px;
+                padding: 8px 12px;
+                text-align: left;
+                font-size: 10.5pt;
+                font-weight: 500;
             }}
-            QPushButton:hover {{ background: {T.RULE_SOFT}; color: {T.INK}; }}
+            QPushButton:hover {{
+                background: {T.RULE_SOFT};
+                color: {T.INK};
+            }}
             QPushButton:checked {{
-                background: #dde7f4; color: {T.ACCENT_D}; font-weight: 600;
+                background: {T.sobre_fondo(T.ACCENT, 0.16)};
+                color: {T.ACCENT_D_TX};
+                font-weight: 600;
             }}
-        """)
-
+            """
+        )
 
 class TrainerWindow(QMainWindow):
     def __init__(self):
@@ -88,7 +111,7 @@ class TrainerWindow(QMainWindow):
         sb.addStretch(1)
 
         self.lbl_status = QLabel(tr("● Listo"))
-        self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt; padding: 4px 8px;")
+        self.lbl_status.setStyleSheet(f"color: {T.OK_TX}; font-size: 9pt; padding: 4px 8px;")
         sb.addWidget(self.lbl_status)
 
         # Crédito de autoría

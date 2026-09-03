@@ -33,7 +33,7 @@ class ErroresPage(DetectorPage):
         super().__init__(state, parent)
 
         # ── Filtros ──
-        c1, l1 = self.card(tr("Filtros"), "🔎")
+        c1, l1 = self.card(tr("Filtros"), "buscar")
         row = QHBoxLayout()
         row.setSpacing(12)
         row.addWidget(QLabel(tr("Tipo:")))
@@ -60,7 +60,7 @@ class ErroresPage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Tabla de errores ──
-        c2, l2 = self.card(tr("Cajas con error"), "⚠")
+        c2, l2 = self.card(tr("Cajas con error"), "errores")
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
             ["Modelo", "Imagen", "Tipo", "Clase GT", "Clase Pred", "Conf"]

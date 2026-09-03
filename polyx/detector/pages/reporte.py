@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 
 from ._base import DetectorPage
 from ...core import theme as T
+from ...core import iconos
 from ...core import pdf_export
 from ...core.report_html import generate_report, SECCIONES, PRESETS
 from ...core.i18n import tr
@@ -33,7 +34,7 @@ class ReportePage(DetectorPage):
         super().__init__(state, parent)
 
         # ── Tarjeta: Generar informe ──
-        c1, l1 = self.card(tr("Generar informe"), "📄")
+        c1, l1 = self.card(tr("Generar informe"), "texto")
         info = QLabel(
             tr("Después de ejecutar al menos una detección, presiona <b>Generar reporte HTML</b> "
             "(se crea <code>informe_deteccion.html</code> dentro de la carpeta del run y se abre "
@@ -52,7 +53,8 @@ class ReportePage(DetectorPage):
 
         row = QHBoxLayout()
         row.setSpacing(8)
-        self.btn_gen = QPushButton(tr("📄  Generar informe HTML"))
+        self.btn_gen = QPushButton(tr("Generar informe HTML"))
+        self.btn_gen.setIcon(iconos.icono("texto", 15, T.ON_ACCENT))
         self.btn_gen.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -61,7 +63,8 @@ class ReportePage(DetectorPage):
         self.btn_gen.clicked.connect(self._generate)
         row.addWidget(self.btn_gen)
 
-        self.btn_pdf = QPushButton(tr("📑  Exportar a PDF"))
+        self.btn_pdf = QPushButton(tr("Exportar a PDF"))
+        self.btn_pdf.setIcon(iconos.icono("reporte", 15, T.ON_ACCENT))
         self.btn_pdf.setStyleSheet(
             f"background: {T.OK}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -84,7 +87,7 @@ class ReportePage(DetectorPage):
         self.body.addWidget(self._card_fotos())
 
         # ── Contenido del reporte ──
-        c2, l2 = self.card(tr("Contenido del reporte"), "📋")
+        c2, l2 = self.card(tr("Contenido del reporte"), "lista")
         contents = QLabel(tr(
             "<ol>"
             "<li><b>Resumen</b> con detecciones, confianza media y tamaño medio.</li>"
@@ -123,7 +126,7 @@ class ReportePage(DetectorPage):
         una figura del paper o para revisarla con lupa necesita el original, y
         eso es lo que copia esta tarjeta.
         """
-        c, l = self.card(tr("Guardar las fotos con las etiquetas"), "🖼️")
+        c, l = self.card(tr("Guardar las fotos con las etiquetas"), "imagenes")
 
         ayuda = QLabel(tr(
             "Guarda cada foto analizada con sus cajas dibujadas, en su resolución "
@@ -146,7 +149,8 @@ class ReportePage(DetectorPage):
             l.addWidget(chk)
 
         fila = QHBoxLayout()
-        self.btn_fotos = QPushButton(tr("🖼️  Guardar fotos etiquetadas"))
+        self.btn_fotos = QPushButton(tr("Guardar fotos etiquetadas"))
+        self.btn_fotos.setIcon(iconos.icono("imagenes", 15, T.ON_ACCENT))
         self.btn_fotos.setStyleSheet(
             f"background: {T.VIO}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -273,7 +277,7 @@ class ReportePage(DetectorPage):
     # ── Alcance ─────────────────────────────────────────────────
     def _card_alcance(self):
         """Tarjeta para elegir si el informe cubre todo el trabajo o unas fotos."""
-        c, l = self.card(tr("Alcance del informe"), "🎯")
+        c, l = self.card(tr("Alcance del informe"), "diana")
 
         ayuda = QLabel(tr(
             "Puedes generar el informe del <b>trabajo completo</b>, solo de las "
@@ -383,7 +387,7 @@ class ReportePage(DetectorPage):
         aquí: si mañana se añade una sección al informe aparece sola su casilla,
         y no puede quedar una sección imposible de desmarcar.
         """
-        c, l = self.card(tr("Qué incluir en el informe"), "🧾")
+        c, l = self.card(tr("Qué incluir en el informe"), "reporte")
         ayuda = QLabel(tr(
             "El informe completo es largo. Desmarca lo que no necesites: las secciones "
             "se renumeran solas y el índice se ajusta. Una sección marcada que no tenga "

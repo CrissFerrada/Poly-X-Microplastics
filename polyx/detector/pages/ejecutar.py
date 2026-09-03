@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from ._base import DetectorPage
 from ...core import theme as T
+from ...core import iconos
 from ..runner import DetectorRunner
 from ...core.i18n import tr
 from ...core.plataforma import abrir_en_el_sistema
@@ -113,7 +114,7 @@ class EjecutarPage(DetectorPage):
         self.runner: DetectorRunner | None = None
 
         # ── Control ──
-        c1, l1 = self.card(tr("Control"), "▶")
+        c1, l1 = self.card(tr("Control"), "ejecutar")
 
         # Aviso de troceado. Vivia solo en la pestana Parametros, donde nadie lo
         # veia; aqui aparece justo antes de pulsar Iniciar, que es cuando importa
@@ -125,7 +126,8 @@ class EjecutarPage(DetectorPage):
 
         row = QHBoxLayout()
         row.setSpacing(8)
-        self.btn_start = QPushButton(tr("▶  Iniciar detección"))
+        self.btn_start = QPushButton(tr("Iniciar detección"))
+        self.btn_start.setIcon(iconos.icono("ejecutar", 15, T.ON_ACCENT))
         self.btn_start.setStyleSheet(
             f"background: {T.ACCENT}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -134,7 +136,8 @@ class EjecutarPage(DetectorPage):
         self.btn_start.clicked.connect(self._start)
         row.addWidget(self.btn_start)
 
-        self.btn_stop = QPushButton(tr("■  Detener"))
+        self.btn_stop = QPushButton(tr("Detener"))
+        self.btn_stop.setIcon(iconos.icono("detener", 15, T.ON_ACCENT))
         self.btn_stop.setStyleSheet(
             f"background: {T.ERR}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -143,7 +146,8 @@ class EjecutarPage(DetectorPage):
         self.btn_stop.clicked.connect(self._stop)
         row.addWidget(self.btn_stop)
 
-        self.btn_review = QPushButton(tr("👁  Revisar en pantalla grande"))
+        self.btn_review = QPushButton(tr("Revisar en pantalla grande"))
+        self.btn_review.setIcon(iconos.icono("ver", 15, T.ON_ACCENT))
         self.btn_review.setStyleSheet(
             f"background: {T.OK}; color: white; border: none; "
             f"border-radius: 6px; padding: 8px 16px; font-weight: 600;"
@@ -153,7 +157,8 @@ class EjecutarPage(DetectorPage):
         self.btn_review.clicked.connect(self._open_review)
         row.addWidget(self.btn_review)
 
-        self.btn_open = QPushButton(tr("📂  Abrir carpeta de resultados"))
+        self.btn_open = QPushButton(tr("Abrir carpeta de resultados"))
+        self.btn_open.setIcon(iconos.icono("dataset", 15, T.INK2))
         self.btn_open.clicked.connect(self._open_results)
         row.addWidget(self.btn_open)
         row.addStretch(1)
@@ -161,7 +166,7 @@ class EjecutarPage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Progreso ──
-        c2, l2 = self.card(tr("Progreso"), "⏳")
+        c2, l2 = self.card(tr("Progreso"), "espera")
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
@@ -173,7 +178,7 @@ class EjecutarPage(DetectorPage):
         self.body.addWidget(c2)
 
         # ── Preview ──
-        c3, l3 = self.card(tr("Preview en vivo"), "👁")
+        c3, l3 = self.card(tr("Preview en vivo"), "ver")
         sub = QLabel(tr("Última imagen procesada por cada modelo:"))
         sub.setStyleSheet(f"color: {T.INK3}; font-size: 9.5pt; border: none;")
         l3.addWidget(sub)

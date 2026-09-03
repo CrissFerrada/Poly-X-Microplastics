@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from ._base import DetectorPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.widgets import KPICard
 from ...core.metrics import LABEL_TP, LABEL_FP, LABEL_FN, LABEL_MISCLS, match_image
 from ...core.i18n import tr
@@ -33,7 +34,7 @@ class ResultadosPage(DetectorPage):
         super().__init__(state, parent)
 
         # ── KPIs ──
-        c1, l1 = self.card(tr("Métricas generales"), "📊")
+        c1, l1 = self.card(tr("Métricas generales"), "resultados")
         grid = QGridLayout()
         grid.setSpacing(12)
         self.kpi_imgs   = KPICard(tr("Imágenes"), T.ACCENT)
@@ -56,7 +57,7 @@ class ResultadosPage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Métricas detalladas ──
-        c2, l2 = self.card(tr("Métricas detalladas (suma de todos los modelos)"), "📋")
+        c2, l2 = self.card(tr("Métricas detalladas (suma de todos los modelos)"), "lista")
         row = QHBoxLayout()
         row.setSpacing(20)
         self.lbl_prec = QLabel(tr("Precisión:  —"))
@@ -71,13 +72,13 @@ class ResultadosPage(DetectorPage):
         self.lbl_sugg = QLabel("")
         self.lbl_sugg.setWordWrap(True)
         self.lbl_sugg.setStyleSheet(
-            f"color: {T.OK}; font-size: 10pt; font-weight: 600; border: none;")
+            f"color: {T.OK_TX}; font-size: 10pt; font-weight: 600; border: none;")
         l2.addWidget(self.lbl_sugg)
         self.body.addWidget(c2)
 
         # ── Histograma de tamaños (solo con calibración) ──
         self.c_hist, l_hist = self.card(
-            tr("Distribución de tamaños (μm) — solo con calibración activa"), "📐"
+            tr("Distribución de tamaños (μm) — solo con calibración activa"), "visor"
         )
         self._hist_placeholder = QLabel(
             tr("Configura μm/px en Parámetros para ver la distribución de tamaños.")
@@ -91,7 +92,7 @@ class ResultadosPage(DetectorPage):
         self.body.addWidget(self.c_hist)
 
         # ── Recargar GT del disco ──
-        c_gt, l_gt = self.card(tr("Ground truth"), "🔄")
+        c_gt, l_gt = self.card(tr("Ground truth"), "recargar")
         nota_gt = QLabel(tr(
             "No pide ninguna carpeta: relee los .txt que están junto a cada "
             "foto, los mismos que ves en GT manual. Hace falta porque la corrida "
@@ -106,9 +107,10 @@ class ResultadosPage(DetectorPage):
         self.lbl_recarga = QLabel("")
         self.lbl_recarga.setWordWrap(True)
         self.lbl_recarga.setStyleSheet(
-            f"color: {T.OK}; font-size: 10pt; font-weight: 600; border: none;")
+            f"color: {T.OK_TX}; font-size: 10pt; font-weight: 600; border: none;")
         row_gt = QHBoxLayout()
-        self.btn_recargar = QPushButton(tr("🔄  Releer los .txt del disco y recalcular"))
+        self.btn_recargar = QPushButton(tr("Releer los .txt del disco y recalcular"))
+        self.btn_recargar.setIcon(iconos.icono("recargar", 15, T.INK2))
         self.btn_recargar.clicked.connect(self._recargar_gt)
         row_gt.addWidget(self.btn_recargar)
         row_gt.addStretch(1)
@@ -117,9 +119,10 @@ class ResultadosPage(DetectorPage):
         self.body.addWidget(c_gt)
 
         # ── Exportar CSV ──
-        c_csv, l_csv = self.card(tr("Exportar datos"), "💾")
+        c_csv, l_csv = self.card(tr("Exportar datos"), "guardar")
         row_csv = QHBoxLayout()
-        btn_csv = QPushButton(tr("📄  Exportar CSV de detecciones"))
+        btn_csv = QPushButton(tr("Exportar CSV de detecciones"))
+        btn_csv.setIcon(iconos.icono("texto", 15, T.INK2))
         btn_csv.clicked.connect(self._export_csv)
         row_csv.addWidget(btn_csv)
         row_csv.addStretch(1)
@@ -127,7 +130,7 @@ class ResultadosPage(DetectorPage):
         self.body.addWidget(c_csv)
 
         # ── Tabla por imagen ──
-        c3, l3 = self.card(tr("Por imagen"), "🖼")
+        c3, l3 = self.card(tr("Por imagen"), "imagenes")
         self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels(
             ["Modelo", "Imagen", "Pred", "GT", LABEL_TP, LABEL_FP, LABEL_FN, "Conf media"]
@@ -141,7 +144,8 @@ class ResultadosPage(DetectorPage):
         self.table.setMinimumHeight(280)
         l3.addWidget(self.table)
         fila_rev = QHBoxLayout()
-        btn_rev = QPushButton(tr("🔍  Revisar partícula a partícula en el Visor"))
+        btn_rev = QPushButton(tr("Revisar partícula a partícula en el Visor"))
+        btn_rev.setIcon(iconos.icono("buscar", 15, T.INK2))
         btn_rev.clicked.connect(self._revisar_en_visor)
         fila_rev.addWidget(btn_rev)
         fila_rev.addStretch(1)
@@ -328,7 +332,7 @@ class ResultadosPage(DetectorPage):
             # Se exige mejora real, no solo un umbral distinto: con F1 plano el
             # maximo cae en cualquier punto y aconsejar moverse ahi seria ruido.
             if tb > ta + 1e-9 and (f1b - f1a) > 0.002:
-                señal = "⚠" if (f1b - f1a) >= 0.01 else "💡"
+                señal = "⚠" if (f1b - f1a) >= 0.01 else "·"
                 lineas.append(
                     f"{señal} {cabeza}  Su mejor umbral es {tb:.2f}: F1 {f1b:.3f} "
                     f"({f1b - f1a:+.3f}), P {pb:.3f} / R {rb:.3f}.")

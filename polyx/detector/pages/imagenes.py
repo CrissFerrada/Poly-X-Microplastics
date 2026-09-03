@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from ._base import DetectorPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.paths import IMAGE_EXTS
 from ...core.yolo_wrap import find_gt_for_image
 from ...core.i18n import tr
@@ -30,12 +31,14 @@ class ImagenesPage(DetectorPage):
         self.setAcceptDrops(True)
 
         # ── Tarjeta Origen ──
-        c1, l1 = self.card(tr("Origen"), "📁")
+        c1, l1 = self.card(tr("Origen"), "dataset")
         row = QHBoxLayout()
         row.setSpacing(8)
-        btn_files = QPushButton(tr("📷  Seleccionar imágenes…"))
+        btn_files = QPushButton(tr("Seleccionar imágenes…"))
+        btn_files.setIcon(iconos.icono("imagenes", 15, T.INK2))
         btn_files.clicked.connect(self._pick_files)
-        btn_folder = QPushButton(tr("📁  Seleccionar carpeta…"))
+        btn_folder = QPushButton(tr("Seleccionar carpeta…"))
+        btn_folder.setIcon(iconos.icono("dataset", 15, T.INK2))
         btn_folder.clicked.connect(self._pick_folder)
         btn_clear = QPushButton(tr("✕  Limpiar"))
         btn_clear.clicked.connect(self._clear)
@@ -73,7 +76,7 @@ class ImagenesPage(DetectorPage):
         self.body.addWidget(c1)
 
         # ── Tarjeta Imágenes cargadas ──
-        c2, l2 = self.card(tr("Imágenes cargadas"), "🖼")
+        c2, l2 = self.card(tr("Imágenes cargadas"), "imagenes")
         self.lbl_count = QLabel(tr("0 imágenes"))
         self.lbl_count.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         l2.addWidget(self.lbl_count)

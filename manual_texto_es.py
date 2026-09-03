@@ -17,7 +17,7 @@ TITULO_H1 = 'Poly-X <em>analytics</em>'
 BAJADA = ("Detección, medida y clasificación de microplásticos por fluorescencia "
           "Nile Red bajo luz UV, con modelos YOLO v8/v11. De la descarga en GitHub "
           "al informe listo para publicar.")
-META = ("<b>Cristofher Ferrada</b> · Doctorado en Ciencias mención Química<br>"
+META = ("<b>Cristofher Ferrada</b> · Dr (c) en Ciencias mención Química<br>"
         "Laboratorio de Química Ambiental · Pontificia Universidad Católica de Valparaíso<br>"
         "Windows 10/11 y macOS · Python 3.11 · 2026")
 

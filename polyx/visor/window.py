@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (
     QApplication,
 )
 
-from ..core import theme as T
+from ..core import theme as T
+from ..core import iconos
 from ..core.widgets import LogoBadge, HLine
 from .state import VisorState
 from .canvas import VisorCanvas
@@ -101,8 +102,10 @@ class VisorWindow(QMainWindow):
         rv.addWidget(lbl_open)
 
         row_open = QHBoxLayout()
-        btn_img = QPushButton(tr("📷  Imagen"))
-        btn_fol = QPushButton(tr("📁  Carpeta"))
+        btn_img = QPushButton(tr("Imagen"))
+        btn_img.setIcon(iconos.icono("imagenes", 15, T.INK2))
+        btn_fol = QPushButton(tr("Carpeta"))
+        btn_fol.setIcon(iconos.icono("dataset", 15, T.INK2))
         btn_img.clicked.connect(self._open_image)
         btn_fol.clicked.connect(self._open_folder)
         row_open.addWidget(btn_img)
@@ -149,7 +152,8 @@ class VisorWindow(QMainWindow):
         )
         rv.addWidget(self.lbl_model)
 
-        btn_load_model = QPushButton(tr("📂  Cargar modelo…"))
+        btn_load_model = QPushButton(tr("Cargar modelo…"))
+        btn_load_model.setIcon(iconos.icono("dataset", 15, T.INK2))
         btn_load_model.clicked.connect(self._load_model)
         rv.addWidget(btn_load_model)
 
@@ -180,12 +184,14 @@ class VisorWindow(QMainWindow):
         self.chk_gpu.setChecked(True)
         rv.addWidget(self.chk_gpu)
 
-        self.btn_detect = QPushButton(tr("▶  Detectar"))
+        self.btn_detect = QPushButton(tr("Detectar"))
+        self.btn_detect.setIcon(iconos.icono("ejecutar", 15, T.INK2))
         self.btn_detect.setObjectName("primary")
         self.btn_detect.clicked.connect(self._detect)
         rv.addWidget(self.btn_detect)
 
-        self.btn_cargar_txt = QPushButton(tr("📄  Cargar etiquetas (.txt)"))
+        self.btn_cargar_txt = QPushButton(tr("Cargar etiquetas (.txt)"))
+        self.btn_cargar_txt.setIcon(iconos.icono("texto", 15, T.INK2))
         self.btn_cargar_txt.setToolTip(
             tr("Muestra las anotaciones YOLO que acompañan a la imagen.\n"
             "Sirve para revisar el conteo manual sobre la placa, con las\n"
@@ -194,7 +200,8 @@ class VisorWindow(QMainWindow):
         self.btn_cargar_txt.clicked.connect(self._cargar_etiquetas)
         rv.addWidget(self.btn_cargar_txt)
 
-        self.btn_cargar_run = QPushButton(tr("📁  Cargar predicciones de una corrida"))
+        self.btn_cargar_run = QPushButton(tr("Cargar predicciones de una corrida"))
+        self.btn_cargar_run.setIcon(iconos.icono("dataset", 15, T.INK2))
         self.btn_cargar_run.setToolTip(
             tr("Lee las predicciones que el Detector dejó en runs/detect_.../ "
             "para esta misma foto. Sirve para revisar una corrida ya cerrada, "
@@ -211,8 +218,10 @@ class VisorWindow(QMainWindow):
         rv.addWidget(lbl_calib)
 
         row_calib = QHBoxLayout()
-        self.btn_linea = QPushButton(tr("📏  Línea"))
-        self.btn_circ  = QPushButton(tr("⭕  Círculo"))
+        self.btn_linea = QPushButton(tr("Línea"))
+        self.btn_linea.setIcon(iconos.icono("linea", 15, T.INK2))
+        self.btn_circ = QPushButton(tr("Círculo"))
+        self.btn_circ.setIcon(iconos.icono("circulo", 15, T.INK2))
         self.btn_linea.setCheckable(True)
         self.btn_circ.setCheckable(True)
         self.btn_linea.clicked.connect(lambda: self._start_calib("linea"))
@@ -230,7 +239,7 @@ class VisorWindow(QMainWindow):
 
         btn_cancel_calib = QPushButton(tr("✕  Cancelar calibración"))
         btn_cancel_calib.setStyleSheet(
-            f"QPushButton {{ color: {T.WARN}; border-color: {T.WARN}; }}"
+            f"QPushButton {{ color: {T.WARN_TX}; border-color: {T.WARN_TX}; }}"
             f"QPushButton:hover {{ background: #fff8c5; }}"
         )
         btn_cancel_calib.clicked.connect(self.state.cancel_calib)
@@ -238,7 +247,7 @@ class VisorWindow(QMainWindow):
         btn_cancel_calib.setVisible(False)
         rv.addWidget(btn_cancel_calib)
 
-        self.lbl_calib_result = QLabel(tr("📐  Sin calibrar"))
+        self.lbl_calib_result = QLabel(tr("Sin calibrar"))
         self.lbl_calib_result.setStyleSheet(f"color: {T.INK2}; font-size: 9.5pt;")
         rv.addWidget(self.lbl_calib_result)
 
@@ -304,14 +313,15 @@ class VisorWindow(QMainWindow):
         rv.addWidget(HLine())
 
         # ── Guardar ──
-        btn_save = QPushButton(tr("💾  Guardar info actual"))
+        btn_save = QPushButton(tr("Guardar info actual"))
+        btn_save.setIcon(iconos.icono("guardar", 15, T.INK2))
         btn_save.setObjectName("primary")
         btn_save.clicked.connect(self._save)
         rv.addWidget(btn_save)
 
         self.lbl_status = QLabel(tr("● Listo"))
         self.lbl_status.setAlignment(Qt.AlignCenter)
-        self.lbl_status.setStyleSheet(f"color: {T.OK}; font-size: 9pt;")
+        self.lbl_status.setStyleSheet(f"color: {T.OK_TX}; font-size: 9pt;")
         rv.addWidget(self.lbl_status)
 
         rv.addStretch(1)
@@ -748,8 +758,8 @@ class VisorWindow(QMainWindow):
                 self.state.cancel_calib()
 
     def _on_calib_changed(self, um_per_px: float, mode_name: str):
-        self.lbl_calib_result.setText(f"📐  {um_per_px:.4f} μm/px  ({mode_name})")
-        self.lbl_calib_result.setStyleSheet(f"color: {T.OK}; font-size: 9.5pt; font-weight: 600;")
+        self.lbl_calib_result.setText(f"{um_per_px:.4f} μm/px  ({mode_name})")
+        self.lbl_calib_result.setStyleSheet(f"color: {T.OK_TX}; font-size: 9.5pt; font-weight: 600;")
         self._set_status(f"● Calibración aplicada: {um_per_px:.4f} μm/px", T.OK)
         self._update_status_bar()
         # Refrescar tabla con nuevas unidades μm
@@ -760,7 +770,7 @@ class VisorWindow(QMainWindow):
         img = self.state.current_image
         img_txt = img.name if img else "Sin imagen"
         if self.state.um_per_px > 0:
-            calib_txt = f"📐 {self.state.um_per_px:.4f} μm/px"
+            calib_txt = f"{self.state.um_per_px:.4f} μm/px"
         else:
             calib_txt = "Sin calibración"
         n_det = len(self.state.detections)

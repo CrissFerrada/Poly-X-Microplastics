@@ -13,7 +13,7 @@ TITULO_H1 = 'Poly-X <em>analytics</em>'
 BAJADA = ("Detection, sizing and classification of microplastics by Nile Red "
           "fluorescence under UV light, with YOLO v8/v11 models. From the GitHub "
           "download to a publication-ready report.")
-META = ("<b>Cristofher Ferrada</b> · PhD in Chemistry<br>"
+META = ("<b>Cristofher Ferrada</b> · PhD (c) in Chemistry<br>"
         "Environmental Chemistry Laboratory · Pontificia Universidad Católica de Valparaíso<br>"
         "Windows 10/11 and macOS · Python 3.11 · 2026")
 

@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 
 from ...core import theme as T
+from ...core import iconos
 from ...core.widgets import StepHeader
 from ..state import DetectorState
 
@@ -34,8 +35,8 @@ class DetectorPage(QWidget):
         outer.addStretch(1)
 
     # ── helper para tarjetas ──
-    def card(self, title: str, icon: str = "") -> tuple[QFrame, QVBoxLayout]:
-        """Tarjeta blanca con borde. Devuelve (frame, layout_interno)."""
+    def card(self, title: str, icono: str = "") -> tuple[QFrame, QVBoxLayout]:
+        """Tarjeta con borde. `icono` es un nombre de core/iconos.py."""
         frame = QFrame()
         frame.setStyleSheet(
             f"QFrame {{ background: {T.BG}; border: 1px solid {T.RULE}; border-radius: 8px; }}"
@@ -47,9 +48,13 @@ class DetectorPage(QWidget):
         if title:
             head = QHBoxLayout()
             head.setSpacing(8)
-            if icon:
-                ic = QLabel(icon)
-                ic.setStyleSheet(f"font-size: 14pt; border: none;")
+            if icono:
+                # `icon` es el nombre de un dibujo de core/iconos.py, no un
+                # emoji: asi la cabecera se ve igual en Windows y en macOS y
+                # toma el color del tema en vez de venir con el suyo.
+                ic = QLabel()
+                ic.setPixmap(iconos.pixmap(icono, 17, T.INK2, 1.85))
+                ic.setStyleSheet("border: none;")
                 head.addWidget(ic)
             t = QLabel(title)
             t.setStyleSheet(

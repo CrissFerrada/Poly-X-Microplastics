@@ -439,7 +439,7 @@ def _fig_barrido(barrido: Dict[str, list]) -> str:
     return _fig_to_b64(fig)
 
 
-_PALETA = (T.ACCENT, T.VIO, T.WARN)
+_PALETA = (T.DOC.ACCENT, T.DOC.VIO, T.DOC.WARN)
 
 
 def _fig_comparacion_metricas(datos: List[tuple]) -> str:
@@ -503,12 +503,12 @@ def _fig_acuerdo_por_imagen(alias_a: str, alias_b: str, pares: List[tuple]) -> s
     fig, ax = plt.subplots(figsize=(4.6, 4.2))
     ax.plot([0, tope], [0, tope], "--", color="#999", linewidth=1,
             label="acuerdo exacto")
-    ax.scatter(a, b, s=26, alpha=0.75, color=T.ACCENT, edgecolor="white",
+    ax.scatter(a, b, s=26, alpha=0.75, color=T.DOC.ACCENT, edgecolor="white",
                linewidth=0.5)
     # Se rotulan las placas que mas se separan: son las que hay que ir a mirar.
     for na, nb, nombre in sorted(pares, key=lambda p: -abs(p[0] - p[1]))[:3]:
         if abs(na - nb) > 0:
-            ax.annotate(nombre, (na, nb), fontsize=7, color=T.INK2,
+            ax.annotate(nombre, (na, nb), fontsize=7, color=T.DOC.INK2,
                         xytext=(4, 4), textcoords="offset points")
     ax.set_xscale("symlog", linthresh=10)
     ax.set_yscale("symlog", linthresh=10)
@@ -576,7 +576,7 @@ def _fig_confidence_hist(confs: List[float]) -> str:
     if not confs:
         return ""
     fig, ax = plt.subplots(figsize=(7, 3.2))
-    ax.hist(confs, bins=20, color=T.ACCENT, edgecolor="black", linewidth=0.5)
+    ax.hist(confs, bins=20, color=T.DOC.ACCENT, edgecolor="black", linewidth=0.5)
     ax.set_xlabel(tr("Confianza"))
     ax.set_ylabel(tr("Frecuencia"))
     ax.set_title(tr("Histograma de confianza"))
@@ -588,7 +588,7 @@ def _fig_size_hist(sizes_um: List[float]) -> str:
     if not sizes_um:
         return ""
     fig, ax = plt.subplots(figsize=(7, 3.2))
-    ax.hist(sizes_um, bins=25, color=T.WARN, edgecolor="black", linewidth=0.5)
+    ax.hist(sizes_um, bins=25, color=T.DOC.WARN, edgecolor="black", linewidth=0.5)
     ax.set_xlabel(tr("Diámetro equivalente (μm)"))
     ax.set_ylabel(tr("Frecuencia"))
     ax.set_title(tr("Distribución de tamaños"))
@@ -816,9 +816,9 @@ def _fig_boxplot_grupos(grupos: Dict[str, List[float]], titulo: str, xlabel: str
     bp = ax.boxplot(datos, tick_labels=etiquetas, patch_artist=True, showfliers=True,
                     flierprops=dict(marker='o', markersize=3, alpha=0.35, markeredgewidth=0))
     for patch in bp["boxes"]:
-        patch.set_facecolor(T.ACCENT)
+        patch.set_facecolor(T.DOC.ACCENT)
         patch.set_alpha(0.30)
-        patch.set_edgecolor(T.ACCENT)
+        patch.set_edgecolor(T.DOC.ACCENT)
     for med in bp["medians"]:
         med.set_color("black")
         med.set_linewidth(1.4)
@@ -917,7 +917,7 @@ def _fig_perfil_profundidad(perfiles: dict) -> str:
     if not perfiles:
         return ""
     # Una linea por estacion, con los colores del informe.
-    colores = [T.ACCENT, T.OK, T.VIO, T.WARN, T.ERR]
+    colores = [T.DOC.ACCENT, T.DOC.OK, T.DOC.VIO, T.DOC.WARN, T.DOC.ERR]
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.2, 4.6), dpi=140, sharey=True)
     for i, (estacion, filas) in enumerate(sorted(perfiles.items())):
         tramos = [f[0] for f in filas]
@@ -2167,7 +2167,7 @@ def generate_report(state, output_path: Path,
 {aviso}
 <p>{tr('El patrón de longitud es el diámetro externo nominal de la placa Petri. El radio en píxeles se obtiene ajustando un círculo por mínimos cuadrados al borde del anillo muestreado en 720 direcciones, con rechazo de atípicos; la transformada de Hough solo aporta el centro aproximado, porque su radio llega a errar un 12&nbsp;% y ese error entraría entero en todos los tamaños reportados.')}</p>
 
-<p style='border-left:3px solid {T.INK3};padding:6px 12px;background:var(--bg_soft)'>
+<p style='border-left:3px solid {T.DOC.INK3};padding:6px 12px;background:var(--bg_soft)'>
 {tr('<strong>Incertidumbre de la escala, y en qué dirección.</strong> El anillo de la placa tiene una pared de unos <strong>{pared:g}&nbsp;mm</strong> (medido sobre las fotos de este estudio: el borde interno cae en 0,960 del radio ajustado y el externo en 1,000). El diámetro nominal de una placa Petri es ambiguo a ese nivel: puede referirse al diámetro <em>externo</em> o al <em>útil interior</em>. Aquí se toma el <strong>externo</strong>, que es el borde al que ajusta el círculo. Si el nominal se refiriera al interior, la escala correcta sería un <strong>{sesgo:g}&nbsp;% mayor</strong> y todas las tallas de este informe estarían <strong>subestimadas</strong> en esa cifra. El sesgo solo puede ir en ese sentido, porque el externo es el mayor de los dos bordes posibles.').format(pared=ESPESOR_PARED_MM, sesgo=SESGO_MAXIMO_PARED_PCT)}</p>
 {_figura_calibracion(state)}"""
             if res["avisos"]:
@@ -2249,7 +2249,7 @@ def generate_report(state, output_path: Path,
             _pc = 100.0 * n_revisar / len(formas)
             _pc_txt = f"{_pc:.1f}" if _pc < 1 else f"{_pc:.0f}"
             aviso_revisar = (
-                f"<p style='border-left:3px solid {T.WARN};padding:6px 12px;"
+                f"<p style='border-left:3px solid {T.DOC.WARN};padding:6px 12px;"
                 f"background:#fff8e6'>"
                 + tr("<strong>{n} de {total} partículas ({pct}&nbsp;%) tienen una talla "
                      "que pide comprobación</strong>: al segmentarlas, la máscara se "
@@ -2265,7 +2265,7 @@ def generate_report(state, output_path: Path,
         # ── Lo apartado por caer sobre el aro ──
         if n_en_el_aro:
             aviso_revisar += (
-                f"<p style='border-left:3px solid {T.INK3};padding:6px 12px;"
+                f"<p style='border-left:3px solid {T.DOC.INK3};padding:6px 12px;"
                 f"background:var(--bg_soft)'>"
                 + tr("<strong>{n} detección(es) caen sobre el anillo de la placa</strong> "
                      "—más allá del {pct} % del radio ajustado— y quedan fuera de esta "
@@ -2601,7 +2601,7 @@ def generate_report(state, output_path: Path,
                 alerta = ""
                 if getattr(d, "revisar", False):
                     alerta = (
-                        f"<div style='font-size:8.5pt;color:{T.WARN};margin-top:3px'>"
+                        f"<div style='font-size:8.5pt;color:{T.DOC.WARN};margin-top:3px'>"
                         f"⚠ {d.aviso_forma or tr('la máscara se salía de la caja y se recortó a ella')}</div>")
                 tarjetas += (
                     f"<div style='display:inline-block;vertical-align:top;margin:0 14px 18px 0;"

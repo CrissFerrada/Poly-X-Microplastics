@@ -1,7 +1,7 @@
 # Poly-X — Suite de detección de microplásticos
 
 **Estado:** Reconstrucción en curso (mayo 2026)  
-**Autor:** Cristofher Ferrada · Doctorado en Ciencias mención Química · PUCV  
+**Autor:** Cristofher Ferrada · Dr (c) en Ciencias mención Química · PUCV  
 **Versión:** 2.0.0  
 **GitHub:** https://github.com/CrissFerrada/Poly-X-Microplastics
 
@@ -151,9 +151,109 @@ data/                     # Otros datasets
 
 ---
 
-## 🎨 Paleta (theme.py)
+## 🎨 Temas y paleta (theme.py)
 
-Coincide con Manual_PolyX.html:
+**Cuatro temas**, elegibles en *Preferencias* (o con `POLYX_TEMA`):
+
+| Tema | Para qué |
+|---|---|
+| `claro` | El de siempre. Por defecto, y el que muestra el manual |
+| `oscuro` | Trabajar de noche y junto a fotos de UV |
+| `azul` | Azul profundo, acento más frío |
+| `contraste` | AAA. Para proyector y para vista cansada |
+
+Cada tema es un diccionario de **tokens** en `PALETAS`. Al importar el módulo se
+resuelve cuál está activo y sus valores se publican como atributos del módulo,
+así que el resto del programa sigue escribiendo `T.INK` sin saber que existen
+los temas.
+
+> **Por eso `from .core.theme import INK` está prohibido.** Ese import se queda
+> con el color que hubiera al arrancar y no vuelve a cambiar. Hay que importar
+> el módulo (`from .core import theme as T`) y leer `T.INK` en el punto de uso.
+
+### Tokens
+
+```python
+INK / INK2 / INK3 / MUTED   # texto, de más a menos contraste
+RULE / RULE_SOFT            # bordes: visible y apenas insinuado
+BG                          # superficie elevada: tarjetas, barras, campos
+BG_SOFT                     # fondo hundido: el lienzo de la ventana
+ACCENT / ACCENT_D           # primario y su hover
+ON_ACCENT                   # texto ENCIMA del acento; no siempre blanco
+OK / WARN / ERR / VIO       # estado, como FONDO de botón relleno
+OK_TX / WARN_TX / ...       # el mismo estado, como TEXTO sobre la tarjeta
+FIELD_1 / FIELD_2 / RING    # campo del microscopio del launcher
+TIP_BG / TIP_FG             # tooltip
+```
+
+**Por qué cada estado tiene dos versiones.** El tono que da 5:1 con texto blanco
+encima es demasiado apagado para leerse *como* texto sobre un fondo oscuro. Un
+solo valor no puede cumplir las dos cosas: elegir uno dejaba media interfaz por
+debajo de 4.5:1. En los temas claros ambos coinciden. Todos los pares
+texto/fondo de los cuatro temas pasan **4.5:1**.
+
+### Lo que NO sigue al tema
+
+- **`CLASS_COLOR_HEX`** (PET/PP/LDPE) — son datos del dominio. Si cambiaran con
+  el tema, dos capturas del mismo análisis no serían comparables.
+- **`T.DOC`** — paleta congelada (la clara) para los **informes HTML**. Un
+  informe se imprime, se adjunta y se archiva: que saliera oscuro porque quien
+  lo generó trabaja de noche gastaría tinta y haría que dos informes del mismo
+  análisis no se parecieran. `report_html.py` e `informe.py` usan `T.DOC.*`.
+
+### Cómo se aplica un cambio de tema
+
+| Dónde | Cuándo |
+|---|---|
+| Launcher | **Al instante** — se reconstruye solo (`_construir_ui`) |
+| Módulos ya abiertos | No cambian: son procesos aparte con el color incrustado |
+| Módulos que se abran después | Ya salen con el tema nuevo |
+
+Es el mismo contrato que el idioma. Preferencias se guardan en
+`~/.polyx_tema.json` (tema + animaciones) y `~/.polyx_idioma.json`.
+
+### Animación
+
+`theme.animaciones()` gobierna el panel del microscopio del launcher. Apagarlo
+no es solo estético: el movimiento continuo molesta a quien tiene sensibilidad
+vestibular, y en un equipo sin GPU ahorra 30 cuadros por segundo. Con las
+animaciones apagadas el panel dibuja un fotograma fijo, no desaparece.
+
+### Iconos
+
+`core/iconos.py` dibuja **40 iconos** con `QPainterPath` sobre una rejilla de
+24×24, con el trazo proporcional al tamaño pedido.
+
+**No se usan emoji como iconos.** Un emoji lo dibuja la fuente del sistema:
+cambia de forma entre Windows 10, 11 y macOS, llega en color fijo —así que no
+puede teñirse con el acento del tema— y mezcla estilos, unos planos y otros con
+degradado, algo que se nota en cuanto hay cuatro juntos en una rejilla.
+
+```python
+from ..core import iconos
+lbl.setPixmap(iconos.pixmap("detector", 26, T.ACCENT))
+btn.setIcon(iconos.icono("guardar", 15, T.INK2))
+```
+
+Para un botón `checkable` —los de la barra lateral— hay
+`icono_conmutable(nombre, tam, color_off, color_on)`: Qt guarda un mapa por
+estado dentro del propio `QIcon`, de modo que el icono de la página activa se
+tiñe de acento junto con su texto, sin escuchar el `toggled`.
+
+Dónde se usan: barras laterales del Detector y del Entrenador
+(`SIDEBAR_ITEMS`), cabeceras de página (`PAGE_ICON`), cabeceras de tarjeta
+(segundo argumento de `card()`) y los botones de acción de los cuatro módulos.
+
+> **Se conservan como texto** las marcas tipográficas que forman parte de una
+> frase: `✓ ✗ ⚠ → ←`. No son iconos, son puntuación, y sustituirlas por
+> pictogramas dentro de un `QLabel` obligaría a partir el texto en tres widgets.
+
+> **Cuidado al reescribir archivos con un script.** `Path.write_text()` traduce
+> `\n` a `\r\n` en Windows: sobre un archivo que ya venía con CRLF, un barrido
+> línea a línea le mete una línea en blanco por cada línea y dobla el archivo.
+> Hay que leer y escribir con `newline=""`.
+
+### Valores del tema claro
 
 ```python
 INK = "#1f2328"          # Texto principal
@@ -475,7 +575,9 @@ runs/detect/trainN/
 - **Inglés:** Docstrings en inglés (excepto clase/método si es muy específico)
 - **Qt Signals:** `models_changed`, `run_started`, `run_finished`, etc.
 - **Rutas:** Siempre `Path` de pathlib, nunca strings
-- **Colores:** Usar `T.ACCENT`, `T.OK`, etc., nunca hardcodes
+- **Colores:** Usar `T.ACCENT`, `T.OK`, etc., nunca hardcodes. Como
+  **texto**, la variante `_TX` (`T.OK_TX`); como **fondo** de botón
+  relleno, la base. En informes HTML, siempre `T.DOC.*`
 - **Métodos:** `_` privado (widget, signal callback)
 
 ---
@@ -588,7 +690,7 @@ set POLYX_IDIOMA=en && .venv\Scripts\python.exe capturar_manual.py --salida manu
 ## 📞 Contacto
 
 **Cristofher Ferrada**  
-Doctorado en Ciencias mención Química — Pontificia Universidad Católica de Valparaíso  
+Dr (c) en Ciencias mención Química — Pontificia Universidad Católica de Valparaíso  
 2026
 
 **Repo:** https://github.com/CrissFerrada/Poly-X-Microplastics

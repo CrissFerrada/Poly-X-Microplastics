@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from ._base import DetectorPage
 from ...core import theme as T
+from ...core import iconos
 from ...core.paths import DEFAULT_MODEL
 from ...core.yolo_wrap import YoloModel
 from ...core.i18n import tr
@@ -32,7 +33,8 @@ class _ModelSlotCard(QFrame):
         # Header del modelo
         head = QHBoxLayout()
         head.setSpacing(8)
-        head_icon = QLabel("🎯")
+        head_icon = QLabel()
+        head_icon.setPixmap(iconos.pixmap("modelo", 17, T.INK2, 1.85))
         head_icon.setStyleSheet("font-size: 14pt; border: none;")
         head_title = QLabel(tr("Modelo {n}").format(n=idx + 1))
         head_title.setStyleSheet(f"color: {T.INK}; font-size: 12.5pt; font-weight: 600; border: none;")
@@ -148,7 +150,7 @@ class ModelosPage(DetectorPage):
             self.slot_cards.append(c)
 
         # Carga rápida
-        qf, qfl = self.card(tr("Carga rápida"), "⚡")
+        qf, qfl = self.card(tr("Carga rápida"), "rayo")
         info = QLabel(
             tr("Si tienes el modelo entrenado por el autor, úsalo como Modelo 1 con un solo clic.")
         )
