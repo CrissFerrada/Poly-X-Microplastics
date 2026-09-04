@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from .core import theme as T
 from .core import iconos
+from .core import marca
 from .core.i18n import tr, idioma
 from .core.preferencias import DialogoPreferencias
 from .core.widgets import LogoBadge, HLine
@@ -553,7 +554,7 @@ class ModuleCard(QFrame):
 class LauncherWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(tr("Poly-X · Suite de microplásticos"))
+        marca.titular(self, "launcher")
         self.resize(1180, 820)
 
         # Se guarda aparte porque la ventana se reconstruye al cambiar de tema
@@ -862,6 +863,9 @@ class LauncherWindow(QMainWindow):
 
 def main():
     app = QApplication.instance() or QApplication(sys.argv)
+    # Antes del primer show(): el boton de la barra de tareas se crea
+    # con la identidad que haya en ese momento.
+    marca.identificar(app, "launcher")
     w = LauncherWindow()
     w.show()
     sys.exit(app.exec())

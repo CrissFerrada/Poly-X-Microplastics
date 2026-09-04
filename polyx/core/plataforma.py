@@ -152,6 +152,34 @@ def descripcion_dispositivo(device: str) -> str:
 
 
 # ── Actualizador ──
+def fijar_identidad_app(app_id: str) -> bool:
+    """Declara ante el sistema que este proceso es Poly-X y no Python.
+
+    Windows agrupa los botones de la barra de tareas por **AppUserModelID**, no
+    por el ejecutable. Un proceso lanzado como ``pythonw.exe -m polyx.detector``
+    que no declara el suyo hereda el de la instalacion de Python, y el shell le
+    pone el icono de Python aunque la ventana tenga el suyo propio. Tambien
+    hace que anclar la ventana a la barra ancle Python.
+
+    Hay que llamarla **antes de que se cree la primera ventana**: el boton de
+    la barra se construye con el identificador que hubiera en ese momento, y
+    cambiarlo despues no surte efecto hasta reabrir.
+
+    En macOS y Linux no existe el concepto y no hay nada que hacer: alli el
+    icono de la ventana basta. Devuelve si llego a fijarse.
+    """
+    if not ES_WINDOWS:
+        return False
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+        return True
+    except (AttributeError, OSError):
+        # Windows Server sin shell32 completo, o una version antigua. No es
+        # motivo para no arrancar: solo se pierde el icono de la barra.
+        return False
+
+
 # El script que aplica la actualizacion es distinto en cada sistema porque
 # tiene que hablar con el gestor de paquetes y el shell de cada uno. El
 # nombre se resuelve aqui para que updates.py y launcher.py no lo repitan.

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import theme as T
+from ..core import marca
 from ..core import iconos
 from ..core.widgets import LogoBadge, HLine
 from .state import LabelerState
@@ -34,7 +35,7 @@ _CLS_COLORS = ["#e3342f", "#ff8c00", "#ffd700", "#00b4d8",
 class LabelerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(tr("Poly-X · Etiquetador"))
+        marca.titular(self, "etiquetador")
         self.resize(1400, 880)
         self.setStyleSheet(T.GLOBAL_QSS + f"QMainWindow {{ background: {T.BG_SOFT}; }}")
 

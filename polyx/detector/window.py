@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import theme as T
+from ..core import marca
 from ..core import iconos
 from ..core.widgets import LogoBadge
 from .state import DetectorState
@@ -76,7 +77,7 @@ class SidebarButton(QPushButton):
 class DetectorWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(tr("Poly-X · Detector"))
+        marca.titular(self, "detector")
         self.resize(1280, 820)
         self.setStyleSheet(T.GLOBAL_QSS + f"QMainWindow {{ background: {T.BG_SOFT}; }}")
 

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import theme as T
+from ..core import marca
 from ..core import iconos
 from ..core.widgets import LogoBadge
 from .state import TrainerState
@@ -71,7 +72,7 @@ class SidebarButton(QPushButton):
 class TrainerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(tr("Poly-X · Entrenador"))
+        marca.titular(self, "entrenador")
         self.resize(1320, 840)
         self.setStyleSheet(T.GLOBAL_QSS + f"QMainWindow {{ background: {T.BG_SOFT}; }}")
 
