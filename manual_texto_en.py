@@ -1333,6 +1333,30 @@ both at once. The figures, the charts and the confusion matrix are
 <b>recomputed over what you chose</b>, so the report always describes the
 photographs it shows.</p>
 
+<h3>Tables and figures ready for a paper</h3>
+<p>Every table and figure in the report comes out <b>numbered</b> (Table 3, Figure 5)
+with its caption, and download links appear below it: <b>CSV</b> and <b>LaTeX</b> for
+tables, <b>SVG</b> for figures. A folder <code>&lt;report&gt;_exportacion\</code> is also
+created next to the report, with everything in every format:</p>
+<table>
+  <tr><th>Subfolder</th><th>Contents</th></tr>
+  <tr><td><code>tablas\</code></td><td>each table as CSV (opens correctly in Excel, accents included), as three-line
+      LaTeX (<code>booktabs</code>), and all of them together in one <code>.xlsx</code> workbook, one sheet per table</td></tr>
+  <tr><td><code>figuras\</code></td><td>each figure as <b>SVG</b> (vector, with text still editable in Inkscape or
+      Illustrator), <b>PDF</b> and <b>PNG at 300 dpi</b></td></tr>
+  <tr><td><code>datos\</code></td><td>the data each chart was drawn from, as CSV, so it can be redone in Origin, Excel
+      or Python. For histograms and boxplots these are the <b>raw measurements</b>, not the bar heights</td></tr>
+  <tr><td><code>indice.csv</code></td><td>one row per file, with its number and caption</td></tr>
+</table>
+<p>File names carry the report number and the language (<code>Table03_..._EN.csv</code>,
+<code>Figure05_..._EN.svg</code>), so what the text says is what is in the folder.
+It is chosen in the <b>Export tables and figures</b> card of the Report tab, and the
+<b>Open export folder</b> button opens it. Regenerating the report replaces only the files
+this module creates; anything you left in that folder is untouched.</p>
+<p>Figures that are photographs (the calibrated plate, the particle cards) stay in the HTML
+and are not exported as figures, because they are not charts. A chart whose data cannot
+be read from the drawing comes out as SVG, PDF and PNG, without a data CSV.</p>
+
 <div class="aviso ok">
   <span class="et">And it comes out in your language</span>
   <p>Titles, tables, figure captions, chart axes and the methods prose follow the

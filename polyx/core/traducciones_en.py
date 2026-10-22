@@ -1197,4 +1197,26 @@ EN: dict[str, str] = {
         'and differ only in brightness, which depends on exposure and focus. '
         'Abstaining is more honest than inventing the class, and the report states '
         'what percentage was left unassigned.',
+    # ── Tablas y figuras exportables ──
+    'Tabla': 'Table',
+    'Figura': 'Figure',
+    'Tipo': 'Type',
+    'Número': 'Number',
+    'Archivos': 'Files',
+    'Leyenda': 'Caption',
+    'confianza': 'confidence',
+    'diametro_equivalente_um': 'equivalent_diameter_um',
+    'grupo': 'group',
+    'talla_um': 'size_um',
+    'Exportar tablas y figuras': 'Export tables and figures',
+    'Crear la carpeta de exportación junto al informe':
+        'Create the export folder next to the report',
+    'Deja cada tabla en CSV, LaTeX y Excel, y cada figura en SVG, PDF y PNG a 300 dpi, '
+    'con los datos del gráfico en CSV y un índice con las leyendas. Tablas y figuras '
+    'salen numeradas en el informe, igual que en los archivos.':
+        'Saves each table as CSV, LaTeX and Excel, and each figure as SVG, PDF and '
+        'PNG at 300 dpi, with the chart data as CSV and an index of the captions. '
+        'Tables and figures are numbered in the report, matching the file names.',
+    'Abrir carpeta de exportación': 'Open export folder',
+    'Tablas y figuras en {}': 'Tables and figures in {}',
 }

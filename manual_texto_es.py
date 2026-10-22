@@ -1351,6 +1351,30 @@ marques</b>, o ambos de una vez. Las cifras, los gráficos y la matriz de confus
 se <b>recalculan sobre lo elegido</b>, de modo que el informe siempre describe las
 fotografías que muestra.</p>
 
+<h3>Tablas y figuras listas para el paper</h3>
+<p>Cada tabla y cada figura del informe sale <b>numerada</b> (Tabla 3, Figura 5) con
+su leyenda, y bajo ella aparecen enlaces de descarga: <b>CSV</b> y <b>LaTeX</b> para
+las tablas, <b>SVG</b> para las figuras. Además, junto al informe se crea la carpeta
+<code>&lt;informe&gt;_exportacion\</code> con todo en todos los formatos:</p>
+<table>
+  <tr><th>Subcarpeta</th><th>Contenido</th></tr>
+  <tr><td><code>tablas\</code></td><td>cada tabla en CSV (abre bien en Excel, con acentos), en LaTeX de tres líneas
+      (<code>booktabs</code>), y todas juntas en un libro <code>.xlsx</code> con una hoja por tabla</td></tr>
+  <tr><td><code>figuras\</code></td><td>cada figura en <b>SVG</b> (vectorial, con el texto editable en Inkscape o
+      Illustrator), <b>PDF</b> y <b>PNG a 300 dpi</b></td></tr>
+  <tr><td><code>datos\</code></td><td>los datos con que se dibujó cada gráfico, en CSV, para rehacerlo en Origin, Excel
+      o Python. En los histogramas y los boxplots son las <b>mediciones crudas</b>, no la altura de las barras</td></tr>
+  <tr><td><code>indice.csv</code></td><td>una fila por archivo, con su número y su leyenda</td></tr>
+</table>
+<p>Los nombres llevan el número del informe y el idioma (<code>Tabla03_..._ES.csv</code>,
+<code>Figura05_..._EN.svg</code>), así que lo que dice el texto es lo que está en la carpeta.
+Se elige en la tarjeta <b>Exportar tablas y figuras</b> de la pestaña Reporte, y el botón
+<b>Abrir carpeta de exportación</b> la abre. Al regenerar el informe se reemplazan solo los archivos
+que crea este módulo; lo que hayas dejado tú en esa carpeta no se toca.</p>
+<p>Las figuras que son fotografías (la placa calibrada, las fichas de partículas) quedan
+en el HTML y no se exportan como figura, porque no son gráficos. Un gráfico cuyos datos
+no se pueden leer del dibujo sale en SVG, PDF y PNG, sin CSV de datos.</p>
+
 <div class="aviso ok">
   <span class="et">Y sale en tu idioma</span>
   <p>Títulos, tablas, pies de figura, ejes de los gráficos y la prosa de métodos

@@ -14,6 +14,7 @@ from ._base import DetectorPage
 from ...core import theme as T
 from ...core import iconos
 from ...core import pdf_export
+from ...core import exportables
 from ...core.report_html import generate_report, SECCIONES, PRESETS
 from ...core.i18n import tr
 from ...core.plataforma import abrir_en_el_sistema
@@ -47,6 +48,9 @@ class ReportePage(DetectorPage):
 
         # ── Qué secciones entran ──
         self.body.addWidget(self._card_secciones())
+
+        # ── Tablas y figuras para llevarse al paper ──
+        self.body.addWidget(self._card_exportar())
 
         # ── Alcance del informe ──
         self.body.addWidget(self._card_alcance())
@@ -116,6 +120,41 @@ class ReportePage(DetectorPage):
         contents.setTextFormat(Qt.RichText)
         l2.addWidget(contents)
         self.body.addWidget(c2)
+
+    # ── Tablas y figuras exportables ────────────────────────────
+    def _card_exportar(self):
+        """Casilla para dejar tablas y figuras en archivos sueltos junto al informe."""
+        c, l = self.card(tr("Exportar tablas y figuras"), "guardar")
+        ayuda = QLabel(tr(
+            "Deja cada tabla en CSV, LaTeX y Excel, y cada figura en SVG, PDF y PNG a "
+            "300 dpi, con los datos del gráfico en CSV y un índice con las leyendas. "
+            "Tablas y figuras salen numeradas en el informe, igual que en los archivos."))
+        ayuda.setWordWrap(True)
+        ayuda.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l.addWidget(ayuda)
+
+        self.chk_exportar = QCheckBox(tr("Crear la carpeta de exportación junto al informe"))
+        self.chk_exportar.setChecked(True)
+        self.chk_exportar.setStyleSheet(f"color: {T.INK2}; border: none;")
+        l.addWidget(self.chk_exportar)
+
+        fila = QHBoxLayout()
+        self.btn_abrir_export = QPushButton(tr("Abrir carpeta de exportación"))
+        self.btn_abrir_export.setCursor(Qt.PointingHandCursor)
+        self.btn_abrir_export.setEnabled(False)
+        self.btn_abrir_export.clicked.connect(self._abrir_exportacion)
+        fila.addWidget(self.btn_abrir_export)
+        fila.addStretch(1)
+        l.addLayout(fila)
+        self._ultima_exportacion = None
+        return c
+
+    def _abrir_exportacion(self):
+        if self._ultima_exportacion and Path(self._ultima_exportacion).exists():
+            try:
+                abrir_en_el_sistema(str(self._ultima_exportacion))
+            except Exception:
+                pass
 
     # ── Fotos etiquetadas ───────────────────────────────────────
     def _card_fotos(self):
@@ -443,11 +482,16 @@ class ReportePage(DetectorPage):
 
     def _write_html(self, out_path: Path, solo_imagenes=None) -> Path:
         """Genera el HTML autocontenido (imágenes en base64) en `out_path`."""
+        exportar = self.chk_exportar.isChecked()
         generate_report(
             self.state, out_path,
             secciones=self._secciones_marcadas(),
             solo_imagenes=solo_imagenes,
+            exportar=exportar,
         )
+        if exportar:
+            self._ultima_exportacion = exportables.carpeta_de(out_path)
+            self.btn_abrir_export.setEnabled(self._ultima_exportacion.exists())
         return out_path
 
     def _trabajos(self) -> list:
@@ -499,8 +543,10 @@ class ReportePage(DetectorPage):
                 out_path = out_dir / f"informe_deteccion{sufijo}.html"
                 self._write_html(out_path, solo_imagenes=fotos)
                 generados.append(out_path)
-            self.lbl_status.setText(
-                "✓ " + tr("{} informe(s) generado(s) en {}").format(len(generados), out_dir))
+            msg = "✓ " + tr("{} informe(s) generado(s) en {}").format(len(generados), out_dir)
+            if self.chk_exportar.isChecked() and self._ultima_exportacion:
+                msg += " · " + tr("Tablas y figuras en {}").format(self._ultima_exportacion)
+            self.lbl_status.setText(msg)
             for p in generados:
                 try:
                     abrir_en_el_sistema(str(p))

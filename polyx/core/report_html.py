@@ -36,6 +36,7 @@ from .metrics import (
 )
 from .yolo_wrap import Detection
 from .asignacion import NO_ASIGNABLE, clase_reportada, resumir
+from . import exportables
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -121,6 +122,10 @@ font-weight:600;letter-spacing:.04em;}
 .b-violet{background:#ece0fd;color:var(--vio);}
 footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:18px;
 font-size:9.5pt;color:var(--ink3);}
+.tabcap{font-size:9.5pt;font-weight:600;color:var(--ink2);margin:16px 0 4px;}
+.exp{font-size:8.5pt;color:var(--ink3);margin:4px 0 14px;}
+.exp a{color:var(--accent_d);text-decoration:none;border-bottom:1px dotted var(--accent_d);}
+@media print{.exp{display:none;}}
 @media print{.container{max-width:none;padding:24px;}
 h2{page-break-after:avoid;}.fig,.gallery .item{page-break-inside:avoid;}
 /* Que la foto y su tabla no queden en paginas distintas del PDF. */
@@ -131,8 +136,12 @@ h2{page-break-after:avoid;}.fig,.gallery .item{page-break-inside:avoid;}
 def _fig_to_b64(fig) -> str:
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", dpi=120)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    # Antes de cerrarla: exportables necesita la figura viva para sacarla en
+    # SVG/PDF/300 dpi y leer sus datos.
+    exportables.capturar(fig, b64)
     plt.close(fig)
-    return base64.b64encode(buf.getvalue()).decode("ascii")
+    return b64
 
 
 def _img_b64(data: bytes) -> str:
@@ -581,6 +590,7 @@ def _fig_confidence_hist(confs: List[float]) -> str:
     ax.set_ylabel(tr("Frecuencia"))
     ax.set_title(tr("Histograma de confianza"))
     ax.grid(axis="y", alpha=0.25)
+    exportables.adjuntar_datos(fig, [tr("confianza")], [[c] for c in confs])
     return _fig_to_b64(fig)
 
 
@@ -593,6 +603,7 @@ def _fig_size_hist(sizes_um: List[float]) -> str:
     ax.set_ylabel(tr("Frecuencia"))
     ax.set_title(tr("Distribución de tamaños"))
     ax.grid(axis="y", alpha=0.25)
+    exportables.adjuntar_datos(fig, [tr("diametro_equivalente_um")], [[s] for s in sizes_um])
     return _fig_to_b64(fig)
 
 
@@ -833,6 +844,9 @@ def _fig_boxplot_grupos(grupos: Dict[str, List[float]], titulo: str, xlabel: str
     rota = len(items) > 5
     plt.setp(ax.get_xticklabels(), rotation=30 if rota else 0, ha="right" if rota else "center")
     fig.tight_layout()
+    # Las mediciones crudas, no los bigotes que dibuja el boxplot.
+    exportables.adjuntar_datos(fig, [tr("grupo"), tr("talla_um")],
+                               [[k, float(x)] for k, v in items for x in v])
     return _fig_to_b64(fig)
 
 
@@ -1532,13 +1546,14 @@ PRESETS = {
 NUM = "@@N@@"
 
 
-def generate_report(state, output_path: Path,
+def _armar_informe(state, output_path: Path,
                     include_refs: bool = True,
                     include_gallery: bool = True,
                     max_gallery: int = 60,
                     max_fichas: int = 12,
                     solo_imagenes=None,
-                    secciones=None) -> Path:
+                    secciones=None,
+                    exportar: bool = True) -> Path:
     """Genera el reporte HTML. `state` es un DetectorState con resultados.
 
     ``max_gallery`` limita cuántas imágenes se incrustan en la galería. Las
@@ -2750,5 +2765,25 @@ def generate_report(state, output_path: Path,
 </footer>
 </div></body></html>
 """
+    # Numera tablas y figuras y, si se pidio, deja la carpeta de exportacion.
+    html = exportables.procesar(html, out_path, exportar)
     out_path.write_text(html, encoding="utf-8")
     return out_path
+
+
+def generate_report(state, output_path: Path, *args, exportar: bool = True,
+                    **kwargs) -> Path:
+    """Genera el informe HTML y, junto a él, ``<informe>_exportacion/``.
+
+    Acepta los mismos argumentos que :func:`_armar_informe`. ``exportar=False``
+    omite la carpeta y los enlaces de descarga; las tablas y figuras salen
+    numeradas igual, porque eso es parte del formato del informe.
+
+    El registro de figuras se abre y se cierra aquí, no dentro del armado: si
+    algo falla a mitad de informe no puede quedar activo para el siguiente.
+    """
+    exportables.iniciar(pesado=exportar)
+    try:
+        return _armar_informe(state, output_path, *args, exportar=exportar, **kwargs)
+    finally:
+        exportables.detener()
