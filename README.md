@@ -3,7 +3,8 @@
 ***Español** · [English](README.en.md)*
 
 > **Detección automatizada y clasificación de microplásticos (PET, PP, LDPE)  
-> por fluorescencia Nile Red bajo luz UV (254 nm) con modelos YOLO v8/v11.**
+> por fluorescencia Nile Red bajo luz UV (254 nm), con cinco motores de detección:
+> YOLOv8, YOLO11, YOLOv8-P2, RT-DETR y RF-DETR.**
 
 **Autor:** Cristofher Ferrada · Dr (c) en Ciencias mención Química · PUCV · 2026  
 **Versión:** 2.0.0 · **Windows 10/11 y macOS** · Python 3.9+
@@ -16,7 +17,7 @@
 |---|---|---|---|
 | 1 | 🏠 **Launcher** | ✅ Funcional | Menú principal — lanza cada módulo en ventana independiente |
 | 2 | 🔬 **Detector** | ✅ Funcional | Análisis en lote con YOLO · reporte HTML paper-quality |
-| 3 | 🎯 **Entrenador** | ✅ Funcional | Entrenamiento YOLO v8/v11 con curvas en vivo |
+| 3 | 🎯 **Entrenador** | ✅ Funcional | Entrena y compara 5 motores (YOLO, RT-DETR, RF-DETR) con curvas en vivo |
 | 4 | 🏷 **Etiquetador** | ✅ Funcional | Anotación YOLO interactiva con pre-anotación automática |
 | 5 | 📐 **Visor** | ✅ Funcional | Inspección de imágenes con calibración interactiva μm/píxel |
 
@@ -49,6 +50,10 @@
   imágenes de galería se recodifican y se limita su número para que el archivo
   siga siendo abrible en un navegador; las métricas cubren todas las imágenes
 - **Exportación a PDF** del reporte (un clic), listo para enviar por correo
+- **Tablas y figuras listas para el paper**: salen numeradas (Tabla 3, Figura 5), con
+  enlaces de descarga en el propio HTML y una carpeta `<informe>_exportacion/` con cada
+  tabla en CSV, LaTeX y Excel, cada figura en SVG, PDF y PNG a 300 dpi, los datos de
+  cada gráfico (mediciones crudas en histogramas y boxplots) y un índice con las leyendas
 - **Secciones del informe elegibles**: trece casillas y tres presets (Completo ·
   Resumen breve · Metodológico). Al desmarcar, las secciones se **renumeran solas**
   y el índice se ajusta; una sección marcada sin datos se omite igualmente
@@ -85,15 +90,27 @@
 - Aviso previo en la pestaña Ejecutar de si el lote se va a trocear y cuánto tardará
 
 ### 🎯 Entrenador
-- Soporte para **YOLO v8 y v11**, tamaños nano → xlarge
+- **Cinco motores de detección**, todos sobre el mismo dataset en formato YOLO:
+
+  | Motor | Qué es | Ojo con |
+  |---|---|---|
+  | **YOLOv8** | La línea base del proyecto | — |
+  | **YOLO11** | Sucesora de v8 | — |
+  | **YOLOv8-P2** | YOLOv8 con cabeza extra de alta resolución para partículas diminutas | Más lenta y con más memoria |
+  | **RT-DETR** | Transformer sin NMS | Solo tallas `l` y `x`; tope de 300 detecciones por pase |
+  | **RF-DETR** | Transformer de Roboflow (DINOv2) | **Opcional**, se instala aparte; guarda `.pth` |
+
+  Los DETR proponen como máximo 300 detecciones por pase: si una placa las agota,
+  Poly-X trocea la foto sola, y si aun así algún recorte satura, el informe declara
+  que ese conteo es una cota inferior
 - Carga de `data.yaml` con auto-detección de splits train/val/test
 - **Validación del dataset** con indicadores ✓/✗ (imágenes, labels, clases)
 - Curvas de pérdida en vivo (Box loss, mAP, Precision, Recall)
 - Augmentación configurable (flip, rotation, mosaic, HSV)
 - Exportación a **ONNX / TensorRT / CoreML**
 - Diagnóstico explícito de GPU/CPU al iniciar el entrenamiento
-- **Entrenar v8 y v11 con la misma configuración** desde una casilla: ambas corridas
-  reutilizan idénticos `imgsz`, `batch`, épocas, semilla y augmentación, que es lo que
+- **Entrenar varias arquitecturas con la misma configuración** desde una casilla: todas
+  las corridas reutilizan idénticos `imgsz`, `batch`, épocas, semilla y augmentación, que es lo que
   permite atribuir la diferencia de métricas a la arquitectura y no a los
   hiperparámetros. Van en secuencia porque comparten GPU, y al terminar el log resume
   la comparación
@@ -333,6 +350,11 @@ fotograma fijo— si el movimiento molesta o si el equipo va justo.
 
 Dependencias principales: `PySide6 6.7`, `Ultralytics 8.3`, `OpenCV 4.10`, `NumPy 1.26`, `Matplotlib 3.9`
 
+> **RF-DETR es opcional.** Se instala con `instalar_rfdetr.bat` (Windows) o
+> `instalar_rfdetr_macOS.command` (Mac), nunca con un `pip install rfdetr` suelto: por
+> su cuenta subiría numpy a 2.x, y Ultralytics 8.3.40 se rompe con numpy 2.
+> `requirements-rfdetr.txt` lo ata a las versiones del proyecto.
+
 > **Mac Intel:** PyTorch dejó de publicar versiones para procesadores Intel a partir
 > de la 2.3, así que el instalador fija la **2.2.2**, la última con soporte x86_64.
 > Funciona correctamente, pero sin aceleración por GPU: cuenta ~1 minuto por foto
@@ -491,10 +513,11 @@ instalación vieja, y retirarlo se llevaría el trabajo sin versionar.
 ```
 polyx/
 ├── launcher.py          # Menú principal
-├── core/                # Módulos compartidos (theme, yolo_wrap, metrics, report_html,
-│                        #   calibracion, morfologia, procedencia, i18n, plataforma)
+├── core/                # Módulos compartidos (theme, yolo_wrap, motores, motor_rfdetr,
+│                        #   metrics, report_html, exportables, calibracion, morfologia,
+│                        #   procedencia, i18n, plataforma)
 ├── detector/            # Módulo 2: análisis en lote (9 páginas)
-├── trainer/             # Módulo 3: entrenamiento YOLO (9 páginas)
+├── trainer/             # Módulo 3: entrenamiento de los 5 motores (9 páginas)
 ├── etiquetador/         # Módulo 4: anotación interactiva
 └── visor/               # Módulo 5: inspección + calibración μm/px
 models/                  # Pesos .pt entrenados
@@ -524,7 +547,7 @@ Imágenes de microscopio (UV 254 nm, tinción Nile Red)
         ↓
   🏷 Etiquetador → anota PET/PP/LDPE en formato YOLO
         ↓
-  🎯 Entrenador  → entrena modelo YOLO v8/v11
+  🎯 Entrenador  → entrena y compara YOLO, YOLO-P2, RT-DETR o RF-DETR
         ↓
   🔬 Detector    → analiza en lote + reporte HTML
         ↓

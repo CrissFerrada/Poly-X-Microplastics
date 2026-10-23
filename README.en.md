@@ -3,7 +3,8 @@
 *[Español](README.md) · **English***
 
 > **Automated detection and classification of microplastics (PET, PP, LDPE)
-> by Nile Red fluorescence under UV light (254 nm), using YOLO v8/v11 models.**
+> by Nile Red fluorescence under UV light (254 nm), with five detection engines:
+> YOLOv8, YOLO11, YOLOv8-P2, RT-DETR and RF-DETR.**
 
 **Author:** Cristofher Ferrada · PhD (c) in Chemistry · PUCV · 2026
 **Version:** 2.0.0 · **Windows 10/11 and macOS** · Python 3.9+
@@ -16,7 +17,7 @@
 |---|---|---|---|
 | 1 | 🏠 **Launcher** | ✅ Working | Main menu — opens each module in its own window |
 | 2 | 🔬 **Detector** | ✅ Working | Batch analysis with YOLO · paper-quality HTML report |
-| 3 | 🎯 **Trainer** | ✅ Working | YOLO v8/v11 training with live curves |
+| 3 | 🎯 **Trainer** | ✅ Working | Trains and compares 5 engines (YOLO, RT-DETR, RF-DETR) with live curves |
 | 4 | 🏷 **Labeller** | ✅ Working | Interactive YOLO annotation with automatic pre-labelling |
 | 5 | 📐 **Viewer** | ✅ Working | Single-image inspection, calibration and particle-by-particle review |
 
@@ -51,6 +52,10 @@
   re-encoded and capped in number so the file stays openable in a browser; the
   metrics still cover every image
 - **PDF export** of the report in one click, ready to email
+- **Paper-ready tables and figures**: numbered (Table 3, Figure 5), with download
+  links inside the HTML and a `<report>_exportacion/` folder holding every table as
+  CSV, LaTeX and Excel, every figure as SVG, PDF and 300 dpi PNG, the data behind each
+  chart (raw measurements for histograms and boxplots) and an index of the captions
 - **Selectable report sections**: thirteen tick boxes and three presets (Full ·
   Short summary · Methodological). Unticking renumbers the sections **on its
   own** and adjusts the table of contents; a ticked section with no data is left
@@ -89,7 +94,19 @@
   will take
 
 ### 🎯 Trainer
-- Supports **YOLO v8 and v11**, sizes nano → xlarge
+- **Five detection engines**, all trained on the same YOLO-format dataset:
+
+  | Engine | What it is | Keep in mind |
+  |---|---|---|
+  | **YOLOv8** | The project baseline | — |
+  | **YOLO11** | Successor to v8 | — |
+  | **YOLOv8-P2** | YOLOv8 with an extra high-resolution head for tiny particles | Slower, more memory |
+  | **RT-DETR** | Transformer without NMS | Sizes `l` and `x` only; capped at 300 detections per pass |
+  | **RF-DETR** | Roboflow transformer (DINOv2) | **Optional**, installed separately; saves `.pth` |
+
+  DETR models return at most 300 detections per pass: if a plate exhausts them, Poly-X
+  splits the photo on its own, and if a tile still saturates, the report states that
+  the count is a lower bound
 - Loads `data.yaml` with automatic train/val/test split detection
 - **Dataset validation** with ✓/✗ indicators (images, labels, classes)
 - Live loss curves (box loss, mAP, precision, recall)
@@ -299,6 +316,11 @@ frame, if the motion bothers you or the machine is struggling.
 Main dependencies: `PySide6 6.7`, `Ultralytics 8.3`, `OpenCV 4.10`, `NumPy 1.26`,
 `Matplotlib 3.9`
 
+> **RF-DETR is optional.** Install it with `instalar_rfdetr.bat` (Windows) or
+> `instalar_rfdetr_macOS.command` (Mac), never with a bare `pip install rfdetr`: on its
+> own it would upgrade numpy to 2.x, and Ultralytics 8.3.40 breaks with numpy 2.
+> `requirements-rfdetr.txt` pins it to the project versions.
+
 > **Intel Macs:** PyTorch stopped shipping builds for Intel processors from 2.3
 > onwards, so the installer pins **2.2.2**, the last release with x86_64 support.
 > It works correctly, but without GPU acceleration: expect about 1 minute per photo
@@ -399,10 +421,11 @@ files**: whichever one you run, the project stays complete for both.
 ```
 polyx/
 ├── launcher.py          # Main menu
-├── core/                # Shared modules (theme, yolo_wrap, metrics, report_html,
-│                        #   calibracion, morfologia, procedencia, i18n, plataforma)
+├── core/                # Shared modules (theme, yolo_wrap, motores, motor_rfdetr,
+│                        #   metrics, report_html, exportables, calibracion, morfologia,
+│                        #   procedencia, i18n, plataforma)
 ├── detector/            # Module 2: batch analysis (9 pages)
-├── trainer/             # Module 3: YOLO training (9 pages)
+├── trainer/             # Module 3: training for the 5 engines (9 pages)
 ├── etiquetador/         # Module 4: interactive annotation
 └── visor/               # Module 5: inspection + µm/px calibration
 models/                  # Trained .pt weights
@@ -432,7 +455,7 @@ Microscope images (UV 254 nm, Nile Red staining)
         ↓
   🏷 Labeller  → annotate PET/PP/LDPE in YOLO format
         ↓
-  🎯 Trainer   → train a YOLO v8/v11 model
+  🎯 Trainer   → train and compare YOLO, YOLO-P2, RT-DETR or RF-DETR
         ↓
   🔬 Detector  → batch analysis + HTML report
         ↓

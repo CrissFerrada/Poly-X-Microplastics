@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 from ..core import theme as T
 from ..core import marca
 from ..core import iconos
+from ..core import motores
 from ..core.widgets import LogoBadge, HLine
 from .state import LabelerState
 from .canvas import BboxCanvas
@@ -371,7 +372,7 @@ class LabelerWindow(QMainWindow):
     # ── Pre-anotación ─────────────────────────────────────────
     def _load_model(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Cargar modelo YOLO", "", "Modelo YOLO (*.pt)"
+            self, "Cargar modelo YOLO", "", motores.FILTRO_PESOS + ";;Todos (*.*)"
         )
         if not path:
             return

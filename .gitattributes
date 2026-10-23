@@ -25,6 +25,7 @@
 
 # ── Binarios: que git no toque nada ──
 *.pt       binary
+*.pth      binary
 *.onnx     binary
 *.png      binary
 *.jpg      binary

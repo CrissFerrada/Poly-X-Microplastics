@@ -215,8 +215,10 @@ class DetectorRunner(QThread):
                     reg = ejecucion.setdefault(
                         slot.alias,
                         {"imagenes": 0, "troceadas": 0, "imgsz_usados": set(),
-                         "fallback_en": []})
+                         "fallback_en": [], "saturadas": []})
                     reg["imagenes"] += 1
+                    if plan_troceo.get("saturado"):
+                        reg["saturadas"].append(img_path.name)
                     if plan_troceo.get("troceado"):
                         reg["troceadas"] += 1
                         # El tile entra a la red a su resolucion nativa; el
@@ -344,6 +346,7 @@ class DetectorRunner(QThread):
                         pred_path=pred_path,
                         gt_path=gt_path,
                         troceo=troceo_desc,
+                        saturado=bool(plan_troceo.get("saturado")),
                     )
                     state.results.setdefault(real_idx, []).append(res)
                     self.image_done.emit(real_idx, res)
@@ -408,6 +411,10 @@ class DetectorRunner(QThread):
                 # Si esta lista no viene vacia, esas fotos se infirieron a menos
                 # resolucion que la pedida porque la GPU se quedo sin memoria.
                 "fallback_por_memoria": reg.get("fallback_en", []),
+                # Arquitectura del peso (core.motores) y fotos donde el motor
+                # llego a su tope de detecciones por pase.
+                "familia": getattr(slot.loaded, "familia", ""),
+                "imagenes_saturadas": reg.get("saturadas", []),
                 "particulas_sin_forma": (sin_forma or {}).get(slot.alias, 0),
             })
             # classes.txt junto a los labels, para poder reabrirlos como

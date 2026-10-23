@@ -28,6 +28,9 @@ polyx/                    # Código fuente
 │   ├── theme.py          # Paleta de colores (Segoe UI, Nile Red RGB)
 │   ├── paths.py          # Rutas (models/, runs/, data/, assets/)
 │   ├── yolo_wrap.py      # Wrapper YOLO (Detection, YoloModel)
+│   ├── motores.py        # Motores: v8, v11, v8-p2, rtdetr, rfdetr (carga y entrenamiento)
+│   ├── motor_rfdetr.py   # RF-DETR opcional, con la interfaz de Ultralytics
+│   ├── exportables.py    # Tablas y figuras del informe: numeradas y exportables
 │   ├── metrics.py        # TP/FP/FN, IoU, matriz de confusión
 │   ├── widgets.py        # LogoBadge, HLine, custom widgets
 │   └── report_html.py    # Generador reporte (base64, paper-quality)
@@ -491,6 +494,34 @@ irregulares.
 Coste 5.9 ms por partícula. Solo cv2 y numpy: `scipy` **no** está en
 `requirements.txt` —llega de rebote con ultralytics— y apoyarse en él rompería
 la instalación el día que ultralytics deje de traerlo.
+
+### Motores (motores.py, motor_rfdetr.py)
+
+`YoloModel` carga cualquier motor: `motores.cargar(ruta)` mira qué red trae el
+archivo y usa la clase que le corresponde. Así los cuatro módulos aceptan un
+motor nuevo sin tocar su propio código.
+
+| Clave | Motor | Ojo con |
+|---|---|---|
+| `v8` / `v11` | YOLO | — |
+| `v8-p2` | YOLOv8 + cabeza P2 | se arma de `yolov8m-p2.yaml` + pesos de v8 |
+| `rtdetr` | RT-DETR | solo tallas l/x; **300 detecciones por pase** |
+| `rfdetr` | RF-DETR (Roboflow) | opcional, `.pth`, entrena fuera de Ultralytics |
+
+> **RT-DETR no se reconoce por el nombre de la clase.** El `rtdetr-l.pt`
+> oficial viene serializado como `DetectionModel`, igual que un YOLO. Abierto con
+> `YOLO()` se infiere con NMS y da basura. Lo inequívoco es la cabeza
+> `RTDETRDecoder`.
+
+> **Tope de los DETR.** Si un pase devuelve las 300 consultas, `predict_auto`
+> trocea la foto. Si un tile también satura, `ImageResult.saturado` queda en
+> True y el informe declara en Métodos que ese conteo es una cota inferior.
+
+> **RF-DETR se instala solo con `requirements-rfdetr.txt`** (`instalar_rfdetr.bat`).
+> `rfdetr[train]` sube numpy a 2.x y OpenCV a 5.x, y `pyarrow` ≥ 20 exige numpy 2
+> *al importar* sin declararlo: el entrenamiento moría en la primera validación.
+> El archivo fija `-c requirements.txt`, `opencv-python-headless==4.10.0.84` y
+> `pyarrow<20`.
 
 ### `YoloModel` (yolo_wrap.py)
 Wrapper lazy-loading de Ultralytics YOLO:

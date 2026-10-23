@@ -1,4 +1,4 @@
-"""Página 1 — Modelo. Preset rápido + familia (v8/v11) + tamaño + pesos custom."""
+"""Página 1 — Modelo. Preset rápido + motor (familia) + tamaño + pesos custom."""
 from __future__ import annotations
 from pathlib import Path
 
@@ -12,6 +12,7 @@ from ._base import TrainerPage
 from ...core import theme as T
 from ..state import PRESETS
 from ...core.i18n import tr
+from ...core import motores
 
 
 SIZE_DESCRIPTIONS = [
@@ -63,9 +64,12 @@ class ModeloPage(TrainerPage):
         row2.setSpacing(20)
         row2.addWidget(QLabel(tr("Familia:")))
         self.combo_family = QComboBox()
-        self.combo_family.addItems(["YOLOv8", "YOLOv11"])
-        self.combo_family.setCurrentText("YOLOv11" if self.state.model.family == "v11" else "YOLOv8")
-        self.combo_family.currentTextChanged.connect(self._on_family)
+        for clave in motores.ORDEN:
+            self.combo_family.addItem(motores.nombre_de(clave), clave)
+        fam = self.state.model.family
+        self.combo_family.setCurrentIndex(
+            motores.ORDEN.index(fam) if fam in motores.ORDEN else 0)
+        self.combo_family.currentIndexChanged.connect(self._on_family)
         row2.addWidget(self.combo_family)
 
         row2.addWidget(QLabel(tr("Tamaño:")))
@@ -90,21 +94,43 @@ class ModeloPage(TrainerPage):
             line.addWidget(text, 1)
             l2.addLayout(line)
 
+        # Que es cada familia: elegir RT-DETR sin saber que no tiene talla m,
+        # o la P2 sin saber que pide mas memoria, sorprende a mitad del
+        # entrenamiento.
+        self.lbl_familia = QLabel()
+        self.lbl_familia.setWordWrap(True)
+        self.lbl_familia.setTextFormat(Qt.RichText)
+        self.lbl_familia.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
+        l2.addWidget(self.lbl_familia)
+
         # ── Comparar arquitecturas ──
         self.chk_comparar = QCheckBox(
-            tr("Entrenar ambas arquitecturas (v8 y v11) con la misma configuración"))
+            tr("Entrenar varias arquitecturas con la misma configuración"))
         self.chk_comparar.setChecked(self.state.model.comparar_familias)
         self.chk_comparar.stateChanged.connect(self._on_comparar)
         self.chk_comparar.setStyleSheet(
             f"QCheckBox {{ font-weight: 600; color: {T.ACCENT_TX}; border: none; }}")
         l2.addWidget(self.chk_comparar)
 
+        fila_cmp = QHBoxLayout()
+        fila_cmp.setSpacing(14)
+        self.chk_familias = {}
+        for clave in motores.ORDEN:
+            chk = QCheckBox(motores.nombre_de(clave))
+            chk.setChecked(clave in self.state.model.familias_comparar)
+            chk.setStyleSheet(f"color: {T.INK2}; border: none;")
+            chk.stateChanged.connect(self._on_familias_comparar)
+            fila_cmp.addWidget(chk)
+            self.chk_familias[clave] = chk
+        fila_cmp.addStretch(1)
+        l2.addLayout(fila_cmp)
+
         self.lbl_comparar = QLabel()
         self.lbl_comparar.setWordWrap(True)
         self.lbl_comparar.setStyleSheet(
             f"color: {T.INK3}; font-size: 10pt; border: none;")
         l2.addWidget(self.lbl_comparar)
-        self._actualizar_aviso_comparar()
+        self._sync_comparar()
 
         # ── Pesos que produce el entrenamiento ──
         self.chk_dominio = QCheckBox(
@@ -156,8 +182,14 @@ class ModeloPage(TrainerPage):
         self.state.apply_preset(name)
         self.state.model.preset_name = name
 
-    def _on_family(self, txt: str):
-        self.state.model.family = "v11" if "11" in txt else "v8"
+    def _on_family(self, _idx: int):
+        self.state.model.family = self.combo_family.currentData()
+        self._actualizar_aviso_comparar()
+        self.state.model_changed.emit()
+
+    def _on_familias_comparar(self):
+        self.state.model.familias_comparar = [
+            c for c, chk in self.chk_familias.items() if chk.isChecked()]
         self._actualizar_aviso_comparar()
         self.state.model_changed.emit()
 
@@ -171,29 +203,50 @@ class ModeloPage(TrainerPage):
 
     def _on_comparar(self):
         self.state.model.comparar_familias = self.chk_comparar.isChecked()
-        # La familia elegida arriba queda sin efecto al comparar: se entrenan
-        # las dos. Se desactiva el combo para que eso se vea, no se adivine.
-        self.combo_family.setEnabled(not self.chk_comparar.isChecked())
-        self._actualizar_aviso_comparar()
+        self._sync_comparar()
         self.state.model_changed.emit()
+
+    def _sync_comparar(self):
+        # La familia elegida arriba queda sin efecto al comparar: se entrenan
+        # las marcadas. Se desactiva el combo para que eso se vea, no se adivine.
+        comparar = self.chk_comparar.isChecked()
+        self.combo_family.setEnabled(not comparar)
+        for chk in self.chk_familias.values():
+            chk.setEnabled(comparar)
+        self._actualizar_aviso_comparar()
 
     def _actualizar_aviso_comparar(self):
         """Explica exactamente que se va a entrenar, con los nombres reales."""
         mdl = self.state.model
+        texto = (f"<b>{motores.nombre_de(mdl.family)}</b> — "
+                 + tr(motores.familia(mdl.family).descripcion))
+        # RF-DETR es opcional: elegirlo sin tenerlo instalado se dice aqui, no
+        # al pulsar Entrenar.
+        quiere_rf = ("rfdetr" in mdl.familias_a_entrenar())
+        from ...core import motor_rfdetr
+        if quiere_rf and not motor_rfdetr.disponible():
+            texto += (f"<br><span style='color:{T.ERR_TX}'>⚠ "
+                      + tr(motor_rfdetr.MENSAJE_NO_INSTALADO) + "</span>")
+        self.lbl_familia.setText(texto)
         if self.chk_comparar.isChecked():
-            pesos = " y ".join(mdl.peso_de(f) for f in ("v8", "v11"))
+            elegidas = mdl.familias_a_entrenar()
+            if len(elegidas) < 2:
+                self.lbl_comparar.setText(tr(
+                    "⚠ Marca al menos dos arquitecturas para compararlas."))
+                return
+            pesos = ", ".join(mdl.peso_de(f) for f in elegidas)
             self.lbl_comparar.setText(tr(
                 "Se entrenarán <b>{}</b> uno tras otro, con idénticos "
                 "imgsz, batch, épocas, semilla y augmentación. Así la "
                 "diferencia de métricas se puede atribuir a la arquitectura "
                 "y no a los hiperparámetros.<br>"
-                "Tarda <b>el doble</b>: van en secuencia porque comparten GPU. "
-                "Al terminar, la comparación sale en el log y en la pestaña "
-                "Comparar.").format(pesos))
+                "Tarda <b>{} veces</b> lo de uno: van en secuencia porque comparten "
+                "GPU. Al terminar, la comparación sale en el log y en la pestaña "
+                "Comparar.").format(pesos, len(elegidas)))
         else:
             self.lbl_comparar.setText(tr(
                 "Se entrenará solo <b>{}</b>. "
-                "Marca la casilla para entrenar también la otra familia y "
+                "Marca la casilla para entrenar también otras arquitecturas y "
                 "compararlas en igualdad de condiciones.").format(
                     mdl.base_weights_name()))
 
@@ -204,7 +257,7 @@ class ModeloPage(TrainerPage):
 
     def _browse_custom(self):
         f, _ = QFileDialog.getOpenFileName(
-            self, "Seleccionar pesos .pt", "", "Pesos PyTorch (*.pt)"
+            self, "Seleccionar pesos .pt", "", "YOLO / RT-DETR (*.pt)"
         )
         if f:
             self.ed_custom.setText(f)

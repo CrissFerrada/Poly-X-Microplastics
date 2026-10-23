@@ -187,7 +187,7 @@ def elegir_mejor_en_real(run_dir: Path, datos_yaml: Path, imgsz: int, batch: int
         _log("[INFO] La validacion no tiene subconjunto real; se conserva best.pt.")
         return None, []
 
-    from ultralytics import YOLO
+    from ..core.motores import cargar_ultralytics
 
     _log("")
     _log("=" * 60)
@@ -198,7 +198,7 @@ def elegir_mejor_en_real(run_dir: Path, datos_yaml: Path, imgsz: int, batch: int
     tabla: List[Dict] = []
     for p in pesos:
         try:
-            res = YOLO(str(p)).val(data=str(yaml_real), imgsz=imgsz, batch=batch,
+            res = cargar_ultralytics(p)[0].val(data=str(yaml_real), imgsz=imgsz, batch=batch,
                                    device=device, plots=False, verbose=False)
             pr, rc = float(res.box.mp), float(res.box.mr)
             fila = {"checkpoint": p.name, "ruta": p,

@@ -36,9 +36,10 @@ class _ExportWorker(QThread):
 
     def run(self):
         try:
-            from ultralytics import YOLO
+            from ...core.motores import cargar_ultralytics
             self.log_line.emit(f"[INFO] Cargando {self.weights}")
-            m = YOLO(self.weights)
+            # RT-DETR necesita su propia clase: con YOLO() valida con NMS.
+            m, _ = cargar_ultralytics(self.weights)
             self.log_line.emit(f"[INFO] Exportando a {self.fmt} (imgsz={self.imgsz}, half={self.half})")
             out = m.export(format=self.fmt, imgsz=self.imgsz, half=self.half)
             self.finished_ok.emit(str(out))

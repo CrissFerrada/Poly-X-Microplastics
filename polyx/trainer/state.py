@@ -55,31 +55,38 @@ AUG_LEVELS = {
 # ────────────────────────────────────────────────────────────────────
 @dataclass
 class ModelConfig:
-    family: str = "v8"      # "v8" o "v11"
+    family: str = "v8"      # clave de core.motores: v8 / v11 / v8-p2 / rtdetr
     size: str = "m"          # n / s / m / l / x
     custom_weights: Optional[Path] = None
     preset_name: str = "Balanceado (recomendado)"
-    # Entrena v8 y v11 seguidos con la MISMA configuracion, para poder atribuir
-    # la diferencia de metricas a la arquitectura y no a los hiperparametros.
+    # Entrena varias arquitecturas seguidas con la MISMA configuracion, para
+    # poder atribuir la diferencia de metricas a la arquitectura y no a los
+    # hiperparametros.
     comparar_familias: bool = False
+    familias_comparar: List[str] = field(default_factory=lambda: ["v8", "v11"])
 
     def familias_a_entrenar(self) -> list[str]:
         """Familias que se entrenaran en esta corrida, en orden."""
-        return ["v8", "v11"] if self.comparar_familias else [self.family]
+        if not self.comparar_familias:
+            return [self.family]
+        from ..core.motores import ORDEN
+        # En el orden fijo de la interfaz, no en el que se marcaron: asi dos
+        # corridas con la misma seleccion producen la misma secuencia.
+        return [f for f in ORDEN if f in self.familias_comparar]
 
     def peso_de(self, familia: str) -> str:
-        """Nombre del peso base de una familia concreta, mismo tamano."""
-        fam = familia.lstrip("v") if familia != "v8" else familia
-        return f"yolo{fam}{self.size}.pt"
+        """Lo que se entrenara para una familia concreta, mismo tamano.
+
+        Ojo con la nomenclatura de Ultralytics, que es inconsistente y no
+        perdona: la familia 8 lleva "v" (yolov8m.pt) y la 11 no (yolo11m.pt).
+        Construir el nombre pegando la familia tal cual daba "yolov11m.pt", que
+        no existe en el catalogo. Ahora el nombre sale de core.motores.
+        """
+        from ..core.motores import descripcion_base
+        return descripcion_base(familia, self.size)
 
     def base_weights_name(self) -> str:
-        """Nombre del peso base tal como lo publica Ultralytics.
-
-        Ojo con la nomenclatura, que es inconsistente y no perdona: la familia 8
-        lleva "v" (yolov8m.pt) y la 11 no (yolo11m.pt). Construir el nombre
-        pegando la familia tal cual daba "yolov11m.pt", que no existe en el
-        catalogo y hacia fallar la descarga de toda la rama v11.
-        """
+        """Lo que se entrenara con la familia elegida."""
         return self.peso_de(self.family)
 
 

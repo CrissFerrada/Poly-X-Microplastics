@@ -129,6 +129,9 @@ class ImageResult:
     verdict: Optional[str] = None
     # geometría del troceado si la foto se partió; "" = se infirió de una pieza
     troceo: str = ""
+    # El motor devolvio tantas detecciones como admite por pase (las 300
+    # consultas de un DETR) incluso troceando: el conteo puede estar truncado.
+    saturado: bool = False
 
     @staticmethod
     def _bytes_de(ruta: Optional[Path]) -> Optional[bytes]:

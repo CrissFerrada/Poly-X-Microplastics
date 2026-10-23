@@ -27,9 +27,10 @@ class _EvalWorker(QThread):
 
     def run(self):
         try:
-            from ultralytics import YOLO
+            from ...core.motores import cargar_ultralytics
             self.log_line.emit(f"[INFO] Cargando {self.weights}")
-            m = YOLO(self.weights)
+            # RT-DETR necesita su propia clase: con YOLO() valida con NMS.
+            m, _ = cargar_ultralytics(self.weights)
             self.log_line.emit(f"[INFO] Validando sobre {self.data_yaml} (imgsz={self.imgsz})")
             res = m.val(data=self.data_yaml, imgsz=self.imgsz, device=self.device, verbose=True)
             d = {

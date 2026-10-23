@@ -15,7 +15,7 @@ DESCRIPCION = ("Manual completo de Poly-X: instalación paso a paso desde GitHub
 SELLO = "Manual de usuario · v2.0.0"
 TITULO_H1 = 'Poly-X <em>analytics</em>'
 BAJADA = ("Detección, medida y clasificación de microplásticos por fluorescencia "
-          "Nile Red bajo luz UV, con modelos YOLO v8/v11. De la descarga en GitHub "
+          "Nile Red bajo luz UV, con YOLO, RT-DETR y RF-DETR. De la descarga en GitHub "
           "al informe listo para publicar.")
 META = ("<b>Cristofher Ferrada</b> · Dr (c) en Ciencias mención Química<br>"
         "Laboratorio de Química Ambiental · Pontificia Universidad Católica de Valparaíso<br>"
@@ -193,7 +193,7 @@ SECCIONES = [
 microplásticos</b> en fotografías de microscopio. Las partículas se tiñen con
 <b>rojo Nilo</b> (Nile Red) y se fotografian bajo luz <b>UV de 254 nm</b>: cada
 polímero emite con un color y un brillo distintos, y sobre esa emisión trabaja un
-modelo de detección <b>YOLO v8/v11</b> que localiza cada partícula, le asigna una
+modelo de detección (<b>YOLO</b>, <b>RT-DETR</b> o <b>RF-DETR</b>) que localiza cada partícula, le asigna una
 clase y devuelve su talla en micrómetros.</p>
 
 <p>Cubre el ciclo entero sin salir del programa: se anotan imágenes, se entrena un
@@ -204,7 +204,7 @@ tablas y figuras ya armadas.</p>
   <div class="mod"><span class="ic">🔬</span><b>Detector</b>
     <span>Analiza carpetas enteras con un modelo entrenado y produce el informe.</span></div>
   <div class="mod"><span class="ic">🎯</span><b>Entrenador</b>
-    <span>Entrena modelos YOLO v8 y v11 con curvas en vivo y auditoría del dataset.</span></div>
+    <span>Entrena y compara cinco arquitecturas de detección con curvas en vivo y auditoría del dataset.</span></div>
   <div class="mod"><span class="ic">🏷</span><b>Etiquetador</b>
     <span>Anota partículas en formato YOLO, con pre-anotación automática.</span></div>
   <div class="mod"><span class="ic">📐</span><b>Visor</b>
@@ -906,12 +906,46 @@ microscopio, otra tinción, otro rango de tallas. Necesita un dataset ya anotado
 <h3>Modelo</h3>
 [[fig:ui/11_ent_modelo|Pestaña <b>Modelo</b>. Familia YOLO v8 o v11, tamaño de nano a xlarge,
 o unos pesos propios de partida.]]
-<p>Soporta <b>YOLO v8 y v11</b>, en todos los tamaños. Hay una casilla para
-<b>entrenar v8 y v11 con la misma configuración</b>: ambas corridas reutilizan
-idénticos <code>imgsz</code>, <code>batch</code>, épocas, semilla y augmentación.
-Es lo que permite atribuir la diferencia de métricas a la arquitectura y no a los
-hiperparametros. Van en secuencia porque comparten GPU, y al terminar el registro
-resume la comparación.</p>
+<p>Ofrece cinco <b>motores de detección</b>. Todos se entrenan con el mismo
+dataset en formato YOLO, así que se comparan sin convertir nada:</p>
+<table>
+  <tr><th>Motor</th><th>Qué es</th><th>Tener en cuenta</th></tr>
+  <tr><td><b>YOLOv8</b></td><td>La línea base del proyecto</td><td>—</td></tr>
+  <tr><td><b>YOLO11</b></td><td>Sucesora de v8, con menos parámetros por talla</td><td>—</td></tr>
+  <tr><td><b>YOLOv8-P2</b></td><td>YOLOv8 con una cabeza extra de alta resolución
+      (stride 4) para partículas diminutas</td><td>Más lenta y con más memoria. Parte de
+      los pesos de v8: la cabeza nueva se entrena desde cero</td></tr>
+  <tr><td><b>RT-DETR</b></td><td>Transformer sin supresión de no-máximos</td><td>Solo
+      tallas <code>l</code> y <code>x</code> (las demás caen a <code>l</code>). Su memoria
+      crece con el número de partículas por imagen: en placas densas baja el batch</td></tr>
+  <tr><td><b>RF-DETR</b></td><td>Transformer de Roboflow con backbone DINOv2</td><td>Opcional:
+      se instala aparte con <code>instalar_rfdetr.bat</code> (o
+      <code>instalar_rfdetr_macOS.command</code>). Guarda <code>.pth</code> en vez de
+      <code>.pt</code>, no muestra curvas en vivo ni elige <code>best_real.pt</code>, y su
+      resolución debe ser múltiplo de 32</td></tr>
+</table>
+<p>La casilla <b>Entrenar varias arquitecturas con la misma configuración</b>
+entrena, una tras otra, las que marques, con idénticos <code>imgsz</code>,
+<code>batch</code>, épocas, semilla y augmentación. Es lo que permite atribuir la
+diferencia de métricas a la arquitectura y no a los hiperparámetros. Van en
+secuencia porque comparten GPU, y al terminar el registro resume la comparación.</p>
+
+<div class="aviso warn">
+  <span class="et">Los DETR tienen un tope de 300 detecciones por pase</span>
+  <p>RT-DETR y RF-DETR no usan NMS: proponen un número fijo de consultas (300) y
+  se quedan con las que superan el umbral. Una placa densa puede tener más
+  partículas que eso. Si un pase devuelve las 300, Poly-X vuelve a analizar la
+  foto troceada, sin que tengas que hacer nada. Si aun troceando algún recorte
+  satura, el informe lo declara en Métodos y avisa de que el conteo de esas fotos
+  es una <b>cota inferior</b>.</p>
+</div>
+
+<div class="aviso warn">
+  <span class="et">RF-DETR no se instala con un «pip install» suelto</span>
+  <p>Por su cuenta subiría numpy a 2.x, y Ultralytics 8.3.40 se rompe con numpy 2
+  al validar la primera época. El instalador lo ata a las versiones del proyecto
+  y comprueba al final que numpy siga en 1.x.</p>
+</div>
 
 <h3>Dataset</h3>
 [[fig:ui/12_ent_dataset|Pestaña <b>Dataset</b>. Carga del <code>data.yaml</code> con
@@ -1410,8 +1444,8 @@ no se pueden leer del dibujo sale en SVG, PDF y PNG, sin CSV de datos.</p>
       revisores lo piden, y sin esa cifra no hay con que comparar el error del
       modelo.</li>
   <li><b>Entrenador</b> → <b>Dataset</b>: pasa la auditoría antes de entrenar.</li>
-  <li><b>Entrenar</b>. Si comparas arquitecturas, usa la casilla de <b>v8 y v11 con
-      la misma configuración</b>.</li>
+  <li><b>Entrenar</b>. Si comparas arquitecturas, usa la casilla de <b>varias
+      arquitecturas con la misma configuración</b>.</li>
   <li>Quédate con <code>best_real.pt</code> si tu dataset mezcla laboratorio y
       material real.</li>
   <li><b>Detector</b> → analiza y compara contra tu conteo manual.</li>

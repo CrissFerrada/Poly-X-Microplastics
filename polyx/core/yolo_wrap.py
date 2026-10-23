@@ -1,4 +1,9 @@
-"""Wrapper delgado sobre Ultralytics YOLO para inferencia + utilidades YOLO-txt."""
+"""Wrapper delgado sobre Ultralytics para inferencia + utilidades YOLO-txt.
+
+Pese al nombre, ``YoloModel`` carga cualquier motor de ``core.motores``
+(YOLOv8, YOLO11, YOLOv8-P2, RT-DETR y, si está instalado, RF-DETR): mira qué
+red trae el archivo de pesos y usa la clase que le corresponde.
+"""
 from __future__ import annotations
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -106,12 +111,20 @@ class YoloModel:
         # pedido si actuó el auto-fallback por falta de memoria GPU)
         self.last_imgsz: int = 0
         self.last_fallback: bool = False
+        # Motor detras del archivo (clave de core.motores) y su tope de
+        # detecciones por pase; None si no tiene, como YOLO.
+        self.familia: str = ""
+        self.tope: Optional[int] = None
+        # El ultimo pase devolvio tantas cajas como el motor puede dar: el
+        # conteo real puede ser mayor. predict_auto() lo usa para trocear.
+        self.last_saturado: bool = False
 
     def load(self):
         if self._model is not None:
             return self
-        from ultralytics import YOLO
-        self._model = YOLO(self.weights_path)
+        from . import motores
+        self._model, self.familia = motores.cargar(self.weights_path)
+        self.tope = motores.tope_por_pase(self._model)
         nm = getattr(self._model, "names", None) or {}
         self.names = dict(nm)
         return self
@@ -181,11 +194,13 @@ class YoloModel:
                     raise
                 _cuda_empty_cache()
         out: List[Detection] = []
+        self.last_saturado = False
         if not res:
             return out
         r = res[0]
         if r.boxes is None or len(r.boxes) == 0:
             return out
+        self.last_saturado = self._satura(len(r.boxes))
         xyxy = r.boxes.xyxy.cpu().numpy()
         confs = r.boxes.conf.cpu().numpy()
         clss = r.boxes.cls.cpu().numpy().astype(int)
@@ -238,6 +253,7 @@ class YoloModel:
         infer_sz = int(imgsz) if imgsz else tile
 
         dets: List[Detection] = []
+        self.last_saturado = False
         bs = max(1, int(batch))
         # Procesar en sub-lotes para no agotar la VRAM (muchos tiles a imgsz alto).
         for start in range(0, len(crops), bs):
@@ -251,6 +267,9 @@ class YoloModel:
             for (x0, y0), r in zip(chunk_org, results):
                 if r.boxes is None or len(r.boxes) == 0:
                     continue
+                # Un tile saturado tambien pierde particulas; se avisa, no se
+                # puede trocear mas fino sin cambiar la escala de entrada.
+                self.last_saturado |= self._satura(len(r.boxes))
                 xyxy = r.boxes.xyxy.cpu().numpy()
                 cf = r.boxes.conf.cpu().numpy()
                 cl = r.boxes.cls.cpu().numpy().astype(int)
@@ -296,12 +315,34 @@ class YoloModel:
                              "troceado": plan is not None, "plan": plan})
 
         if plan is None:
-            return self.predict(image_path, conf=conf, iou=iou, imgsz=imgsz,
+            dets = self.predict(image_path, conf=conf, iou=iou, imgsz=imgsz,
                                 device=device)
-        return self.predict_sliced(image_path, conf=conf, iou=iou,
+            if not self.last_saturado or wh is None:
+                return dets
+            # Un DETR devolvio todas sus consultas: la placa tiene mas
+            # particulas de las que cabe contar en un pase. Se trocea aunque
+            # la foto no supere el umbral, porque truncar el conteo en silencio
+            # es peor que tardar mas.
+            plan = politica_troceado(wh[0], wh[1], imgsz, umbral_px=0,
+                                     tile=tile, overlap=overlap)
+            if plan is None:
+                # Foto mas chica que un tile: no hay como partirla.
+                if registro is not None:
+                    registro["saturado"] = True
+                return dets
+            if registro is not None:
+                registro.update({"troceado": True, "plan": plan,
+                                 "por_saturacion": True})
+        dets = self.predict_sliced(image_path, conf=conf, iou=iou,
                                    tile=plan["tile"], overlap=plan["overlap"],
                                    device=device, agnostic_nms=agnostic_nms,
                                    imgsz=imgsz, batch=batch)
+        if registro is not None and self.last_saturado:
+            registro["saturado"] = True
+        return dets
+
+    def _satura(self, n: int) -> bool:
+        return bool(self.tope) and n >= self.tope
 
 
 def tamano_imagen(image_path: str | Path) -> Optional[Tuple[int, int]]:

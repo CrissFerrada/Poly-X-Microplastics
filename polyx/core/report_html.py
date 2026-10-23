@@ -1960,7 +1960,7 @@ def _armar_informe(state, output_path: Path,
                     f"<figure><img src='{_uri_galeria(pred_bytes)}' />"
                     f"<figcaption>{tr('Predicción del modelo')} · {slot.alias}"
                     f"<span class='sub'>"
-                    + tr("{n} detección(es) por YOLO").format(n=len(r.predictions))
+                    + tr("{n} detección(es) del modelo").format(n=len(r.predictions))
                     + "</span>"
                     f"</figcaption></figure>"
                 )
@@ -2018,7 +2018,7 @@ def _armar_informe(state, output_path: Path,
                         + "</p>")
             gallery_html = (
                 tr("<p>Cada bloque muestra, a la izquierda, las detecciones del "
-                   "modelo (<em>bounding boxes</em> dibujadas por YOLO con su clase y "
+                   "modelo (<em>bounding boxes</em> dibujadas por el modelo con su clase y "
                    "confianza) y, a la derecha, las etiquetas reales de control "
                    "(<em>Ground Truth</em>). Esta vista lado a lado permite evaluar "
                    "visualmente dónde acertó o falló el modelo.</p>")
@@ -2096,16 +2096,37 @@ def _armar_informe(state, output_path: Path,
         _ul_ver = ultralytics.__version__
     except Exception:
         _ul_ver = "—"
-    _model_names = ", ".join(s.alias for s in active) if active else "—"
+    # Cada modelo con su arquitectura: un informe que compara YOLO con RT-DETR
+    # no puede decir "el modelo YOLO" de los dos.
+    from . import motores as _motores
+    _familias = [getattr(getattr(s, "loaded", None), "familia", "") for s in active]
+    _model_names = ", ".join(
+        (f"{_motores.nombre_de(f)} «{s.alias}»" if f else f"«{s.alias}»")
+        for s, f in zip(active, _familias)) if active else "—"
+    _hay_detr = "rtdetr" in _familias
+    # Fotos donde el motor llego a su tope de detecciones por pase aun
+    # troceando. Se declara en Metodos porque cambia lo que significa el numero:
+    # en esas fotos el conteo es una cota inferior, no una medida.
+    _saturadas = sorted({Path(r.image_path).name for r in all_results
+                         if getattr(r, "saturado", False)})
+    _aviso_saturacion = (tr(
+        "En {n} imagen(es) el modelo devolvió el máximo de detecciones que admite "
+        "por pase aun troceando la foto, de modo que su conteo es una cota "
+        "inferior: {fotos}. ").format(
+            n=len(_saturadas), fotos=", ".join(_saturadas[:12])
+            + (" …" if len(_saturadas) > 12 else "")) if _saturadas else "")
     methods_para = (
         "<p><strong>" + tr("Resumen de la configuración empleada:") + "</strong></p>"
         "<blockquote style='border-left:3px solid var(--accent); margin:8px 0; "
         "padding:6px 14px; color:#424a53; background:#f6f8fa; border-radius:0 6px 6px 0;'>"
-        + tr("La detección automatizada se realizó con el modelo YOLO «{modelos}» "
+        + tr("La detección automatizada se realizó con {modelos} "
              "(Ultralytics {ul}) a una resolución de entrada de {imgsz} px, umbral de "
              "confianza {conf} y supresión de no-máximos con IoU {iou}. ").format(
                  modelos=_model_names, ul=_ul_ver, imgsz=p.imgsz,
                  conf=f"{p.conf:g}", iou=f"{p.iou_nms:g}")
+        + (tr("RT-DETR no aplica supresión de no-máximos: ese IoU solo se usó al "
+              "fusionar los recortes de las imágenes troceadas. ") if _hay_detr else "")
+        + _aviso_saturacion
         + (tr("Las métricas de error se calcularon contra anotación manual "
               "independiente, emparejando predicciones y etiquetas con IoU ≥ {iou}. "
               ).format(iou=f"{p.iou_tp:g}") if any_gt else "")
@@ -2673,7 +2694,7 @@ def _armar_informe(state, output_path: Path,
     # y anidarlos dentro de {tr(...)} pediria comillas del mismo tipo.
     _resumen_parrafo = tr(
         "Se analizaron <strong>{imgs} imágenes</strong> con <strong>{n} {modelos}</strong> "
-        "YOLO entrenado para detectar microplásticos de PET, PP y LDPE bajo "
+        "entrenado para detectar microplásticos de PET, PP y LDPE bajo "
         "fluorescencia Nile Red (254 nm). El total de detecciones fue "
         "<strong>{dets}</strong> con una confianza media de <strong>{conf}</strong>."
     ).format(imgs=total_imgs, n=len(active),
@@ -2761,7 +2782,7 @@ def _armar_informe(state, output_path: Path,
 {secciones_html}
 <footer>
   © Cristofher Ferrada · {tr('Generado por Poly-X')}<br>
-  {tr('Suite de detección de microplásticos por fluorescencia Nile Red (254 nm) e IA (YOLO v8/v11).')}
+  {tr('Suite de detección de microplásticos por fluorescencia Nile Red (254 nm) e IA (YOLO, RT-DETR).')}
 </footer>
 </div></body></html>
 """

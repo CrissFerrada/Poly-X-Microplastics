@@ -1,0 +1,15 @@
+# Motor opcional RF-DETR (Roboflow). Se instala con instalar_rfdetr.bat o
+# instalar_rfdetr_macOS.command, nunca con un "pip install rfdetr" suelto.
+#
+# Por que con restricciones: rfdetr[train] sube por su cuenta numpy a 2.x y
+# OpenCV a 5.x. Ultralytics 8.3.40 se rompe con numpy 2 (np.trapz al validar),
+# asi que se instala atado a las versiones de requirements.txt. roboflow trae
+# ademas opencv-python-headless: se fija en la misma version que opencv-python
+# para que los dos paquetes no se pisen el modulo cv2 con builds distintos.
+-c requirements.txt
+opencv-python-headless==4.10.0.84
+# pyarrow 20+ exige numpy 2 AL IMPORTAR, aunque al instalar no lo declara: el
+# entrenamiento de RF-DETR moria en la primera validacion ("pyarrow requires
+# NumPy 2.0 or newer"). Lo arrastra vernier, el evaluador COCO por defecto.
+pyarrow<20
+rfdetr[train]==1.11.2

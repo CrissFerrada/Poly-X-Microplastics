@@ -14,6 +14,7 @@ from ...core import theme as T
 from ...core import iconos
 from ...core.paths import DEFAULT_MODEL
 from ...core.yolo_wrap import YoloModel
+from ...core import motores
 from ...core.i18n import tr
 
 
@@ -83,7 +84,7 @@ class _ModelSlotCard(QFrame):
     def _browse(self):
         f, _ = QFileDialog.getOpenFileName(
             self, "Seleccionar modelo YOLO (.pt)", "",
-            "Pesos PyTorch (*.pt);;Todos (*.*)"
+            motores.FILTRO_PESOS + ";;Todos (*.*)"
         )
         if f:
             self.ed_path.setText(f)

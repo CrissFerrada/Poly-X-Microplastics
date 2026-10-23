@@ -11,7 +11,7 @@ DESCRIPCION = ("Complete Poly-X manual: step-by-step installation from GitHub on
 SELLO = "User manual · v2.0.0"
 TITULO_H1 = 'Poly-X <em>analytics</em>'
 BAJADA = ("Detection, sizing and classification of microplastics by Nile Red "
-          "fluorescence under UV light, with YOLO v8/v11 models. From the GitHub "
+          "fluorescence under UV light, with YOLO, RT-DETR and RF-DETR. From the GitHub "
           "download to a publication-ready report.")
 META = ("<b>Cristofher Ferrada</b> · PhD (c) in Chemistry<br>"
         "Environmental Chemistry Laboratory · Pontificia Universidad Católica de Valparaíso<br>"
@@ -181,7 +181,7 @@ SECCIONES = [
 <p>Poly-X is a desktop program that <b>counts, measures and classifies
 microplastics</b> in microscope photographs. Particles are stained with
 <b>Nile Red</b> and photographed under <b>254 nm UV light</b>: each polymer emits
-with a distinct colour and brightness, and a <b>YOLO v8/v11</b> detection model
+with a distinct colour and brightness, and a detection model (<b>YOLO</b>, <b>RT-DETR</b> or <b>RF-DETR</b>)
 works on that emission, locating each particle, assigning it a class and
 returning its size in micrometres.</p>
 
@@ -193,7 +193,7 @@ and figures already assembled.</p>
   <div class="mod"><span class="ic">🔬</span><b>Detector</b>
     <span>Analyses whole folders with a trained model and produces the report.</span></div>
   <div class="mod"><span class="ic">🎯</span><b>Trainer</b>
-    <span>Trains YOLO v8 and v11 models with live curves and a dataset audit.</span></div>
+    <span>Trains and compares five detection architectures with live curves and a dataset audit.</span></div>
   <div class="mod"><span class="ic">🏷</span><b>Labeller</b>
     <span>Annotates particles in YOLO format, with automatic pre-annotation.</span></div>
   <div class="mod"><span class="ic">📐</span><b>Viewer</b>
@@ -891,12 +891,46 @@ the <a href="#etiquetador">Labeller</a> produces — and a fair amount of patien
 <h3>Model</h3>
 [[fig:ui/11_ent_modelo|The <b>Model</b> tab. YOLO v8 or v11 family, sizes from nano to xlarge, or
 your own starting weights.]]
-<p>Supports <b>YOLO v8 and v11</b>, in every size. There is a checkbox to
-<b>train v8 and v11 with the same configuration</b>: both runs reuse identical
-<code>imgsz</code>, <code>batch</code>, epochs, seed and augmentation. That is what
-allows a difference in metrics to be attributed to the architecture rather than to
-the hyperparameters. They run in sequence because they share the GPU, and when
-they finish the log summarises the comparison.</p>
+<p>It offers five <b>detection engines</b>. All of them train on the same
+YOLO-format dataset, so they can be compared without converting anything:</p>
+<table>
+  <tr><th>Engine</th><th>What it is</th><th>Keep in mind</th></tr>
+  <tr><td><b>YOLOv8</b></td><td>The project baseline</td><td>—</td></tr>
+  <tr><td><b>YOLO11</b></td><td>Successor to v8, with fewer parameters per size</td><td>—</td></tr>
+  <tr><td><b>YOLOv8-P2</b></td><td>YOLOv8 with an extra high-resolution head
+      (stride 4) for tiny particles</td><td>Slower and uses more memory. Starts from the
+      v8 weights: the new head is trained from scratch</td></tr>
+  <tr><td><b>RT-DETR</b></td><td>Transformer without non-maximum suppression</td><td>Sizes
+      <code>l</code> and <code>x</code> only (the others fall back to <code>l</code>). Its
+      memory grows with the number of particles per image: lower the batch for dense plates</td></tr>
+  <tr><td><b>RF-DETR</b></td><td>Roboflow transformer with a DINOv2 backbone</td><td>Optional:
+      installed separately with <code>instalar_rfdetr.bat</code> (or
+      <code>instalar_rfdetr_macOS.command</code>). Saves <code>.pth</code> instead of
+      <code>.pt</code>, shows no live curves and does not pick <code>best_real.pt</code>; its
+      resolution must be a multiple of 32</td></tr>
+</table>
+<p>The <b>Train several architectures with the same settings</b> checkbox trains
+the ones you tick, one after another, with identical <code>imgsz</code>,
+<code>batch</code>, epochs, seed and augmentation. That is what allows a difference
+in metrics to be attributed to the architecture rather than to the
+hyperparameters. They run in sequence because they share the GPU, and when they
+finish the log summarises the comparison.</p>
+
+<div class="aviso warn">
+  <span class="et">DETR models are capped at 300 detections per pass</span>
+  <p>RT-DETR and RF-DETR do not use NMS: they propose a fixed number of queries
+  (300) and keep those above the threshold. A dense plate can hold more particles
+  than that. If a pass returns all 300, Poly-X re-analyses the photo in tiles,
+  without you doing anything. If a tile still saturates, the report states it in
+  Methods and warns that the count for those photos is a <b>lower bound</b>.</p>
+</div>
+
+<div class="aviso warn">
+  <span class="et">RF-DETR is not installed with a bare «pip install»</span>
+  <p>On its own it would upgrade numpy to 2.x, and Ultralytics 8.3.40 breaks with
+  numpy 2 when validating the first epoch. The installer pins it to the project
+  versions and checks at the end that numpy is still 1.x.</p>
+</div>
 
 <h3>Dataset</h3>
 [[fig:ui/12_ent_dataset|The <b>Dataset</b> tab. Loading <code>data.yaml</code> with automatic split
@@ -1392,8 +1426,8 @@ be read from the drawing comes out as SVG, PDF and PNG, without a data CSV.</p>
       Reviewers ask for it, and without that figure there is nothing to compare the
       model's error against.</li>
   <li><b>Trainer</b> → <b>Dataset</b>: pass the audit before training.</li>
-  <li><b>Train</b>. If you are comparing architectures, use the <b>v8 and v11 with
-      the same configuration</b> checkbox.</li>
+  <li><b>Train</b>. If you are comparing architectures, use the <b>several
+      architectures with the same settings</b> checkbox.</li>
   <li>Keep <code>best_real.pt</code> if your dataset mixes laboratory and real
       material.</li>
   <li><b>Detector</b> → analyse and compare against your manual count.</li>

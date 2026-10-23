@@ -8,6 +8,7 @@ from PySide6.QtCore import QThread, Signal
 
 from .state import TrainerState, EpochMetrics
 from .dominio import elegir_mejor_en_real
+from ..core import motores
 
 
 class TrainerRunner(QThread):
@@ -46,8 +47,10 @@ class TrainerRunner(QThread):
         self.log_line.emit(cab)
         self.log_line.emit("  " + "-" * (len(cab) - 2))
         for c in comparativa:
-            fila = (f"  {c['familia']:<10}{c['peso_base']:<16}"
-                    f"{c['map50']:>9.4f}{c['epoca_mejor']:>8}")
+            # RF-DETR no reporta mAP por epoca a Poly-X: su celda queda en guion.
+            m50 = f"{c['map50']:>9.4f}" if c.get("map50") is not None else f"{'-':>9}"
+            ep = f"{c['epoca_mejor']:>8}" if c.get("epoca_mejor") is not None else f"{'-':>8}"
+            fila = f"  {c['familia']:<10}{c['peso_base']:<16}{m50}{ep}"
             if hay_real:
                 fr = c.get("f1_real")
                 fila += f"{fr:>10.4f}" if fr is not None else f"{'-':>10}"
@@ -60,7 +63,16 @@ class TrainerRunner(QThread):
         etiqueta = ("F1 en sedimento real" if hay_real else "mAP50")
         utiles = [c for c in comparativa if c.get(clave) is not None]
         if not utiles:
-            utiles, clave, etiqueta = comparativa, "map50", "mAP50"
+            clave, etiqueta = "map50", "mAP50"
+            utiles = [c for c in comparativa if c.get(clave) is not None]
+        if len(utiles) < 2:
+            self.log_line.emit("")
+            self.log_line.emit(
+                "  No hay dos modelos con la misma metrica para declarar un ganador:")
+            self.log_line.emit(
+                "  comparalos en el Detector, sobre las mismas imagenes con GT.")
+            self.log_line.emit("=" * 60)
+            return
         mejor = max(utiles, key=lambda c: c[clave])
         peor = min(utiles, key=lambda c: c[clave])
         d = mejor[clave] - peor[clave]
@@ -79,6 +91,31 @@ class TrainerRunner(QThread):
         self.log_line.emit(
             "  Los pesos quedaron en runs_train/; comparalos en la pestana Comparar.")
         self.log_line.emit("=" * 60)
+
+    def _entrenar_rfdetr(self, familia, mdl, ds, p, proj_dir, nombre, weights) -> dict:
+        """Entrena RF-DETR, que no pasa por Ultralytics.
+
+        Usa los mismos imgsz, batch y epocas que el resto de la comparacion,
+        pero no emite curvas en vivo ni reelige best_real.pt: su bucle de
+        entrenamiento es otro y no expone esos ganchos. El log lo dice para que
+        la ausencia no parezca un fallo.
+        """
+        from ..core import motor_rfdetr
+        self.log_line.emit(f"[INFO] Motor {motores.nombre_de(familia)} ({weights})")
+        if not motor_rfdetr.disponible():
+            self.log_line.emit("[ERROR] " + motor_rfdetr.MENSAJE_NO_INSTALADO)
+            return {"familia": familia, "peso_base": weights, "run": nombre,
+                    "best": "", "map50": None, "epoca_mejor": None, "f1_real": None}
+        self.log_line.emit(
+            "[INFO] RF-DETR no emite curvas en vivo ni elige best_real.pt; "
+            "el progreso sale en este log.")
+        best = motor_rfdetr.entrenar(
+            ds.yaml_path, mdl.size, proj_dir / nombre, epochs=int(p.epochs),
+            batch=int(p.batch), imgsz=int(p.imgsz), log=self.log_line.emit)
+        self.log_line.emit(f"[INFO] Pesos de RF-DETR: {best}")
+        return {"familia": familia, "peso_base": weights, "run": nombre,
+                "best": str(best), "map50": None, "epoca_mejor": None,
+                "f1_real": None}
 
     def run(self):
         try:
@@ -273,8 +310,22 @@ class TrainerRunner(QThread):
                         f"[INFO] Modelo {i} de {len(familias)}: {familia} ({weights})")
                     self.log_line.emit("=" * 60)
 
+                if familia in motores.FUERA_DE_ULTRALYTICS and not usa_custom:
+                    comparativa.append(self._entrenar_rfdetr(
+                        familia, mdl, ds, p, proj_dir, nombre, weights))
+                    if comparativa[-1]["best"]:
+                        ultimo_best = comparativa[-1]["best"]
+                    continue
+
                 self.log_line.emit(f"[INFO] Cargando modelo base: {weights}")
-                model = YOLO(weights)
+                if usa_custom:
+                    if Path(weights).suffix.lower() == ".pth":
+                        raise ValueError(
+                            "Continuar un entrenamiento de RF-DETR desde un .pth no "
+                            "está soportado: deja vacío 'Pesos personalizados'.")
+                    model, _ = motores.cargar_ultralytics(weights)
+                else:
+                    model = motores.modelo_para_entrenar(familia, mdl.size)
                 model.add_callback("on_train_start", _on_train_start)
                 model.add_callback("on_train_epoch_end", _on_train_epoch_end)
                 model.add_callback("on_train_end", _on_train_end)
