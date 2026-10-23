@@ -1219,6 +1219,61 @@ EN: dict[str, str] = {
         'Tables and figures are numbered in the report, matching the file names.',
     'Abrir carpeta de exportación': 'Open export folder',
     'Tablas y figuras en {}': 'Tables and figures in {}',
+    # ── Componentes opcionales ──
+    'Componentes opcionales':
+        'Optional components',
+    'Este archivo es un modelo RF-DETR, y ese motor no está instalado.\n\n¿Instalarlo ahora? Tarda unos minutos y después hay que volver a abrir el Detector.':
+        'This file is an RF-DETR model, and that engine is not installed.\n\nInstall it now? It takes a few minutes, and the Detector must be reopened afterwards.',
+    'Falta RF-DETR':
+        'RF-DETR missing',
+    'Instalación en curso':
+        'Installation in progress',
+    'Instalando… puede tardar varios minutos. No cierres Poly-X.':
+        'Installing… this can take several minutes. Do not close Poly-X.',
+    'Instalar':
+        'Install',
+    'Instalar RF-DETR…':
+        'Install RF-DETR…',
+    'Instalar {}':
+        'Install {}',
+    'Instalar…':
+        'Install…',
+    'La instalación falló (código {}). Revisa el registro de arriba.':
+        'The installation failed (code {}). Check the log above.',
+    'La instalación todavía está corriendo. Si la detienes, el componente puede quedar a medio instalar.\n\n¿Detenerla igual?':
+        'The installation is still running. If you stop it, the component may be left half-installed.\n\nStop it anyway?',
+    'Listo para instalar.':
+        'Ready to install.',
+    'Motor de detección de Roboflow (transformer con backbone DINOv2). Hace falta para entrenar o usar modelos RF-DETR (.pth).':
+        'Roboflow detection engine (transformer with a DINOv2 backbone). Needed to train or use RF-DETR models (.pth).',
+    'No se pudo ejecutar Python: {}':
+        'Python could not be run: {}',
+    'Paquetes que Poly-X no trae de fábrica. Se instalan atados a las versiones del programa, así que no rompen lo que ya funciona.':
+        "Packages that Poly-X does not ship with. They are installed pinned to the program's versions, so they do not break what already works.",
+    'RF-DETR no está instalado. Instálalo con el botón de abajo y vuelve a abrir el Entrenador.':
+        'RF-DETR is not installed. Install it with the button below and reopen the Trainer.',
+    'Reinstalar':
+        'Reinstall',
+    'Reinstalar…':
+        'Reinstall…',
+    'Se descargan {}. Tu instalación actual no cambia: las versiones quedan atadas a las de Poly-X.':
+        'This downloads {}. Your current installation does not change: versions are pinned to those of Poly-X.',
+    'Se instaló, pero la verificación falló. No entrenes hasta revisarlo: copia el registro y avisa.':
+        'It was installed, but the check failed. Do not train until it is reviewed: copy the log and report it.',
+    'Verificando que todo siga en orden…':
+        'Checking that everything is still in order…',
+    'falta instalar RF-DETR':
+        'RF-DETR needs installing',
+    'instalado':
+        'installed',
+    'no instalado':
+        'not installed',
+    'unos 50 paquetes, varios cientos de MB':
+        'about 50 packages, several hundred MB',
+    '{} quedó instalado. Cierra y vuelve a abrir este módulo para usarlo.':
+        '{} is installed. Close and reopen this module to use it.',
+    '{} ya está instalado. Puedes reinstalarlo si algo falla.':
+        '{} is already installed. You can reinstall it if something fails.',
     # ── Motores de detección ──
     'RT-DETR no aplica supresión de no-máximos: ese IoU solo se usó al fusionar los recortes de las imágenes troceadas. ':
         'RT-DETR does not apply non-maximum suppression: that IoU was only used to merge the tiles of split images. ',

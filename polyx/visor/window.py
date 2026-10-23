@@ -886,7 +886,7 @@ class VisorWindow(QMainWindow):
         if ev.mimeData().hasUrls():
             for u in ev.mimeData().urls():
                 p = u.toLocalFile().lower()
-                if p.endswith(".pt") or any(p.endswith(e) for e in
+                if motores.es_peso(p) or any(p.endswith(e) for e in
                         (".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif")):
                     ev.acceptProposedAction()
                     return
@@ -895,7 +895,7 @@ class VisorWindow(QMainWindow):
     def dropEvent(self, ev):
         for url in ev.mimeData().urls():
             path = Path(url.toLocalFile())
-            if path.suffix.lower() == ".pt":
+            if motores.es_peso(path):
                 try:
                     from ..core.yolo_wrap import YoloModel
                     self.state.model = YoloModel(str(path))

@@ -103,6 +103,15 @@ class ModeloPage(TrainerPage):
         self.lbl_familia.setStyleSheet(f"color: {T.INK3}; font-size: 10pt; border: none;")
         l2.addWidget(self.lbl_familia)
 
+        fila_rf = QHBoxLayout()
+        self.btn_instalar_rf = QPushButton(tr("Instalar RF-DETR…"))
+        self.btn_instalar_rf.setCursor(Qt.PointingHandCursor)
+        self.btn_instalar_rf.clicked.connect(self._instalar_rfdetr)
+        self.btn_instalar_rf.setVisible(False)
+        fila_rf.addWidget(self.btn_instalar_rf)
+        fila_rf.addStretch(1)
+        l2.addLayout(fila_rf)
+
         # ── Comparar arquitecturas ──
         self.chk_comparar = QCheckBox(
             tr("Entrenar varias arquitecturas con la misma configuración"))
@@ -187,6 +196,11 @@ class ModeloPage(TrainerPage):
         self._actualizar_aviso_comparar()
         self.state.model_changed.emit()
 
+    def _instalar_rfdetr(self):
+        from ...core.instalador_ui import ofrecer_instalacion
+        ofrecer_instalacion("rfdetr", self)
+        self._actualizar_aviso_comparar()
+
     def _on_familias_comparar(self):
         self.state.model.familias_comparar = [
             c for c, chk in self.chk_familias.items() if chk.isChecked()]
@@ -224,10 +238,14 @@ class ModeloPage(TrainerPage):
         # al pulsar Entrenar.
         quiere_rf = ("rfdetr" in mdl.familias_a_entrenar())
         from ...core import motor_rfdetr
-        if quiere_rf and not motor_rfdetr.disponible():
+        falta_rf = quiere_rf and not motor_rfdetr.disponible()
+        if falta_rf:
             texto += (f"<br><span style='color:{T.ERR_TX}'>⚠ "
-                      + tr(motor_rfdetr.MENSAJE_NO_INSTALADO) + "</span>")
+                      + tr("RF-DETR no está instalado. Instálalo con el botón de "
+                           "abajo y vuelve a abrir el Entrenador.") + "</span>")
         self.lbl_familia.setText(texto)
+        if hasattr(self, "btn_instalar_rf"):
+            self.btn_instalar_rf.setVisible(falta_rf)
         if self.chk_comparar.isChecked():
             elegidas = mdl.familias_a_entrenar()
             if len(elegidas) < 2:

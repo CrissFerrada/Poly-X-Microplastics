@@ -94,7 +94,7 @@ class _ModelSlotCard(QFrame):
     def dragEnterEvent(self, ev: QDragEnterEvent):
         if ev.mimeData().hasUrls():
             urls = ev.mimeData().urls()
-            if any(u.toLocalFile().lower().endswith(".pt") for u in urls):
+            if any(motores.es_peso(u.toLocalFile()) for u in urls):
                 ev.acceptProposedAction()
                 self.setStyleSheet(
                     f"QFrame {{ background: #ddf4ff; border: 2px solid {T.ACCENT}; "
@@ -114,7 +114,7 @@ class _ModelSlotCard(QFrame):
         )
         for url in ev.mimeData().urls():
             path = url.toLocalFile()
-            if path.lower().endswith(".pt"):
+            if motores.es_peso(path):
                 self.ed_path.setText(path)
                 self._emit_change()
                 break
@@ -189,10 +189,19 @@ class ModelosPage(DetectorPage):
         slot.alias = alias or tr("Modelo {n}").format(n=idx + 1)
         if path_str:
             p = Path(path_str)
-            if p.exists() and p.suffix.lower() == ".pt":
+            if p.exists() and motores.es_peso(p) and not self._falta_rfdetr(p):
                 slot.path = p
                 slot.loaded = None  # se cargará perezosamente al ejecutar
                 self.slot_cards[idx].set_loaded_status("✓ archivo válido", T.OK)
+            elif p.exists() and motores.es_peso(p):
+                # Un .pth sin RF-DETR instalado: el archivo esta bien, falta el
+                # motor. Se ofrece instalarlo en vez de dar un error opaco al
+                # ejecutar.
+                slot.path = None
+                slot.loaded = None
+                self.slot_cards[idx].set_loaded_status(
+                    "✗ " + tr("falta instalar RF-DETR"), T.ERR)
+                self._ofrecer_rfdetr()
             else:
                 slot.path = None
                 slot.loaded = None
@@ -202,6 +211,21 @@ class ModelosPage(DetectorPage):
             slot.loaded = None
             self.slot_cards[idx].set_loaded_status("", T.INK3)
         self.state.models_changed.emit()
+
+    @staticmethod
+    def _falta_rfdetr(p: Path) -> bool:
+        from ...core import motor_rfdetr
+        return motor_rfdetr.es_peso_rfdetr(p) and not motor_rfdetr.disponible()
+
+    def _ofrecer_rfdetr(self):
+        r = QMessageBox.question(
+            self, tr("Falta RF-DETR"),
+            tr("Este archivo es un modelo RF-DETR, y ese motor no está instalado.\n\n"
+               "¿Instalarlo ahora? Tarda unos minutos y después hay que volver a "
+               "abrir el Detector."))
+        if r == QMessageBox.Yes:
+            from ...core.instalador_ui import ofrecer_instalacion
+            ofrecer_instalacion("rfdetr", self)
 
     def _load_default(self):
         if not DEFAULT_MODEL.exists():

@@ -187,6 +187,14 @@ def cargar(ruta: str | Path) -> Tuple[object, str]:
     return cargar_ultralytics(ruta)
 
 
+# Extensiones que Poly-X sabe abrir como peso de un modelo.
+EXTENSIONES_PESO = (".pt", ".pth")
+
+
+def es_peso(ruta: str | Path) -> bool:
+    return Path(ruta).suffix.lower() in EXTENSIONES_PESO
+
+
 # Filtro de los dialogos de abrir pesos, igual en los cuatro modulos.
 FILTRO_PESOS = "Pesos de modelo (*.pt *.pth);;YOLO / RT-DETR (*.pt);;RF-DETR (*.pth)"
 

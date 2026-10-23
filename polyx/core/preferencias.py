@@ -9,6 +9,9 @@ dejar que el usuario lo descubra:
 * **Idioma** — no se puede aplicar en caliente: los textos se fijan al
   construir cada widget. Los modulos que se abran despues salen traducidos.
 * **Animacion** — inmediata en todas partes; solo hay que repintar.
+
+Ademas lista los **componentes opcionales** (``core.componentes``) con su boton
+de instalar.
 """
 from __future__ import annotations
 
@@ -189,6 +192,14 @@ class DialogoPreferencias(QDialog):
         raiz.addWidget(self._pista(
             tr("Apágalo si el movimiento te molesta o si el equipo va justo. "
                "El panel queda en un fotograma fijo.")))
+
+        raiz.addSpacing(16)
+        raiz.addWidget(self._titulo(tr("Componentes opcionales")))
+        raiz.addWidget(self._pista(
+            tr("Paquetes que Poly-X no trae de fábrica. Se instalan atados a las "
+               "versiones del programa, así que no rompen lo que ya funciona.")))
+        from .instalador_ui import SeccionComponentes
+        raiz.addWidget(SeccionComponentes(self))
 
         raiz.addSpacing(18)
         pie = QHBoxLayout()

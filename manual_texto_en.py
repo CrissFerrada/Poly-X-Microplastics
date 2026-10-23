@@ -904,8 +904,8 @@ YOLO-format dataset, so they can be compared without converting anything:</p>
       <code>l</code> and <code>x</code> only (the others fall back to <code>l</code>). Its
       memory grows with the number of particles per image: lower the batch for dense plates</td></tr>
   <tr><td><b>RF-DETR</b></td><td>Roboflow transformer with a DINOv2 backbone</td><td>Optional:
-      installed separately with <code>instalar_rfdetr.bat</code> (or
-      <code>instalar_rfdetr_macOS.command</code>). Saves <code>.pth</code> instead of
+      installed with the <b>Install RF-DETR…</b> button that appears here when you pick it,
+      or from <b>Preferences → Optional components</b>. Saves <code>.pth</code> instead of
       <code>.pt</code>, shows no live curves and does not pick <code>best_real.pt</code>; its
       resolution must be a multiple of 32</td></tr>
 </table>
@@ -931,6 +931,19 @@ finish the log summarises the comparison.</p>
   numpy 2 when validating the first epoch. The installer pins it to the project
   versions and checks at the end that numpy is still 1.x.</p>
 </div>
+
+<h3>Optional components</h3>
+<p>Whatever Poly-X does not ship with is installed from the interface itself,
+without opening a console: <b>Preferences → Optional components</b> lists each
+component with its status and an <b>Install…</b> button. The Trainer offers the
+same button when you pick RF-DETR, and the Detector offers it if you load a
+<code>.pth</code> model without it installed.</p>
+<p>The installation window shows the pip log as it goes and, when done,
+<b>checks in a fresh process</b> that the component loads and that numpy is still
+1.x. If the check fails, it is not reported as installed. Afterwards you need to
+<b>close and reopen the module</b>. If you prefer the console,
+<code>instalar_rfdetr.bat</code> (or <code>instalar_rfdetr_macOS.command</code>)
+does exactly the same.</p>
 
 <h3>Dataset</h3>
 [[fig:ui/12_ent_dataset|The <b>Dataset</b> tab. Loading <code>data.yaml</code> with automatic split

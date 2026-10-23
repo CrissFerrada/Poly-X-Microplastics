@@ -350,8 +350,9 @@ fotograma fijo— si el movimiento molesta o si el equipo va justo.
 
 Dependencias principales: `PySide6 6.7`, `Ultralytics 8.3`, `OpenCV 4.10`, `NumPy 1.26`, `Matplotlib 3.9`
 
-> **RF-DETR es opcional.** Se instala con `instalar_rfdetr.bat` (Windows) o
-> `instalar_rfdetr_macOS.command` (Mac), nunca con un `pip install rfdetr` suelto: por
+> **RF-DETR es opcional.** Se instala desde la interfaz, en **Preferencias →
+> Componentes opcionales** (o con el botón que aparece en el Entrenador al elegirlo),
+> o por consola con `instalar_rfdetr.bat` / `instalar_rfdetr_macOS.command`. Nunca con un `pip install rfdetr` suelto: por
 > su cuenta subiría numpy a 2.x, y Ultralytics 8.3.40 se rompe con numpy 2.
 > `requirements-rfdetr.txt` lo ata a las versiones del proyecto.
 

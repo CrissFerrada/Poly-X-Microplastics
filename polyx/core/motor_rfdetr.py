@@ -44,6 +44,9 @@ _PASO_RESOLUCION = 32   # patch_size (16) x num_windows (2) en todas las tallas
 
 def disponible() -> bool:
     """¿Está instalado el paquete ``rfdetr``?"""
+    # Se instala desde la propia interfaz, en otro proceso: sin invalidar la
+    # cache de importacion no se veria hasta reiniciar.
+    importlib.invalidate_caches()
     return importlib.util.find_spec("rfdetr") is not None
 
 

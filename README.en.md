@@ -316,8 +316,9 @@ frame, if the motion bothers you or the machine is struggling.
 Main dependencies: `PySide6 6.7`, `Ultralytics 8.3`, `OpenCV 4.10`, `NumPy 1.26`,
 `Matplotlib 3.9`
 
-> **RF-DETR is optional.** Install it with `instalar_rfdetr.bat` (Windows) or
-> `instalar_rfdetr_macOS.command` (Mac), never with a bare `pip install rfdetr`: on its
+> **RF-DETR is optional.** Install it from the interface, in **Preferences →
+> Optional components** (or with the button the Trainer shows when you pick it), or
+> from the console with `instalar_rfdetr.bat` / `instalar_rfdetr_macOS.command`. Never with a bare `pip install rfdetr`: on its
 > own it would upgrade numpy to 2.x, and Ultralytics 8.3.40 breaks with numpy 2.
 > `requirements-rfdetr.txt` pins it to the project versions.
 

@@ -30,6 +30,8 @@ polyx/                    # Código fuente
 │   ├── yolo_wrap.py      # Wrapper YOLO (Detection, YoloModel)
 │   ├── motores.py        # Motores: v8, v11, v8-p2, rtdetr, rfdetr (carga y entrenamiento)
 │   ├── motor_rfdetr.py   # RF-DETR opcional, con la interfaz de Ultralytics
+│   ├── componentes.py    # Registro de componentes opcionales (requisitos + verificación)
+│   ├── instalador_ui.py  # Diálogo que los instala con pip (QProcess) y sección de Preferencias
 │   ├── exportables.py    # Tablas y figuras del informe: numeradas y exportables
 │   ├── metrics.py        # TP/FP/FN, IoU, matriz de confusión
 │   ├── widgets.py        # LogoBadge, HLine, custom widgets
@@ -517,7 +519,11 @@ motor nuevo sin tocar su propio código.
 > trocea la foto. Si un tile también satura, `ImageResult.saturado` queda en
 > True y el informe declara en Métodos que ese conteo es una cota inferior.
 
-> **RF-DETR se instala solo con `requirements-rfdetr.txt`** (`instalar_rfdetr.bat`).
+> **Componentes opcionales.** Uno nuevo es una entrada en `componentes.COMPONENTES`
+> (archivo de requisitos, módulo, verificación): el diálogo, Preferencias y los
+> botones lo toman solos. pip corre con el `python.exe` de al lado de `pythonw.exe`.
+
+> **RF-DETR se instala solo con `requirements-rfdetr.txt`** (botón en la interfaz o `instalar_rfdetr.bat`).
 > `rfdetr[train]` sube numpy a 2.x y OpenCV a 5.x, y `pyarrow` ≥ 20 exige numpy 2
 > *al importar* sin declararlo: el entrenamiento moría en la primera validación.
 > El archivo fija `-c requirements.txt`, `opencv-python-headless==4.10.0.84` y
