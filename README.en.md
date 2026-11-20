@@ -534,6 +534,8 @@ are not out yet.
 
 ## Licence and contact
 
+Poly-X is released under the [MIT License](LICENSE): every version, past and future, including those published before the LICENSE file was added. Redistribution of the software and of derivative works is permitted under the same terms.
+
 **Cristofher Ferrada** — PhD (c) in Chemistry, Pontificia Universidad Católica de
 Valparaíso, 2026.
 
