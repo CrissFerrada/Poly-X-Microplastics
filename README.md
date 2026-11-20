@@ -630,6 +630,8 @@ resultados que aún no han salido.
 
 ## Licencia y contacto
 
+Poly-X se distribuye bajo la [licencia MIT](LICENSE): todas sus versiones, anteriores y posteriores, incluidas las publicadas antes de agregar el archivo LICENSE. Se autoriza su redistribución y la de trabajos derivados bajo los mismos términos.
+
 **Cristofher Ferrada**  
 Laboratorio de Química Ambiental · Pontificia Universidad Católica de Valparaíso  
 [cristofher.ferrada@pucv.cl](mailto:cristofher.ferrada@pucv.cl)
